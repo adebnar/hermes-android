@@ -1,12 +1,14 @@
 package com.hermes.client.data.network
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -17,12 +19,25 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.min
+import kotlin.math.pow
 
 class GatewayRpcException(val code: Int, message: String) : Exception(message)
+
+data class BackoffPolicy(
+    val baseMs: Long = 500,
+    val factor: Double = 2.0,
+    val maxMs: Long = 10_000,
+) {
+    fun delayFor(attempt: Int): Long =
+        min(maxMs, (baseMs * factor.pow(attempt)).toLong())
+}
 
 open class HermesGatewayClient(
     private val okHttp: OkHttpClient,
     private val json: Json,
+    private val scope: CoroutineScope,
+    private val backoff: BackoffPolicy = BackoffPolicy(),
     private val wsUrlProvider: () -> String,
 ) {
     private val _events = MutableSharedFlow<ServerEvent>(extraBufferCapacity = 256)
@@ -36,6 +51,7 @@ open class HermesGatewayClient(
 
     @Volatile private var ws: WebSocket? = null
     @Volatile protected var manuallyClosed = false
+    private var attempt = 0
 
     fun connect() {
         manuallyClosed = false
@@ -50,6 +66,7 @@ open class HermesGatewayClient(
 
     private val listener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            attempt = 0
             _state.value = ConnectionState.Connected
         }
 
@@ -75,8 +92,16 @@ open class HermesGatewayClient(
 
     protected open fun onSocketClosed(reason: String) {
         failAllPending(reason)
-        if (!manuallyClosed) _state.value = ConnectionState.Error(reason)
-        else _state.value = ConnectionState.Disconnected
+        if (manuallyClosed) {
+            _state.value = ConnectionState.Disconnected
+            return
+        }
+        _state.value = ConnectionState.Reconnecting
+        val delayMs = backoff.delayFor(attempt++)
+        scope.launch {
+            kotlinx.coroutines.delay(delayMs)
+            if (!manuallyClosed) openSocket()
+        }
     }
 
     private fun failAllPending(reason: String) {
@@ -99,6 +124,7 @@ open class HermesGatewayClient(
 
     fun close() {
         manuallyClosed = true
+        failAllPending("client closing")
         ws?.close(1000, "client closing")
         ws = null
         _state.value = ConnectionState.Disconnected

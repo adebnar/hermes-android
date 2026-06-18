@@ -1,7 +1,9 @@
 package com.hermes.client.data.network
 
 import app.cash.turbine.test
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -26,6 +28,9 @@ import java.util.concurrent.TimeUnit
 class HermesGatewayClientTest {
     @get:Rule val serverRule = MockWebServerRule()
     private val json = Json { ignoreUnknownKeys = true }
+    // A long-lived scope shared by all tests in this class; real Dispatchers.IO threads
+    // are fine here because OkHttp itself runs on real threads.
+    private val testScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Creates an OkHttpClient and HermesGatewayClient for one test.
@@ -37,7 +42,7 @@ class HermesGatewayClientTest {
         val okHttp = OkHttpClient.Builder()
             .readTimeout(10, TimeUnit.SECONDS)
             .build()
-        return HermesGatewayClient(okHttp, json) { "$base?token=t" } to okHttp
+        return HermesGatewayClient(okHttp, json, testScope) { "$base?token=t" } to okHttp
     }
 
     /**
