@@ -6,29 +6,43 @@ import kotlinx.serialization.Serializable
 @Serializable data class StatusDto(val ok: Boolean = true)
 
 @Serializable data class SessionDto(
-    @SerialName("session_id") val sessionId: String,
+    // The gateway returns the session id under "id" (not "session_id").
+    @SerialName("id") val sessionId: String,
     val title: String? = null,
     val model: String? = null,
     val provider: String? = null,
-    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("last_active") val lastActive: Double? = null,
     @SerialName("message_count") val messageCount: Int = 0,
     val profile: String? = null,
 )
 @Serializable data class SessionListDto(val sessions: List<SessionDto> = emptyList())
 
 @Serializable data class MessageDto(
-    val id: String? = null,
+    // The gateway returns a numeric message id, and content may be null (e.g. tool-only turns).
+    val id: Int? = null,
     val role: String,
-    val content: String = "",
+    val content: String? = null,
 )
 @Serializable data class MessagesDto(val messages: List<MessageDto> = emptyList())
 
-@Serializable data class ProfileDto(val name: String, val active: Boolean = false)
+@Serializable data class ProfileDto(
+    val name: String,
+    @SerialName("is_default") val isDefault: Boolean = false,
+)
 @Serializable data class ProfilesDto(val profiles: List<ProfileDto> = emptyList())
 
-@Serializable data class ModelOptionDto(
+/** Flattened, UI-facing option (provider slug + fully-qualified model string). */
+data class ModelOptionDto(
     val provider: String,
     val model: String,
     val label: String? = null,
 )
-@Serializable data class ModelOptionsDto(val options: List<ModelOptionDto> = emptyList())
+
+/** Real /api/model/options shape: providers each carry a list of model-name strings. */
+@Serializable data class ModelProviderDto(
+    val slug: String,
+    val name: String? = null,
+    @SerialName("is_current") val isCurrent: Boolean = false,
+    val models: List<String> = emptyList(),
+)
+@Serializable data class ModelOptionsDto(val providers: List<ModelProviderDto> = emptyList())

@@ -14,7 +14,7 @@ class MappersTest {
     }
 
     @Test fun message_dto_maps_role_and_text() {
-        val m = MessageDto(id = "m1", role = "assistant", content = "hello").toDomain()
+        val m = MessageDto(id = 1, role = "assistant", content = "hello").toDomain()
         assertEquals(Role.ASSISTANT, m.role)
         assertEquals("hello", m.text)
         assertEquals(false, m.isStreaming)

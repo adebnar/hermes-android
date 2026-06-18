@@ -17,9 +17,9 @@ class ChatReducerTest {
     @Test fun start_delta_complete_builds_one_assistant_message() {
         var s = ChatUiState.empty()
         s = reduce(s, ev("message.start") { put("message_id", "a1") })
-        s = reduce(s, ev("message.delta") { put("delta", "Hel") })
-        s = reduce(s, ev("message.delta") { put("delta", "lo") })
-        s = reduce(s, ev("message.complete") { put("content", "Hello") })
+        s = reduce(s, ev("message.delta") { put("text","Hel") })
+        s = reduce(s, ev("message.delta") { put("text","lo") })
+        s = reduce(s, ev("message.complete") { put("text","Hello") })
         assertEquals(1, s.messages.size)
         assertEquals(Role.ASSISTANT, s.messages[0].role)
         assertEquals("Hello", s.messages[0].text)
@@ -30,7 +30,7 @@ class ChatReducerTest {
     @Test fun tool_events_attach_to_current_turn() {
         var s = ChatUiState.empty()
         s = reduce(s, ev("message.start") { put("message_id", "a1") })
-        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("tool_name", "search") })
+        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("name","search") })
         s = reduce(s, ev("tool.complete") { put("tool_id", "t1"); put("result", "found") })
         val tools = s.messages.last().tools
         assertEquals(1, tools.size)
@@ -48,8 +48,8 @@ class ChatReducerTest {
     @Test fun thinking_delta_accumulates() {
         var s = ChatUiState.empty()
         s = reduce(s, ev("message.start") { put("message_id", "a1") })
-        s = reduce(s, ev("thinking.delta") { put("delta", "hmm ") })
-        s = reduce(s, ev("thinking.delta") { put("delta", "ok") })
+        s = reduce(s, ev("reasoning.delta") { put("text","hmm ") })
+        s = reduce(s, ev("reasoning.delta") { put("text","ok") })
         assertEquals("hmm ok", s.messages.last().thinking)
     }
 
@@ -57,8 +57,8 @@ class ChatReducerTest {
     @Test fun late_tool_complete_after_message_complete_is_not_dropped() {
         var s = ChatUiState.empty()
         s = reduce(s, ev("message.start") { put("message_id", "a1") })
-        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("tool_name", "search") })
-        s = reduce(s, ev("message.complete") { put("content", "done") })
+        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("name","search") })
+        s = reduce(s, ev("message.complete") { put("text","done") })
         // At this point the assistant message is no longer streaming.
         s = reduce(s, ev("tool.complete") { put("tool_id", "t1"); put("result", "done") })
         val tools = s.messages.last().tools
@@ -71,7 +71,7 @@ class ChatReducerTest {
     @Test fun markInterrupted_with_streaming_message() {
         var s = ChatUiState.empty()
         s = reduce(s, ev("message.start") { put("message_id", "a1") })
-        s = reduce(s, ev("message.delta") { put("delta", "partial") })
+        s = reduce(s, ev("message.delta") { put("text","partial") })
         assertTrue(s.isGenerating)
         assertTrue(s.messages.last().isStreaming)
 

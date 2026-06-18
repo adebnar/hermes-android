@@ -13,11 +13,11 @@ fun SessionDto.toDomain() = Session(
 )
 
 fun MessageDto.toDomain() = ChatMessage(
-    id = id ?: "m-${hashCode()}",
+    id = id?.toString() ?: "m-${hashCode()}",
     role = when (role.lowercase()) {
         "user" -> Role.USER
         "assistant" -> Role.ASSISTANT
         else -> Role.SYSTEM
     },
-    text = content,
+    text = content.orEmpty(),
 )

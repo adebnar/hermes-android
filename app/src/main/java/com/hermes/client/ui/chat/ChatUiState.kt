@@ -55,16 +55,19 @@ fun reduce(state: ChatUiState, event: ServerEvent): ChatUiState {
             ),
             isGenerating = true,
         )
-        "message.delta" -> mutateLastAssistant { it.copy(text = it.text + (event.str("delta") ?: "")) }
-        "thinking.delta", "reasoning.delta" ->
-            mutateLastAssistant { it.copy(thinking = it.thinking + (event.str("delta") ?: "")) }
+        // Gateway streams text under payload.text (not "delta"/"content").
+        "message.delta" -> mutateLastAssistant { it.copy(text = it.text + (event.str("text") ?: "")) }
+        // Real reasoning arrives as reasoning.delta/reasoning.available (payload.text).
+        // thinking.delta is only a transient spinner status, so it's ignored (else branch).
+        "reasoning.delta", "reasoning.available" ->
+            mutateLastAssistant { it.copy(thinking = it.thinking + (event.str("text") ?: "")) }
         "message.complete" -> mutateLastAssistant {
-            it.copy(text = event.str("content") ?: it.text, isStreaming = false)
+            it.copy(text = (event.str("text") ?: event.str("rendered")) ?: it.text, isStreaming = false)
         }.copy(isGenerating = false)
         "tool.start" -> mutateLastAssistant {
             it.copy(tools = it.tools + ToolCall(
                 id = event.str("tool_id") ?: "t-${it.tools.size}",
-                name = event.str("tool_name") ?: "tool",
+                name = event.str("name") ?: "tool",
                 status = ToolStatus.RUNNING,
             ))
         }

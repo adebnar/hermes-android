@@ -56,7 +56,7 @@ class ChatViewModelTest {
         vm.state.test {
             awaitItem() // initial empty (or current) state
             events.emit(ServerEvent("message.start", "s1", buildJsonObject { put("session_id", "s1") }))
-            events.emit(ServerEvent("message.delta", "s1", buildJsonObject { put("session_id", "s1"); put("delta", "Hi") }))
+            events.emit(ServerEvent("message.delta", "s1", buildJsonObject { put("session_id", "s1"); put("text", "Hi") }))
             advanceUntilIdle()
             val latest = expectMostRecentItem()
             assertEquals("Hi", latest.messages.last().text)

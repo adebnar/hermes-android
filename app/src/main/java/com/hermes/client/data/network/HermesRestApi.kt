@@ -63,7 +63,10 @@ class HermesRestApi(
 
     suspend fun profiles(): List<ProfileDto> = get<ProfilesDto>("/api/profiles").profiles
 
-    suspend fun modelOptions(): List<ModelOptionDto> = get<ModelOptionsDto>("/api/model/options").options
+    suspend fun modelOptions(): List<ModelOptionDto> =
+        get<ModelOptionsDto>("/api/model/options").providers.flatMap { p ->
+            p.models.map { m -> ModelOptionDto(provider = p.slug, model = m, label = m) }
+        }
 
     suspend fun setModel(provider: String, model: String) = withContext(Dispatchers.IO) {
         val obj: JsonObject = buildJsonObject {

@@ -152,7 +152,7 @@ private fun ProfilePickerButton(
             profiles.forEach { profile ->
                 DropdownMenuItem(
                     text = {
-                        val label = if (profile.active) "${profile.name} ✓" else profile.name
+                        val label = if (profile.isDefault) "${profile.name} ✓" else profile.name
                         Text(label)
                     },
                     onClick = { onSelect(profile); expanded = false },

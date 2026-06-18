@@ -23,7 +23,7 @@ class HermesRestApiTest {
 
     @Test fun sessions_parses_list_and_sends_token() = runTest {
         serverRule.server.enqueue(MockResponse.Builder().code(200).body(
-            """{"sessions":[{"session_id":"s1","title":"First","model":"opus","provider":"anthropic","message_count":3}]}"""
+            """{"sessions":[{"id":"s1","title":"First","model":"opus","provider":"anthropic","message_count":3}]}"""
         ).build())
 
         val list = api(serverRule.server).sessions(limit = 20, offset = 0)

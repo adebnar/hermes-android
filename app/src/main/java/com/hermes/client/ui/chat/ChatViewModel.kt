@@ -57,6 +57,9 @@ class ChatViewModel @Inject constructor(
             } catch (e: HermesApiException) {
                 if (e.code == 401) { _unauthorized.value = true; return@launch }
                 _state.value = ChatUiState(messages = emptyList())
+            } catch (e: Exception) {
+                // History load failed (network/parse) — start with an empty thread rather than crash.
+                _state.value = ChatUiState(messages = emptyList())
             }
             chat.resume(id)
             // Load model options and profiles; failures are non-fatal
