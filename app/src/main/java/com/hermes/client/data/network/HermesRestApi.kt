@@ -24,7 +24,9 @@ class HermesRestApi(
 
     private fun builder(path: String): Request.Builder {
         val cfg = config()
-        val b = Request.Builder().url("${cfg.baseUrl}$path")
+        // Trim trailing slashes so a user-entered "http://host:9119/" doesn't produce
+        // "//api/..." — the gateway routes a double slash to its web UI (HTML), not the API.
+        val b = Request.Builder().url("${cfg.baseUrl.trimEnd('/')}$path")
         if (cfg.token.isNotBlank()) b.header("X-Hermes-Session-Token", cfg.token)
         return b
     }
@@ -43,7 +45,7 @@ class HermesRestApi(
      */
     suspend fun statusFor(baseUrl: String, token: String): Boolean = withContext(Dispatchers.IO) {
         runCatching {
-            val rb = Request.Builder().url("$baseUrl/api/status").get()
+            val rb = Request.Builder().url("${baseUrl.trimEnd('/')}/api/status").get()
             if (token.isNotBlank()) rb.header("X-Hermes-Session-Token", token)
             okHttp.newCall(rb.build()).execute().use { it.isSuccessful }
         }.getOrDefault(false)
