@@ -1,0 +1,80 @@
+package com.hermes.client.ui.chat
+
+import com.hermes.client.data.network.ServerEvent
+import com.hermes.client.domain.ChatMessage
+import com.hermes.client.domain.Role
+import com.hermes.client.domain.ToolCall
+import com.hermes.client.domain.ToolStatus
+import kotlinx.serialization.json.jsonPrimitive
+
+data class ApprovalRequest(val prompt: String)
+data class ClarifyRequest(val question: String, val options: List<String>)
+
+data class ChatUiState(
+    val messages: List<ChatMessage> = emptyList(),
+    val pendingApproval: ApprovalRequest? = null,
+    val pendingClarify: ClarifyRequest? = null,
+    val isGenerating: Boolean = false,
+) {
+    companion object { fun empty() = ChatUiState() }
+}
+
+fun ChatUiState.withUserMessage(text: String): ChatUiState =
+    copy(
+        messages = messages + ChatMessage(id = "u-${messages.size}", role = Role.USER, text = text),
+        isGenerating = true,
+    )
+
+private fun ServerEvent.str(key: String): String? = payload[key]?.jsonPrimitive?.content
+
+/** Pure reducer: folds one server event into the chat state. */
+fun reduce(state: ChatUiState, event: ServerEvent): ChatUiState {
+    fun mutateLastAssistant(block: (ChatMessage) -> ChatMessage): ChatUiState {
+        val idx = state.messages.indexOfLast { it.role == Role.ASSISTANT && it.isStreaming }
+        if (idx < 0) return state
+        val updated = state.messages.toMutableList()
+        updated[idx] = block(updated[idx])
+        return state.copy(messages = updated)
+    }
+
+    return when (event.type) {
+        "message.start" -> state.copy(
+            messages = state.messages + ChatMessage(
+                id = event.str("message_id") ?: "a-${state.messages.size}",
+                role = Role.ASSISTANT, text = "", isStreaming = true,
+            ),
+            isGenerating = true,
+        )
+        "message.delta" -> mutateLastAssistant { it.copy(text = it.text + (event.str("delta") ?: "")) }
+        "thinking.delta", "reasoning.delta" ->
+            mutateLastAssistant { it.copy(thinking = it.thinking + (event.str("delta") ?: "")) }
+        "message.complete" -> mutateLastAssistant {
+            it.copy(text = event.str("content") ?: it.text, isStreaming = false)
+        }.copy(isGenerating = false)
+        "tool.start" -> mutateLastAssistant {
+            it.copy(tools = it.tools + ToolCall(
+                id = event.str("tool_id") ?: "t-${it.tools.size}",
+                name = event.str("tool_name") ?: "tool",
+                status = ToolStatus.RUNNING,
+            ))
+        }
+        "tool.complete" -> mutateLastAssistant { msg ->
+            val tid = event.str("tool_id")
+            msg.copy(tools = msg.tools.map {
+                if (it.id == tid) it.copy(status = ToolStatus.DONE, output = event.str("result") ?: "") else it
+            })
+        }
+        "approval.request" -> state.copy(pendingApproval = ApprovalRequest(event.str("prompt") ?: ""))
+        "clarify.request" -> state.copy(
+            pendingClarify = ClarifyRequest(event.str("question") ?: "", emptyList()),
+        )
+        "error" -> state.copy(
+            messages = state.messages + ChatMessage(
+                id = "e-${state.messages.size}", role = Role.SYSTEM,
+                text = event.str("message") ?: "error", isError = true,
+            ),
+            isGenerating = false,
+        )
+        else -> state
+    }
+}
