@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -25,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.hermes.client.data.network.ModelOptionDto
+import com.hermes.client.data.network.ProfileDto
 import com.hermes.client.ui.components.StatusDot
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,6 +42,8 @@ fun ChatScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val connState by vm.connectionState.collectAsStateWithLifecycle()
     val unauthorized by vm.unauthorized.collectAsStateWithLifecycle()
+    val models by vm.models.collectAsStateWithLifecycle()
+    val profiles by vm.profiles.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
 
     // I1: route back to Setup when the server returns 401
@@ -49,7 +55,21 @@ fun ChatScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Chat") },
-                actions = { StatusDot(connState) },
+                actions = {
+                    if (models.isNotEmpty()) {
+                        ModelPickerButton(
+                            models = models,
+                            onSelect = { vm.selectModel(it.provider, it.model) },
+                        )
+                    }
+                    if (profiles.isNotEmpty()) {
+                        ProfilePickerButton(
+                            profiles = profiles,
+                            onSelect = { vm.selectProfile(it.name) },
+                        )
+                    }
+                    StatusDot(connState)
+                },
             )
         },
         bottomBar = {
@@ -98,5 +118,46 @@ fun ChatScreen(
                 TextButton(onClick = { vm.clarify(answer) }) { Text("Send") }
             },
         )
+    }
+}
+
+@Composable
+private fun ModelPickerButton(
+    models: List<ModelOptionDto>,
+    onSelect: (ModelOptionDto) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    TextButton(onClick = { expanded = true }) {
+        Text("Model")
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            models.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label ?: "${option.provider}/${option.model}") },
+                    onClick = { onSelect(option); expanded = false },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfilePickerButton(
+    profiles: List<ProfileDto>,
+    onSelect: (ProfileDto) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    TextButton(onClick = { expanded = true }) {
+        Text("Profile")
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            profiles.forEach { profile ->
+                DropdownMenuItem(
+                    text = {
+                        val label = if (profile.active) "${profile.name} ✓" else profile.name
+                        Text(label)
+                    },
+                    onClick = { onSelect(profile); expanded = false },
+                )
+            }
+        }
     }
 }

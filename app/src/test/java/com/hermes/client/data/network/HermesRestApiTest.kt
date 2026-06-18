@@ -63,4 +63,17 @@ class HermesRestApiTest {
         )
         assertFalse(result)
     }
+
+    @Test fun setActiveProfile_posts_to_correct_endpoint_with_token_and_name() = runTest {
+        serverRule.server.enqueue(MockResponse.Builder().code(200).body("{}").build())
+
+        api(serverRule.server).setActiveProfile("personal")
+
+        val recorded = serverRule.server.takeRequest()
+        assertEquals("POST", recorded.method)
+        assertTrue(recorded.target.startsWith("/api/profiles/active"))
+        assertEquals("secret", recorded.headers["X-Hermes-Session-Token"])
+        val body = recorded.body?.utf8().orEmpty()
+        assertTrue("body should contain profile name", body.contains("\"personal\""))
+    }
 }

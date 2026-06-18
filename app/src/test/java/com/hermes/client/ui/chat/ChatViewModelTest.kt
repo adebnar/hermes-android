@@ -2,8 +2,12 @@ package com.hermes.client.ui.chat
 
 import app.cash.turbine.test
 import com.hermes.client.data.network.ConnectionState
+import com.hermes.client.data.network.ModelOptionDto
+import com.hermes.client.data.network.ProfileDto
 import com.hermes.client.data.network.ServerEvent
 import com.hermes.client.data.repository.ChatRepository
+import com.hermes.client.data.repository.ModelRepository
+import com.hermes.client.data.repository.ProfileRepository
 import com.hermes.client.data.repository.SessionRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -31,16 +35,22 @@ class ChatViewModelTest {
     private val connectionStateFlow = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     private val chatRepo = mockk<ChatRepository>(relaxed = true)
     private val sessionRepo = mockk<SessionRepository>(relaxed = true)
+    private val modelRepo = mockk<ModelRepository>(relaxed = true)
+    private val profileRepo = mockk<ProfileRepository>(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
         every { chatRepo.events } returns events
         every { chatRepo.connectionState } returns connectionStateFlow
         coEvery { sessionRepo.history(any()) } returns emptyList()
+        coEvery { modelRepo.options() } returns emptyList()
+        coEvery { profileRepo.list() } returns emptyList()
     }
 
+    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo)
+
     @Test fun streamed_delta_appears_in_state() = runTest {
-        val vm = ChatViewModel(chatRepo, sessionRepo)
+        val vm = buildVm()
         vm.open("s1")
         advanceUntilIdle()
         vm.state.test {
@@ -59,7 +69,7 @@ class ChatViewModelTest {
      * chat.resume() must be called a second time to re-attach the agent stream.
      */
     @Test fun reconnect_triggers_second_resume() = runTest {
-        val vm = ChatViewModel(chatRepo, sessionRepo)
+        val vm = buildVm()
         vm.open("s1")
         advanceUntilIdle()
         // open() already called resume once; now simulate a reconnect cycle
@@ -77,7 +87,7 @@ class ChatViewModelTest {
      * the in-flight assistant message must be marked interrupted and isGenerating cleared.
      */
     @Test fun reconnecting_while_generating_marks_interrupted() = runTest {
-        val vm = ChatViewModel(chatRepo, sessionRepo)
+        val vm = buildVm()
         vm.open("s1")
         advanceUntilIdle()
 
@@ -100,7 +110,7 @@ class ChatViewModelTest {
      * C2 edge case: the very first Connected (startup) must NOT trigger a second resume.
      */
     @Test fun initial_connected_does_not_double_resume() = runTest {
-        val vm = ChatViewModel(chatRepo, sessionRepo)
+        val vm = buildVm()
         // Start with Connecting, then transition to Connected (first connect)
         connectionStateFlow.value = ConnectionState.Connecting
         vm.open("s1")
@@ -110,5 +120,27 @@ class ChatViewModelTest {
 
         // Only one resume from open(); the Connected transition had prev==Connecting (not Reconnecting)
         coVerify(exactly = 1) { chatRepo.resume("s1") }
+    }
+
+    @Test fun selectModel_calls_modelRepo_set() = runTest {
+        val vm = buildVm()
+        vm.open("s1")
+        advanceUntilIdle()
+
+        vm.selectModel("anthropic", "opus")
+        advanceUntilIdle()
+
+        coVerify { modelRepo.set("anthropic", "opus") }
+    }
+
+    @Test fun selectProfile_calls_profileRepo_setActive() = runTest {
+        val vm = buildVm()
+        vm.open("s1")
+        advanceUntilIdle()
+
+        vm.selectProfile("personal")
+        advanceUntilIdle()
+
+        coVerify { profileRepo.setActive("personal") }
     }
 }

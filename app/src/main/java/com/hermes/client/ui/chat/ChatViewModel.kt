@@ -4,7 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hermes.client.data.network.ConnectionState
 import com.hermes.client.data.network.HermesApiException
+import com.hermes.client.data.network.ModelOptionDto
+import com.hermes.client.data.network.ProfileDto
 import com.hermes.client.data.repository.ChatRepository
+import com.hermes.client.data.repository.ModelRepository
+import com.hermes.client.data.repository.ProfileRepository
 import com.hermes.client.data.repository.SessionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -20,6 +24,8 @@ import javax.inject.Inject
 class ChatViewModel @Inject constructor(
     private val chat: ChatRepository,
     private val sessions: SessionRepository,
+    private val modelRepo: ModelRepository,
+    private val profileRepo: ProfileRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChatUiState.empty())
@@ -30,6 +36,12 @@ class ChatViewModel @Inject constructor(
     // I1: expose 401 unauthorized so the nav layer can route back to Setup
     private val _unauthorized = MutableStateFlow(false)
     val unauthorized: StateFlow<Boolean> = _unauthorized.asStateFlow()
+
+    private val _models = MutableStateFlow<List<ModelOptionDto>>(emptyList())
+    val models: StateFlow<List<ModelOptionDto>> = _models.asStateFlow()
+
+    private val _profiles = MutableStateFlow<List<ProfileDto>>(emptyList())
+    val profiles: StateFlow<List<ProfileDto>> = _profiles.asStateFlow()
 
     private var sessionId: String = ""
     private var collectJob: Job? = null
@@ -47,6 +59,9 @@ class ChatViewModel @Inject constructor(
                 _state.value = ChatUiState(messages = emptyList())
             }
             chat.resume(id)
+            // Load model options and profiles; failures are non-fatal
+            launch { runCatching { _models.value = modelRepo.options() } }
+            launch { runCatching { _profiles.value = profileRepo.list() } }
         }
         collectJob?.cancel()
         collectJob = viewModelScope.launch {
@@ -90,5 +105,13 @@ class ChatViewModel @Inject constructor(
     fun clarify(answer: String) {
         _state.value = _state.value.copy(pendingClarify = null)
         viewModelScope.launch { chat.respondClarify(sessionId, answer) }
+    }
+
+    fun selectModel(provider: String, model: String) {
+        viewModelScope.launch { runCatching { modelRepo.set(provider, model) } }
+    }
+
+    fun selectProfile(name: String) {
+        viewModelScope.launch { runCatching { profileRepo.setActive(name) } }
     }
 }

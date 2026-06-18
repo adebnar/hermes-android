@@ -79,4 +79,13 @@ class HermesRestApi(
             if (!resp.isSuccessful) throw HermesApiException(resp.code, "set model failed")
         }
     }
+
+    suspend fun setActiveProfile(name: String) = withContext(Dispatchers.IO) {
+        val obj: JsonObject = buildJsonObject { put("name", name) }
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+            .toRequestBody("application/json".toMediaType())
+        okHttp.newCall(builder("/api/profiles/active").post(payload).build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw HermesApiException(resp.code, "set active profile failed")
+        }
+    }
 }
