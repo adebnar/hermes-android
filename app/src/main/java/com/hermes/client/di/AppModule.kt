@@ -6,6 +6,8 @@ import com.hermes.client.data.auth.EncryptedCredentialStore
 import com.hermes.client.data.network.HermesGatewayClient
 import com.hermes.client.data.network.HermesRestApi
 import com.hermes.client.data.repository.ChatRepository
+import com.hermes.client.data.repository.ModelRepository
+import com.hermes.client.data.repository.ProfileRepository
 import com.hermes.client.data.repository.SessionRepository
 import dagger.Module
 import dagger.Provides
@@ -17,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
@@ -25,11 +28,17 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideJson(): Json = Json { ignoreUnknownKeys = true }
+    fun provideJson(): Json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient = OkHttpClient()
+    fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
+        .pingInterval(20, TimeUnit.SECONDS)
+        .readTimeout(0, TimeUnit.SECONDS)
+        .build()
 
     @Provides
     @Singleton
@@ -38,7 +47,7 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideAppScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    fun provideAppScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Provides
     @Singleton
@@ -51,7 +60,7 @@ object AppModule {
         okHttp = okHttp,
         json = json,
         scope = scope,
-        wsUrlProvider = { store.load()?.wsUrl ?: "" },
+        wsUrlProvider = { store.load()?.wsUrl ?: error("no gateway configured") },
     )
 
     @Provides
@@ -75,4 +84,14 @@ object AppModule {
     @Singleton
     fun provideSessionRepository(rest: HermesRestApi): SessionRepository =
         SessionRepository(rest)
+
+    @Provides
+    @Singleton
+    fun provideModelRepository(rest: HermesRestApi): ModelRepository =
+        ModelRepository(rest)
+
+    @Provides
+    @Singleton
+    fun provideProfileRepository(rest: HermesRestApi): ProfileRepository =
+        ProfileRepository(rest)
 }
