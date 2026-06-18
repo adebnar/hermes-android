@@ -1,0 +1,23 @@
+package com.hermes.client.domain
+
+import com.hermes.client.data.network.MessageDto
+import com.hermes.client.data.network.SessionDto
+
+fun SessionDto.toDomain() = Session(
+    id = sessionId,
+    title = title?.ifBlank { "Untitled" } ?: "Untitled",
+    model = model,
+    provider = provider,
+    messageCount = messageCount,
+    profile = profile,
+)
+
+fun MessageDto.toDomain() = ChatMessage(
+    id = id ?: "m-${hashCode()}",
+    role = when (role.lowercase()) {
+        "user" -> Role.USER
+        "assistant" -> Role.ASSISTANT
+        else -> Role.SYSTEM
+    },
+    text = content,
+)
