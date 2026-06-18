@@ -23,8 +23,14 @@ class ChatRepository(private val client: HermesGatewayClient) {
             ?: error("session.create returned no id")
     }
 
-    suspend fun resume(sessionId: String) {
-        client.call("session.resume", buildJsonObject { put("session_id", sessionId) })
+    /**
+     * Resumes a session. The gateway accepts the stored (REST) id but returns a NEW short
+     * live handle in `session_id` — callers MUST use that returned id for subsequent
+     * submit/interrupt and for filtering streamed events. Returns null if not present.
+     */
+    suspend fun resume(sessionId: String): String? {
+        val result = client.call("session.resume", buildJsonObject { put("session_id", sessionId) })
+        return result.jsonObject["session_id"]?.jsonPrimitive?.content
     }
 
     suspend fun submit(sessionId: String, text: String) {

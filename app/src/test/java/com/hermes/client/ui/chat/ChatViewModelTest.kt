@@ -42,6 +42,9 @@ class ChatViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher())
         every { chatRepo.events } returns events
         every { chatRepo.connectionState } returns connectionStateFlow
+        // resume returns null here so the ViewModel keeps the opened id stable for these tests
+        // (production switches to the live handle resume returns).
+        coEvery { chatRepo.resume(any()) } returns null
         coEvery { sessionRepo.history(any()) } returns emptyList()
         coEvery { modelRepo.options() } returns emptyList()
         coEvery { profileRepo.list() } returns emptyList()

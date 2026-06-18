@@ -47,5 +47,6 @@ class SessionsViewModel @Inject constructor(
         }
     }
 
-    suspend fun createSession(): String = chat.createSession()
+    /** Returns the new session id, or null if creation failed (so the UI doesn't crash). */
+    suspend fun createSession(): String? = runCatching { chat.createSession() }.getOrNull()
 }

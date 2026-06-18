@@ -42,7 +42,7 @@ fun SessionsScreen(
         topBar = { TopAppBar(title = { Text("Sessions") }) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { scope.launch { onOpen(vm.createSession()) } },
+                onClick = { scope.launch { vm.createSession()?.let { onOpen(it) } } },
                 text = { Text("New") },
                 icon = {},
             )

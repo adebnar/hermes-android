@@ -10,6 +10,8 @@ import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.ModelRepository
 import com.hermes.client.data.repository.ProfileRepository
 import com.hermes.client.data.repository.SessionRepository
+import com.hermes.client.domain.ChatMessage
+import com.hermes.client.domain.Role
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,7 +63,9 @@ class ChatViewModel @Inject constructor(
                 // History load failed (network/parse) — start with an empty thread rather than crash.
                 _state.value = ChatUiState(messages = emptyList())
             }
-            chat.resume(id)
+            // resume() returns the live socket handle for this session; switch to it so
+            // submit/interrupt and event filtering use the id the gateway actually knows.
+            runCatching { chat.resume(id) }.getOrNull()?.let { sessionId = it }
             // Load model options and profiles; failures are non-fatal
             launch { runCatching { _models.value = modelRepo.options() } }
             launch { runCatching { _profiles.value = profileRepo.list() } }
@@ -85,7 +89,7 @@ class ChatViewModel @Inject constructor(
                 // C2: reconnect cycle completed (Reconnecting → Connected) → re-attach agent stream
                 // Guard: prev must be Reconnecting (not null) to skip the very first Connected transition
                 if (cur is ConnectionState.Connected && prev is ConnectionState.Reconnecting) {
-                    launch { chat.resume(sessionId) }
+                    launch { runCatching { chat.resume(sessionId) }.getOrNull()?.let { sessionId = it } }
                 }
                 prev = cur
             }
@@ -95,19 +99,39 @@ class ChatViewModel @Inject constructor(
     fun send(text: String) {
         if (text.isBlank()) return
         _state.value = _state.value.withUserMessage(text)
-        viewModelScope.launch { chat.submit(sessionId, text) }
+        viewModelScope.launch {
+            try {
+                chat.submit(sessionId, text)
+            } catch (e: Exception) {
+                // A gateway error (e.g. "session not found") must surface, not crash the app.
+                appendError(e.message ?: "Failed to send message")
+            }
+        }
     }
 
-    fun stop() { viewModelScope.launch { chat.interrupt(sessionId) } }
+    fun stop() { viewModelScope.launch { runCatching { chat.interrupt(sessionId) } } }
 
     fun approve(approve: Boolean) {
         _state.value = _state.value.copy(pendingApproval = null)
-        viewModelScope.launch { chat.respondApproval(sessionId, approve) }
+        viewModelScope.launch { runCatching { chat.respondApproval(sessionId, approve) } }
     }
 
     fun clarify(answer: String) {
         _state.value = _state.value.copy(pendingClarify = null)
-        viewModelScope.launch { chat.respondClarify(sessionId, answer) }
+        viewModelScope.launch { runCatching { chat.respondClarify(sessionId, answer) } }
+    }
+
+    /** Appends a non-fatal error as a system message and stops the generating spinner. */
+    private fun appendError(text: String) {
+        _state.value = _state.value.copy(
+            messages = _state.value.messages + ChatMessage(
+                id = "e-${_state.value.messages.size}",
+                role = Role.SYSTEM,
+                text = text,
+                isError = true,
+            ),
+            isGenerating = false,
+        )
     }
 
     fun selectModel(provider: String, model: String) {
