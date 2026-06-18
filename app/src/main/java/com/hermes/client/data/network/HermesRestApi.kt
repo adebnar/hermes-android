@@ -37,10 +37,25 @@ class HermesRestApi(
         }
     }
 
-    suspend fun status(): Boolean = withContext(Dispatchers.IO) {
+    /**
+     * T10b: test connectivity using explicitly supplied credentials WITHOUT reading from
+     * configProvider. Used by SetupViewModel.test() so unverified creds are never persisted.
+     */
+    suspend fun statusFor(baseUrl: String, token: String): Boolean = withContext(Dispatchers.IO) {
         runCatching {
-            okHttp.newCall(builder("/api/status").get().build()).execute().use { it.isSuccessful }
+            val req = Request.Builder()
+                .url("$baseUrl/api/status")
+                .header("X-Hermes-Session-Token", token)
+                .get()
+                .build()
+            okHttp.newCall(req).execute().use { it.isSuccessful }
         }.getOrDefault(false)
+    }
+
+    /** Delegates to [statusFor] using the current stored config. */
+    suspend fun status(): Boolean {
+        val cfg = configProvider() ?: return false
+        return statusFor(cfg.baseUrl, cfg.token)
     }
 
     suspend fun sessions(limit: Int, offset: Int): List<SessionDto> =

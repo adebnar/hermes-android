@@ -1,15 +1,18 @@
 package com.hermes.client.ui.chat
 
 import app.cash.turbine.test
+import com.hermes.client.data.network.ConnectionState
 import com.hermes.client.data.network.ServerEvent
 import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.SessionRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -17,18 +20,22 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
     private val events = MutableSharedFlow<ServerEvent>(extraBufferCapacity = 64)
+    private val connectionStateFlow = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     private val chatRepo = mockk<ChatRepository>(relaxed = true)
     private val sessionRepo = mockk<SessionRepository>(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
         every { chatRepo.events } returns events
+        every { chatRepo.connectionState } returns connectionStateFlow
         coEvery { sessionRepo.history(any()) } returns emptyList()
     }
 
@@ -45,5 +52,63 @@ class ChatViewModelTest {
             assertEquals("Hi", latest.messages.last().text)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    /**
+     * C2: when connectionState transitions Reconnecting → Connected (not the first Connected),
+     * chat.resume() must be called a second time to re-attach the agent stream.
+     */
+    @Test fun reconnect_triggers_second_resume() = runTest {
+        val vm = ChatViewModel(chatRepo, sessionRepo)
+        vm.open("s1")
+        advanceUntilIdle()
+        // open() already called resume once; now simulate a reconnect cycle
+        connectionStateFlow.value = ConnectionState.Reconnecting
+        advanceUntilIdle()
+        connectionStateFlow.value = ConnectionState.Connected
+        advanceUntilIdle()
+
+        // resume must have been called exactly twice: once in open(), once on reconnect
+        coVerify(exactly = 2) { chatRepo.resume("s1") }
+    }
+
+    /**
+     * I3: when connectionState enters Reconnecting while generation is in progress,
+     * the in-flight assistant message must be marked interrupted and isGenerating cleared.
+     */
+    @Test fun reconnecting_while_generating_marks_interrupted() = runTest {
+        val vm = ChatViewModel(chatRepo, sessionRepo)
+        vm.open("s1")
+        advanceUntilIdle()
+
+        // Start a generation via message.start event
+        events.emit(ServerEvent("message.start", "s1", buildJsonObject { put("message_id", "m1") }))
+        advanceUntilIdle()
+        assertTrue("should be generating after message.start", vm.state.value.isGenerating)
+
+        // Simulate connection drop while generating
+        connectionStateFlow.value = ConnectionState.Reconnecting
+        advanceUntilIdle()
+
+        val s = vm.state.value
+        assertFalse("isGenerating should be cleared after Reconnecting", s.isGenerating)
+        val lastMsg = s.messages.lastOrNull()
+        assertTrue("last message should be marked interrupted", lastMsg?.interrupted == true)
+    }
+
+    /**
+     * C2 edge case: the very first Connected (startup) must NOT trigger a second resume.
+     */
+    @Test fun initial_connected_does_not_double_resume() = runTest {
+        val vm = ChatViewModel(chatRepo, sessionRepo)
+        // Start with Connecting, then transition to Connected (first connect)
+        connectionStateFlow.value = ConnectionState.Connecting
+        vm.open("s1")
+        advanceUntilIdle()
+        connectionStateFlow.value = ConnectionState.Connected
+        advanceUntilIdle()
+
+        // Only one resume from open(); the Connected transition had prev==Connecting (not Reconnecting)
+        coVerify(exactly = 1) { chatRepo.resume("s1") }
     }
 }

@@ -32,9 +32,9 @@ class SetupViewModel @Inject constructor(
     fun onUrlChange(v: String) { _state.value = _state.value.copy(url = v.trim()) }
     fun onTokenChange(v: String) { _state.value = _state.value.copy(token = v.trim()) }
 
+    // T10b: test() must NOT persist unverified credentials — use statusFor() with transient values
     fun test() = viewModelScope.launch {
-        store.save(GatewayConfig(_state.value.url, _state.value.token))
-        val ok = rest.status()
+        val ok = rest.statusFor(_state.value.url, _state.value.token)
         _state.value = _state.value.copy(testResult = if (ok) "Connected" else "Unreachable")
     }
 

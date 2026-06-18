@@ -29,11 +29,21 @@ import com.hermes.client.ui.components.StatusDot
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(sessionId: String, vm: ChatViewModel = hiltViewModel()) {
+fun ChatScreen(
+    sessionId: String,
+    vm: ChatViewModel = hiltViewModel(),
+    onUnauthorized: () -> Unit = {},
+) {
     LaunchedEffect(sessionId) { vm.open(sessionId) }
     val state by vm.state.collectAsStateWithLifecycle()
     val connState by vm.connectionState.collectAsStateWithLifecycle()
+    val unauthorized by vm.unauthorized.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
+
+    // I1: route back to Setup when the server returns 401
+    LaunchedEffect(unauthorized) {
+        if (unauthorized) onUnauthorized()
+    }
 
     Scaffold(
         topBar = {

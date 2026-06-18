@@ -8,6 +8,7 @@ import mockwebserver3.MockWebServer
 import mockwebserver3.junit4.MockWebServerRule
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -37,5 +38,29 @@ class HermesRestApiTest {
     @Test fun status_returns_true_on_200() = runTest {
         serverRule.server.enqueue(MockResponse.Builder().code(200).body("""{"ok":true}""").build())
         assertTrue(api(serverRule.server).status())
+    }
+
+    // T10b: statusFor() uses supplied baseUrl+token directly, never touches configProvider
+    @Test fun statusFor_uses_explicit_credentials_not_stored_config() = runTest {
+        val server = serverRule.server
+        server.enqueue(MockResponse.Builder().code(200).body("""{"ok":true}""").build())
+
+        // api() is wired with token="secret", but we call statusFor with a different token
+        val result = api(server).statusFor(
+            baseUrl = server.url("/").toString().trimEnd('/'),
+            token = "explicit-token",
+        )
+        assertTrue(result)
+        val recorded = server.takeRequest()
+        assertEquals("explicit-token", recorded.headers["X-Hermes-Session-Token"])
+    }
+
+    @Test fun statusFor_returns_false_on_non_2xx() = runTest {
+        serverRule.server.enqueue(MockResponse.Builder().code(401).body("Unauthorized").build())
+        val result = api(serverRule.server).statusFor(
+            baseUrl = serverRule.server.url("/").toString().trimEnd('/'),
+            token = "bad-token",
+        )
+        assertFalse(result)
     }
 }

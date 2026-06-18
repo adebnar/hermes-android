@@ -14,6 +14,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -24,9 +25,19 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SessionsScreen(vm: SessionsViewModel = hiltViewModel(), onOpen: (String) -> Unit) {
+fun SessionsScreen(
+    vm: SessionsViewModel = hiltViewModel(),
+    onOpen: (String) -> Unit,
+    onUnauthorized: () -> Unit = {},
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+
+    // I1: route to Setup when a 401 is received
+    LaunchedEffect(state.unauthorized) {
+        if (state.unauthorized) onUnauthorized()
+    }
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("Sessions") }) },
         floatingActionButton = {
