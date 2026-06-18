@@ -9,3 +9,6 @@ local.properties
 captures/
 .cxx/
 .kotlin/
+
+# Local tooling
+.claude/
