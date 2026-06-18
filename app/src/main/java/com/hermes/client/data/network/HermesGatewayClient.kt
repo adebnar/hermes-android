@@ -18,6 +18,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 import kotlin.math.pow
@@ -51,7 +52,7 @@ open class HermesGatewayClient(
 
     @Volatile private var ws: WebSocket? = null
     @Volatile protected var manuallyClosed = false
-    private var attempt = 0
+    private val attempt = AtomicInteger(0)
 
     fun connect() {
         manuallyClosed = false
@@ -66,7 +67,7 @@ open class HermesGatewayClient(
 
     private val listener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            attempt = 0
+            attempt.set(0)
             _state.value = ConnectionState.Connected
         }
 
@@ -97,7 +98,7 @@ open class HermesGatewayClient(
             return
         }
         _state.value = ConnectionState.Reconnecting
-        val delayMs = backoff.delayFor(attempt++)
+        val delayMs = backoff.delayFor(attempt.getAndIncrement())
         scope.launch {
             kotlinx.coroutines.delay(delayMs)
             if (!manuallyClosed) openSocket()
