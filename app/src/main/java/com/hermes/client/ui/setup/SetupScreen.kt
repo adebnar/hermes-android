@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -24,20 +25,22 @@ fun SetupScreen(vm: SetupViewModel = hiltViewModel(), onSaved: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     LaunchedEffect(state.saved) { if (state.saved) onSaved() }
     Column(
-        Modifier.fillMaxSize().padding(24.dp),
+        // safeDrawingPadding keeps content clear of the status bar (clock/notifications)
+        // and navigation bar under the enforced edge-to-edge display.
+        Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Connect to Hermes", style = MaterialTheme.typography.headlineSmall)
         OutlinedTextField(
             value = state.url,
             onValueChange = vm::onUrlChange,
-            label = { Text("Gateway URL (e.g. http://my-mac:9119)") },
+            label = { Text("Gateway URL (e.g. https://my-mac.ts.net:8443)") },
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = state.token,
             onValueChange = vm::onTokenChange,
-            label = { Text("Token") },
+            label = { Text("Token (optional)") },
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

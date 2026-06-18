@@ -24,9 +24,9 @@ class HermesRestApi(
 
     private fun builder(path: String): Request.Builder {
         val cfg = config()
-        return Request.Builder()
-            .url("${cfg.baseUrl}$path")
-            .header("X-Hermes-Session-Token", cfg.token)
+        val b = Request.Builder().url("${cfg.baseUrl}$path")
+        if (cfg.token.isNotBlank()) b.header("X-Hermes-Session-Token", cfg.token)
+        return b
     }
 
     private suspend inline fun <reified T> get(path: String): T = withContext(Dispatchers.IO) {
@@ -43,12 +43,9 @@ class HermesRestApi(
      */
     suspend fun statusFor(baseUrl: String, token: String): Boolean = withContext(Dispatchers.IO) {
         runCatching {
-            val req = Request.Builder()
-                .url("$baseUrl/api/status")
-                .header("X-Hermes-Session-Token", token)
-                .get()
-                .build()
-            okHttp.newCall(req).execute().use { it.isSuccessful }
+            val rb = Request.Builder().url("$baseUrl/api/status").get()
+            if (token.isNotBlank()) rb.header("X-Hermes-Session-Token", token)
+            okHttp.newCall(rb.build()).execute().use { it.isSuccessful }
         }.getOrDefault(false)
     }
 
