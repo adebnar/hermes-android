@@ -1,6 +1,7 @@
 package com.hermes.client.data.network
 
 import app.cash.turbine.test
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -59,11 +60,21 @@ class HermesGatewayClientTest {
         okHttp.connectionPool.evictAll()
     }
 
+    private companion object {
+        const val GATEWAY_READY_FRAME =
+            """{"jsonrpc":"2.0","method":"event","params":{"type":"gateway.ready","payload":{}}}"""
+    }
+
     @Test fun call_resolves_with_matching_reply() = runTest {
-        // Server echoes a result for whatever id the client sent.
+        // Server sends gateway.ready on open, then echoes a result for whatever id the client sent.
         serverRule.server.enqueue(
             MockResponse.Builder().webSocketUpgrade(
                 object : WebSocketListener() {
+                    override fun onOpen(webSocket: WebSocket, response: Response) {
+                        // Send gateway.ready so the client's readyGate is lifted before call().
+                        webSocket.send(GATEWAY_READY_FRAME)
+                    }
+
                     override fun onMessage(webSocket: WebSocket, text: String) {
                         val id = json.parseToJsonElement(text).jsonObject["id"]!!.jsonPrimitive.content
                         webSocket.send("""{"jsonrpc":"2.0","id":$id,"result":{"pong":true}}""")
@@ -90,7 +101,7 @@ class HermesGatewayClientTest {
             MockResponse.Builder().webSocketUpgrade(
                 object : WebSocketListener() {
                     override fun onOpen(webSocket: WebSocket, response: Response) {
-                        webSocket.send("""{"jsonrpc":"2.0","method":"event","params":{"type":"gateway.ready","payload":{}}}""")
+                        webSocket.send(GATEWAY_READY_FRAME)
                     }
                 }
             ).build()
@@ -106,6 +117,54 @@ class HermesGatewayClientTest {
                     assertEquals(ConnectionState.Connected, client.connectionState.value)
                     cancelAndIgnoreRemainingEvents()
                 }
+            }
+        } finally {
+            tearDownClient(client, okHttp)
+        }
+    }
+
+    /**
+     * Asserts that connectionState is Connecting after the socket opens but BEFORE
+     * gateway.ready is delivered, and Connected only after gateway.ready arrives.
+     */
+    @Test fun state_is_connecting_until_gateway_ready_received() = runTest {
+        // Gate that the test controls: server holds gateway.ready until we release it.
+        val allowReady = CompletableDeferred<Unit>()
+        // Gate that signals the test once the socket has opened server-side.
+        val socketOpened = CompletableDeferred<WebSocket>()
+
+        serverRule.server.enqueue(
+            MockResponse.Builder().webSocketUpgrade(
+                object : WebSocketListener() {
+                    override fun onOpen(webSocket: WebSocket, response: Response) {
+                        socketOpened.complete(webSocket)
+                        // Do NOT send gateway.ready yet — wait for the test to release.
+                    }
+                }
+            ).build()
+        )
+
+        val (client, okHttp) = makeClientAndHttp(serverRule.server)
+        try {
+            withContext(Dispatchers.Default) {
+                client.connect()
+
+                // Wait until the server-side socket is open.
+                val serverWs = withTimeout(5_000) { socketOpened.await() }
+
+                // State must be Connecting (not Connected) before gateway.ready.
+                assertEquals(ConnectionState.Connecting, client.connectionState.value)
+
+                // Now deliver gateway.ready from the server.
+                serverWs.send(GATEWAY_READY_FRAME)
+
+                // Poll until Connected (the message is dispatched on OkHttp's IO thread).
+                withTimeout(5_000) {
+                    while (client.connectionState.value != ConnectionState.Connected) {
+                        kotlinx.coroutines.delay(10)
+                    }
+                }
+                assertEquals(ConnectionState.Connected, client.connectionState.value)
             }
         } finally {
             tearDownClient(client, okHttp)

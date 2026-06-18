@@ -54,12 +54,19 @@ open class HermesGatewayClient(
     @Volatile protected var manuallyClosed = false
     private val attempt = AtomicInteger(0)
 
+    // Readiness gate: awaited by call() before sending RPCs.
+    // Recreated (uncompleted) on each openSocket(); completed when gateway.ready arrives;
+    // completed exceptionally when socket closes/fails or close() is called.
+    @Volatile private var readyGate: CompletableDeferred<Unit> = CompletableDeferred()
+
     fun connect() {
         manuallyClosed = false
         openSocket()
     }
 
     protected fun openSocket() {
+        // Install a fresh, uncompleted readiness gate for this new socket attempt.
+        readyGate = CompletableDeferred()
         _state.value = ConnectionState.Connecting
         val request = Request.Builder().url(wsUrlProvider()).build()
         ws = okHttp.newWebSocket(request, listener)
@@ -67,8 +74,8 @@ open class HermesGatewayClient(
 
     private val listener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            attempt.set(0)
-            _state.value = ConnectionState.Connected
+            // Do NOT set state to Connected here. Wait for gateway.ready event.
+            // Do NOT reset the attempt counter here either.
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
@@ -77,7 +84,15 @@ open class HermesGatewayClient(
                     is RpcResult -> pending.remove(msg.id)?.complete(msg.result)
                     is RpcErrorReply -> pending.remove(msg.id)
                         ?.completeExceptionally(GatewayRpcException(msg.error.code, msg.error.message))
-                    is RpcEvent -> _events.tryEmit(msg.event)
+                    is RpcEvent -> {
+                        // Handle gateway.ready: flip to Connected and open the readiness gate.
+                        if (msg.event.type == "gateway.ready") {
+                            attempt.set(0)
+                            _state.value = ConnectionState.Connected
+                            readyGate.complete(Unit)
+                        }
+                        _events.tryEmit(msg.event)
+                    }
                 }
             }
         }
@@ -92,6 +107,8 @@ open class HermesGatewayClient(
     }
 
     protected open fun onSocketClosed(reason: String) {
+        // Fail any call() that is currently awaiting readiness so it throws immediately.
+        readyGate.completeExceptionally(GatewayRpcException(0, reason))
         failAllPending(reason)
         if (manuallyClosed) {
             _state.value = ConnectionState.Disconnected
@@ -112,6 +129,8 @@ open class HermesGatewayClient(
     }
 
     suspend fun call(method: String, params: JsonObject): JsonElement {
+        // Wait until gateway.ready has been received before sending any RPC.
+        readyGate.await()
         val id = nextId.getAndIncrement()
         val deferred = CompletableDeferred<JsonElement>()
         pending[id] = deferred
@@ -125,6 +144,8 @@ open class HermesGatewayClient(
 
     fun close() {
         manuallyClosed = true
+        // Fail any call() awaiting readiness so it throws immediately rather than hanging.
+        readyGate.completeExceptionally(GatewayRpcException(0, "client closing"))
         failAllPending("client closing")
         ws?.close(1000, "client closing")
         ws = null
@@ -134,6 +155,7 @@ open class HermesGatewayClient(
     /** Immediately cancel the underlying socket (no graceful close handshake). */
     internal fun cancelNow() {
         manuallyClosed = true
+        readyGate.completeExceptionally(GatewayRpcException(0, "client cancelled"))
         ws?.cancel()
         ws = null
         _state.value = ConnectionState.Disconnected

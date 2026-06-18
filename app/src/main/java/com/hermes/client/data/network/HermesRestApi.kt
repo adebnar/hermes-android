@@ -4,6 +4,9 @@ import com.hermes.client.data.auth.GatewayConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -51,7 +54,11 @@ class HermesRestApi(
     suspend fun modelOptions(): List<ModelOptionDto> = get<ModelOptionsDto>("/api/model/options").options
 
     suspend fun setModel(provider: String, model: String) = withContext(Dispatchers.IO) {
-        val payload = """{"provider":"$provider","model":"$model"}"""
+        val obj: JsonObject = buildJsonObject {
+            put("provider", provider)
+            put("model", model)
+        }
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
             .toRequestBody("application/json".toMediaType())
         okHttp.newCall(builder("/api/model/set").post(payload).build()).execute().use { resp ->
             if (!resp.isSuccessful) throw HermesApiException(resp.code, "set model failed")
