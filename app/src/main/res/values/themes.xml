@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme. Colors are driven by Compose's MaterialTheme;
+         this only provides a no-action-bar DayNight window theme for the Activity. -->
+    <style name="Theme.Hermes" parent="Theme.Material3.DayNight.NoActionBar" />
+</resources>
