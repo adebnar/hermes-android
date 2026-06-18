@@ -98,6 +98,7 @@ class HermesGatewayClientTest {
                     client.connect()
                     val event = withTimeout(5_000) { awaitItem() }
                     assertEquals("gateway.ready", event.type)
+                    assertEquals(ConnectionState.Connected, client.connectionState.value)
                     cancelAndIgnoreRemainingEvents()
                 }
             }

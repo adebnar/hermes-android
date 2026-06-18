@@ -105,7 +105,7 @@ open class HermesGatewayClient(
     }
 
     /** Immediately cancel the underlying socket (no graceful close handshake). */
-    fun cancelNow() {
+    internal fun cancelNow() {
         manuallyClosed = true
         ws?.cancel()
         ws = null
