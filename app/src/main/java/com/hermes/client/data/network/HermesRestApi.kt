@@ -72,6 +72,7 @@ class HermesRestApi(
 
     suspend fun setModel(provider: String, model: String) = withContext(Dispatchers.IO) {
         val obj: JsonObject = buildJsonObject {
+            put("scope", "main")   // required by /api/model/set (the primary model slot)
             put("provider", provider)
             put("model", model)
         }
