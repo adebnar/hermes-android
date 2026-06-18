@@ -25,16 +25,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.hermes.client.ui.components.StatusDot
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(sessionId: String, vm: ChatViewModel = hiltViewModel()) {
     LaunchedEffect(sessionId) { vm.open(sessionId) }
     val state by vm.state.collectAsStateWithLifecycle()
+    val connState by vm.connectionState.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Chat") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Chat") },
+                actions = { StatusDot(connState) },
+            )
+        },
         bottomBar = {
             Row(
                 Modifier.fillMaxWidth().padding(8.dp),

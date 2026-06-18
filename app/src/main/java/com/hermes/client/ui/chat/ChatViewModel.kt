@@ -2,6 +2,7 @@ package com.hermes.client.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hermes.client.data.network.ConnectionState
 import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.SessionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +23,8 @@ class ChatViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(ChatUiState.empty())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
+
+    val connectionState: StateFlow<ConnectionState> = chat.connectionState
 
     private var sessionId: String = ""
     private var collectJob: Job? = null
