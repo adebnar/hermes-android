@@ -6,6 +6,7 @@ import com.hermes.client.domain.ToolStatus
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -50,5 +51,41 @@ class ChatReducerTest {
         s = reduce(s, ev("thinking.delta") { put("delta", "hmm ") })
         s = reduce(s, ev("thinking.delta") { put("delta", "ok") })
         assertEquals("hmm ok", s.messages.last().thinking)
+    }
+
+    // T8b: tool.complete arriving AFTER message.complete must still update the tool card.
+    @Test fun late_tool_complete_after_message_complete_is_not_dropped() {
+        var s = ChatUiState.empty()
+        s = reduce(s, ev("message.start") { put("message_id", "a1") })
+        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("tool_name", "search") })
+        s = reduce(s, ev("message.complete") { put("content", "done") })
+        // At this point the assistant message is no longer streaming.
+        s = reduce(s, ev("tool.complete") { put("tool_id", "t1"); put("result", "done") })
+        val tools = s.messages.last().tools
+        assertEquals(1, tools.size)
+        assertEquals(ToolStatus.DONE, tools[0].status)
+        assertEquals("done", tools[0].output)
+    }
+
+    // I3: markInterrupted closes the streaming message and clears isGenerating.
+    @Test fun markInterrupted_with_streaming_message() {
+        var s = ChatUiState.empty()
+        s = reduce(s, ev("message.start") { put("message_id", "a1") })
+        s = reduce(s, ev("message.delta") { put("delta", "partial") })
+        assertTrue(s.isGenerating)
+        assertTrue(s.messages.last().isStreaming)
+
+        val interrupted = s.markInterrupted()
+        assertFalse(interrupted.isGenerating)
+        assertFalse(interrupted.messages.last().isStreaming)
+        assertTrue(interrupted.messages.last().interrupted)
+    }
+
+    @Test fun markInterrupted_without_streaming_message_still_clears_isGenerating() {
+        // Build a state with isGenerating=true but no streaming message.
+        val s = ChatUiState.empty().copy(isGenerating = true)
+        val result = s.markInterrupted()
+        assertFalse(result.isGenerating)
+        assertEquals(s.messages, result.messages) // nothing else changed
     }
 }

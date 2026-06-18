@@ -29,8 +29,18 @@ private fun ServerEvent.str(key: String): String? = payload[key]?.jsonPrimitive?
 
 /** Pure reducer: folds one server event into the chat state. */
 fun reduce(state: ChatUiState, event: ServerEvent): ChatUiState {
+    // Targets the last STREAMING assistant message.
     fun mutateLastAssistant(block: (ChatMessage) -> ChatMessage): ChatUiState {
         val idx = state.messages.indexOfLast { it.role == Role.ASSISTANT && it.isStreaming }
+        if (idx < 0) return state
+        val updated = state.messages.toMutableList()
+        updated[idx] = block(updated[idx])
+        return state.copy(messages = updated)
+    }
+
+    // Targets the last assistant message regardless of streaming state.
+    fun mutateLastAssistantAny(block: (ChatMessage) -> ChatMessage): ChatUiState {
+        val idx = state.messages.indexOfLast { it.role == Role.ASSISTANT }
         if (idx < 0) return state
         val updated = state.messages.toMutableList()
         updated[idx] = block(updated[idx])
@@ -58,7 +68,7 @@ fun reduce(state: ChatUiState, event: ServerEvent): ChatUiState {
                 status = ToolStatus.RUNNING,
             ))
         }
-        "tool.complete" -> mutateLastAssistant { msg ->
+        "tool.complete" -> mutateLastAssistantAny { msg ->
             val tid = event.str("tool_id")
             msg.copy(tools = msg.tools.map {
                 if (it.id == tid) it.copy(status = ToolStatus.DONE, output = event.str("result") ?: "") else it
@@ -77,4 +87,22 @@ fun reduce(state: ChatUiState, event: ServerEvent): ChatUiState {
         )
         else -> state
     }
+}
+
+/**
+ * Pure helper: marks the current generation as interrupted.
+ * - Finds the last assistant message with isStreaming==true; if present, sets
+ *   isStreaming=false and interrupted=true on it.
+ * - Always sets isGenerating=false, whether or not a streaming message was found.
+ */
+fun ChatUiState.markInterrupted(): ChatUiState {
+    val idx = messages.indexOfLast { it.role == Role.ASSISTANT && it.isStreaming }
+    val newMessages = if (idx >= 0) {
+        messages.toMutableList().also { list ->
+            list[idx] = list[idx].copy(isStreaming = false, interrupted = true)
+        }.toList()
+    } else {
+        messages
+    }
+    return copy(messages = newMessages, isGenerating = false)
 }

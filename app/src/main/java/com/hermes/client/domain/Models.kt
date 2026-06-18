@@ -27,4 +27,5 @@ data class ChatMessage(
     val thinking: String = "",
     val isStreaming: Boolean = false,
     val isError: Boolean = false,
+    val interrupted: Boolean = false,
 )
