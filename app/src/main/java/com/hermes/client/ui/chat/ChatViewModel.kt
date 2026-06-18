@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.SessionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +24,7 @@ class ChatViewModel @Inject constructor(
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
 
     private var sessionId: String = ""
+    private var collectJob: Job? = null
 
     fun open(id: String) {
         sessionId = id
@@ -32,7 +33,8 @@ class ChatViewModel @Inject constructor(
             _state.value = ChatUiState(messages = history)
             chat.resume(id)
         }
-        viewModelScope.launch(Dispatchers.Unconfined) {
+        collectJob?.cancel()
+        collectJob = viewModelScope.launch {
             chat.events.filter { it.sessionId == null || it.sessionId == sessionId }
                 .onEach { event -> _state.value = reduce(_state.value, event) }
                 .collect {}
