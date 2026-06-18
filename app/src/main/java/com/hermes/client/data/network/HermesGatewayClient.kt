@@ -2,6 +2,7 @@ package com.hermes.client.data.network
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -58,6 +60,10 @@ open class HermesGatewayClient(
     // Recreated (uncompleted) on each openSocket(); completed when gateway.ready arrives;
     // completed exceptionally when socket closes/fails or close() is called.
     @Volatile private var readyGate: CompletableDeferred<Unit> = CompletableDeferred()
+
+    private companion object {
+        const val READY_TIMEOUT_MS = 15_000L
+    }
 
     fun connect() {
         manuallyClosed = false
@@ -130,7 +136,14 @@ open class HermesGatewayClient(
 
     suspend fun call(method: String, params: JsonObject): JsonElement {
         // Wait until gateway.ready has been received before sending any RPC.
-        readyGate.await()
+        // Bounded wait: if the server never sends gateway.ready, throw after READY_TIMEOUT_MS.
+        // The await() happens BEFORE registering in `pending`, so a timeout here never leaks
+        // a pending entry.
+        try {
+            withTimeout(READY_TIMEOUT_MS) { readyGate.await() }
+        } catch (e: TimeoutCancellationException) {
+            throw GatewayRpcException(0, "gateway readiness timeout")
+        }
         val id = nextId.getAndIncrement()
         val deferred = CompletableDeferred<JsonElement>()
         pending[id] = deferred

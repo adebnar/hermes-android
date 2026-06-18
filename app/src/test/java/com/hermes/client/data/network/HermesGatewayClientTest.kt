@@ -128,8 +128,6 @@ class HermesGatewayClientTest {
      * gateway.ready is delivered, and Connected only after gateway.ready arrives.
      */
     @Test fun state_is_connecting_until_gateway_ready_received() = runTest {
-        // Gate that the test controls: server holds gateway.ready until we release it.
-        val allowReady = CompletableDeferred<Unit>()
         // Gate that signals the test once the socket has opened server-side.
         val socketOpened = CompletableDeferred<WebSocket>()
 
