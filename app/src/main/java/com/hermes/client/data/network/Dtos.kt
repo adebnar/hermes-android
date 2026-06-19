@@ -30,6 +30,7 @@ import kotlinx.serialization.Serializable
     @SerialName("is_default") val isDefault: Boolean = false,
 )
 @Serializable data class ProfilesDto(val profiles: List<ProfileDto> = emptyList())
+@Serializable data class ActiveProfileDto(val active: String? = null, val current: String? = null)
 
 /** Flattened, UI-facing option (provider slug + fully-qualified model string). */
 data class ModelOptionDto(

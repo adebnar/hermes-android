@@ -3,6 +3,7 @@ package com.hermes.client.ui.sessions
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +14,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -38,9 +40,11 @@ import kotlinx.coroutines.launch
 fun SessionsScreen(
     vm: SessionsViewModel = hiltViewModel(),
     onOpen: (String) -> Unit,
+    onMenu: () -> Unit = {},
     onUnauthorized: () -> Unit = {},
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     // I1: route to Setup when a 401 is received
@@ -49,7 +53,22 @@ fun SessionsScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Sessions") }) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Sessions")
+                        activeProfile?.let {
+                            Text(
+                                "Profile: $it",
+                                style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
+                },
+                navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { scope.launch { vm.createSession()?.let { onOpen(it) } } },

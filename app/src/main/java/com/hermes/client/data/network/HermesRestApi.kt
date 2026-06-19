@@ -65,6 +65,14 @@ class HermesRestApi(
 
     suspend fun profiles(): List<ProfileDto> = get<ProfilesDto>("/api/profiles").profiles
 
+    /** The gateway's currently-active profile name (current takes precedence over active). */
+    suspend fun activeProfile(): String? =
+        get<ActiveProfileDto>("/api/profiles/active").let { it.current ?: it.active }
+
+    /** Raw provider list (each provider carries its model strings + an is_current flag). */
+    suspend fun modelProviders(): List<ModelProviderDto> =
+        get<ModelOptionsDto>("/api/model/options").providers
+
     suspend fun modelOptions(): List<ModelOptionDto> =
         get<ModelOptionsDto>("/api/model/options").providers.flatMap { p ->
             p.models.map { m -> ModelOptionDto(provider = p.slug, model = m, label = m) }

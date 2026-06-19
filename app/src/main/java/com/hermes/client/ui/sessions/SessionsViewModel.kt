@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hermes.client.data.network.HermesApiException
 import com.hermes.client.data.repository.ChatRepository
+import com.hermes.client.data.repository.ProfileManager
 import com.hermes.client.data.repository.SessionRepository
 import com.hermes.client.domain.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,11 +27,21 @@ data class SessionsUiState(
 class SessionsViewModel @Inject constructor(
     private val sessions: SessionRepository,
     private val chat: ChatRepository,
+    private val profileManager: ProfileManager,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SessionsUiState())
     val state: StateFlow<SessionsUiState> = _state.asStateFlow()
 
-    init { chat.connect(); refresh() }
+    /** The active profile, shown as a subtitle so the tenant context is always visible. */
+    val activeProfile: StateFlow<String?> = profileManager.active
+
+    init {
+        chat.connect()
+        refresh()
+        viewModelScope.launch { profileManager.refresh() }
+        // When the active profile changes (via the drawer), reload this profile's sessions.
+        viewModelScope.launch { profileManager.changed.drop(1).collect { refresh() } }
+    }
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
