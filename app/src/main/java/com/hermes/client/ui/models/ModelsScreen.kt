@@ -64,7 +64,9 @@ fun ModelsScreen(
                                 modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
                             )
                         }
-                        items(provider.models, key = { "${provider.slug}/$it" }) { model ->
+                        // No key: a provider can list the same model name more than once,
+                        // and duplicate keys crash LazyColumn.
+                        items(provider.models) { model ->
                             ListItem(
                                 headlineContent = { Text(model) },
                                 modifier = Modifier.clickable { vm.select(provider.slug, model) },

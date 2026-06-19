@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -60,7 +63,7 @@ fun ChatScreen(
     // Slash-command palette: when the draft is a "/query", show matching commands.
     val slashMatches = if (draft.startsWith("/") && !draft.contains(' ')) {
         val q = draft.drop(1).lowercase()
-        commands.filter { it.first.removePrefix("/").lowercase().startsWith(q) }.take(6)
+        commands.filter { it.first.removePrefix("/").lowercase().startsWith(q) }.take(20)
     } else emptyList()
     val connected = connState is ConnectionState.Connected
     val canSend = connected && draft.isNotBlank() && !state.isGenerating
@@ -118,12 +121,17 @@ fun ChatScreen(
             Column(Modifier.navigationBarsPadding().imePadding()) {
                 if (slashMatches.isNotEmpty()) {
                     androidx.compose.material3.Surface(tonalElevation = 3.dp) {
-                        Column(Modifier.fillMaxWidth()) {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 220.dp)
+                                .verticalScroll(rememberScrollState()),
+                        ) {
                             slashMatches.forEach { (name, desc) ->
                                 val cmd = if (name.startsWith("/")) name else "/$name"
                                 androidx.compose.material3.ListItem(
                                     headlineContent = { Text(cmd) },
-                                    supportingContent = { if (desc.isNotBlank()) Text(desc) },
+                                    supportingContent = { if (desc.isNotBlank()) Text(desc, maxLines = 1) },
                                     modifier = Modifier.clickable { draft = "$cmd " },
                                 )
                             }

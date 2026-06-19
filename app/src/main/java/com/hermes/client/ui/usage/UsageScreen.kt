@@ -135,7 +135,9 @@ fun UsageScreen(
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp))
                     }
-                    items(state.topModels, key = { it.model }) { m ->
+                    // No key: model names can repeat across providers (e.g. two "gemma"),
+                    // and duplicate keys crash LazyColumn.
+                    items(state.topModels) { m ->
                         ListItem(
                             headlineContent = { Text(m.model) },
                             supportingContent = { Text("${m.sessions} sessions · ${m.apiCalls} calls") },
