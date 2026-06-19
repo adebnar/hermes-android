@@ -3,9 +3,12 @@ package com.hermes.client.ui.usage
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +46,7 @@ data class UsageUiState(
     val sessions: Int = 0,
     val apiCalls: Int = 0,
     val topModels: List<ModelUsageDto> = emptyList(),
+    val daily: List<com.hermes.client.data.network.UsageDayDto> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
 )
@@ -75,6 +79,7 @@ class UsageViewModel @Inject constructor(
             sessions = usage.daily.sumOf { it.sessions },
             apiCalls = usage.daily.sumOf { it.apiCalls },
             topModels = models.sortedByDescending { it.inputTokens + it.outputTokens }.take(8),
+            daily = usage.daily.sortedBy { it.day },
             loading = false,
         )
     }
@@ -119,6 +124,12 @@ fun UsageScreen(
                                     Modifier.weight(1f))
                                 Stat("Est. cost", "$" + "%.2f".format(state.estimatedCost), Modifier.weight(1f))
                             }
+                            if (state.daily.isNotEmpty()) {
+                                Text("DAILY TOKENS", style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
+                                DailyTokensChart(state.daily)
+                            }
                         }
                         Text("TOP MODELS", style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
@@ -137,6 +148,36 @@ fun UsageScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DailyTokensChart(daily: List<com.hermes.client.data.network.UsageDayDto>) {
+    val bars = daily.takeLast(30)
+    val maxTok = (bars.maxOfOrNull { it.inputTokens + it.outputTokens } ?: 1L).coerceAtLeast(1L)
+    val inputColor = MaterialTheme.colorScheme.primary
+    val outputColor = MaterialTheme.colorScheme.tertiary
+    androidx.compose.foundation.Canvas(
+        Modifier.fillMaxWidth().height(120.dp).padding(top = 4.dp),
+    ) {
+        if (bars.isEmpty()) return@Canvas
+        val gap = 3.dp.toPx()
+        val barW = ((size.width - gap * (bars.size - 1)) / bars.size).coerceAtLeast(1f)
+        bars.forEachIndexed { i, d ->
+            val x = i * (barW + gap)
+            val inH = size.height * (d.inputTokens.toFloat() / maxTok)
+            val outH = size.height * (d.outputTokens.toFloat() / maxTok)
+            // output stacked on top of input
+            drawRect(inputColor, topLeft = androidx.compose.ui.geometry.Offset(x, size.height - inH),
+                size = androidx.compose.ui.geometry.Size(barW, inH))
+            drawRect(outputColor, topLeft = androidx.compose.ui.geometry.Offset(x, size.height - inH - outH),
+                size = androidx.compose.ui.geometry.Size(barW, outH))
+        }
+    }
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Text("input", style = MaterialTheme.typography.labelSmall, color = inputColor)
+        Spacer(Modifier.width(12.dp))
+        Text("output", style = MaterialTheme.typography.labelSmall, color = outputColor)
     }
 }
 

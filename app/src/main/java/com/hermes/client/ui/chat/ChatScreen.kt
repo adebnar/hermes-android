@@ -4,7 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardActions
@@ -34,7 +37,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermes.client.data.network.ConnectionState
 import com.hermes.client.data.network.ModelOptionDto
-import com.hermes.client.data.network.ProfileDto
 import com.hermes.client.ui.components.StatusDot
 import com.hermes.client.ui.components.connectionLabel
 
@@ -43,6 +45,7 @@ import com.hermes.client.ui.components.connectionLabel
 fun ChatScreen(
     sessionId: String,
     vm: ChatViewModel = hiltViewModel(),
+    onMenu: () -> Unit = {},
     onUnauthorized: () -> Unit = {},
 ) {
     LaunchedEffect(sessionId) { vm.open(sessionId) }
@@ -50,7 +53,7 @@ fun ChatScreen(
     val connState by vm.connectionState.collectAsStateWithLifecycle()
     val unauthorized by vm.unauthorized.collectAsStateWithLifecycle()
     val models by vm.models.collectAsStateWithLifecycle()
-    val profiles by vm.profiles.collectAsStateWithLifecycle()
+    val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     val connected = connState is ConnectionState.Connected
     val canSend = connected && draft.isNotBlank() && !state.isGenerating
@@ -69,18 +72,20 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Chat") },
+                navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+                title = {
+                    Column {
+                        Text("Chat")
+                        activeProfile?.let {
+                            Text("Profile: $it", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                },
                 actions = {
                     if (models.isNotEmpty()) {
                         ModelPickerButton(
                             models = models,
                             onSelect = { vm.selectModel(it.provider, it.model) },
-                        )
-                    }
-                    if (profiles.isNotEmpty()) {
-                        ProfilePickerButton(
-                            profiles = profiles,
-                            onSelect = { vm.selectProfile(it.name) },
                         )
                     }
                     StatusDot(connState)
@@ -89,7 +94,7 @@ fun ChatScreen(
         },
         bottomBar = {
             Row(
-                Modifier.fillMaxWidth().padding(8.dp),
+                Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OutlinedTextField(
@@ -110,7 +115,7 @@ fun ChatScreen(
             }
         },
     ) { padding ->
-        Column(Modifier.padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding)) {
             if (!connected) {
                 ConnectionBanner(connState, onRetry = { vm.reconnect() })
             }
@@ -185,24 +190,3 @@ private fun ModelPickerButton(
     }
 }
 
-@Composable
-private fun ProfilePickerButton(
-    profiles: List<ProfileDto>,
-    onSelect: (ProfileDto) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    TextButton(onClick = { expanded = true }) {
-        Text("Profile")
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            profiles.forEach { profile ->
-                DropdownMenuItem(
-                    text = {
-                        val label = if (profile.isDefault) "${profile.name} ✓" else profile.name
-                        Text(label)
-                    },
-                    onClick = { onSelect(profile); expanded = false },
-                )
-            }
-        }
-    }
-}

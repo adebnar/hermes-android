@@ -47,6 +47,9 @@ class ChatViewModel @Inject constructor(
     private val _profiles = MutableStateFlow<List<ProfileDto>>(emptyList())
     val profiles: StateFlow<List<ProfileDto>> = _profiles.asStateFlow()
 
+    /** Active profile name — shown in the chat top bar so the user knows which tenant they're in. */
+    val activeProfile: StateFlow<String?> = profileManager.active
+
     private var sessionId: String = ""
     private var collectJob: Job? = null
     private var connJob: Job? = null

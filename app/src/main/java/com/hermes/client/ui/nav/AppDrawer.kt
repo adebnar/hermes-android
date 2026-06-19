@@ -28,7 +28,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 private val DESTINATIONS = listOf(
     "sessions" to "Sessions",
     "models" to "Models",
-    "profiles" to "Profiles",
     "cron" to "Cron jobs",
     "messaging" to "Messaging",
     "usage" to "Usage",

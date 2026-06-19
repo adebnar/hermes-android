@@ -88,6 +88,7 @@ fun HermesNav(hasConfig: Boolean) {
             composable("chat/{id}") { entry ->
                 ChatScreen(
                     sessionId = entry.arguments?.getString("id") ?: "",
+                    onMenu = openDrawer,
                     onUnauthorized = onUnauthorized,
                 )
             }
