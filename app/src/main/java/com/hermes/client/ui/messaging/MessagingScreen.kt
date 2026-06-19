@@ -1,6 +1,7 @@
 package com.hermes.client.ui.messaging
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,6 +36,7 @@ data class MessagingUiState(
     val platforms: List<MessagingPlatformDto> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
+    val message: String? = null,
 )
 
 @HiltViewModel
@@ -49,11 +51,23 @@ class MessagingViewModel @Inject constructor(
     fun load() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = null)
         runCatching { tools.messagingPlatforms() }
-            .onSuccess { _state.value = MessagingUiState(platforms = it, loading = false) }
+            .onSuccess { _state.value = _state.value.copy(platforms = it, loading = false, error = null) }
             .onFailure {
-                _state.value = MessagingUiState(loading = false, error = it.message ?: "Failed to load")
+                _state.value = _state.value.copy(loading = false, error = it.message ?: "Failed to load")
             }
     }
+
+    fun toggle(id: String, enabled: Boolean) = viewModelScope.launch {
+        // Optimistic; reload to reflect true state (enabling may fail if not configured).
+        _state.value = _state.value.copy(
+            platforms = _state.value.platforms.map { if (it.id == id) it.copy(enabled = enabled) else it },
+        )
+        runCatching { tools.setMessagingEnabled(id, enabled) }
+            .onSuccess { _state.value = _state.value.copy(message = if (enabled) "$id enabled" else "$id disabled"); load() }
+            .onFailure { _state.value = _state.value.copy(message = "Failed: ${it.message}"); load() }
+    }
+
+    fun clearMessage() { _state.value = _state.value.copy(message = null) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,6 +77,10 @@ fun MessagingScreen(
     vm: MessagingViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val snackbar = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+    androidx.compose.runtime.LaunchedEffect(state.message) {
+        state.message?.let { snackbar.showSnackbar(it); vm.clearMessage() }
+    }
 
     Scaffold(
         topBar = {
@@ -71,6 +89,7 @@ fun MessagingScreen(
                 navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
             )
         },
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbar) },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
@@ -80,19 +99,24 @@ fun MessagingScreen(
                     items(state.platforms, key = { it.id }) { p ->
                         val status = when {
                             p.enabled && p.gatewayRunning -> "Connected"
-                            p.configured -> "Configured (not running)"
+                            p.enabled -> "Enabled"
+                            p.configured -> "Configured"
                             else -> "Not configured"
                         }
                         ListItem(
                             headlineContent = { Text(p.name ?: p.id) },
-                            supportingContent = { Text(p.description ?: "") },
+                            supportingContent = {
+                                Column {
+                                    Text(p.description ?: "")
+                                    Text(status, style = MaterialTheme.typography.labelSmall,
+                                        color = if (p.enabled) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
                             trailingContent = {
-                                Text(
-                                    status,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (p.enabled && p.gatewayRunning)
-                                        MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                androidx.compose.material3.Switch(
+                                    checked = p.enabled,
+                                    onCheckedChange = { vm.toggle(p.id, it) },
                                 )
                             },
                         )

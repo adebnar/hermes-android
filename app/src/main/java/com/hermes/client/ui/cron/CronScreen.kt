@@ -28,9 +28,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun CronScreen(
     onMenu: () -> Unit,
     onOpen: (String) -> Unit = {},
+    onNew: () -> Unit = {},
     vm: CronViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    // Reload when returning to this screen (e.g. after create/edit/delete) so the list is fresh.
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { vm.load() }
 
     Scaffold(
         topBar = {
@@ -44,6 +47,11 @@ fun CronScreen(
                     }
                 },
                 navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+            )
+        },
+        floatingActionButton = {
+            androidx.compose.material3.ExtendedFloatingActionButton(
+                onClick = onNew, text = { Text("New") }, icon = {},
             )
         },
     ) { padding ->

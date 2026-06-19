@@ -44,6 +44,7 @@ import com.hermes.client.ui.util.formatIso
 fun CronDetailScreen(
     jobId: String,
     onBack: () -> Unit,
+    onEdit: () -> Unit = {},
     vm: CronDetailViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -97,6 +98,8 @@ fun CronDetailScreen(
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 Button(onClick = { vm.trigger() }) { Text("Run now") }
+                                Spacer(Modifier.width(8.dp))
+                                OutlinedButton(onClick = onEdit) { Text("Edit") }
                                 Spacer(Modifier.width(8.dp))
                                 TextButton(onClick = { confirmingDelete = true }) { Text("Delete") }
                             }

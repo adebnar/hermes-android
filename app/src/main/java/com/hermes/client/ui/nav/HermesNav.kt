@@ -13,6 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import com.hermes.client.ui.admin.SessionAdminScreen
 import com.hermes.client.ui.chat.ChatScreen
 import com.hermes.client.ui.cron.CronDetailScreen
+import com.hermes.client.ui.cron.CronEditScreen
 import com.hermes.client.ui.cron.CronScreen
 import com.hermes.client.ui.management.ManagementScreen
 import com.hermes.client.ui.messaging.MessagingScreen
@@ -98,12 +99,21 @@ fun HermesNav(hasConfig: Boolean) {
                 CronScreen(
                     onMenu = openDrawer,
                     onOpen = { id -> nav.navigate("cron_detail/$id") },
+                    onNew = { nav.navigate("cron_edit/new") },
                 )
             }
             composable("cron_detail/{id}") { entry ->
+                val id = entry.arguments?.getString("id") ?: ""
                 CronDetailScreen(
-                    jobId = entry.arguments?.getString("id") ?: "",
+                    jobId = id,
                     onBack = { nav.popBackStack() },
+                    onEdit = { nav.navigate("cron_edit/$id") },
+                )
+            }
+            composable("cron_edit/{id}") { entry ->
+                CronEditScreen(
+                    jobId = entry.arguments?.getString("id") ?: "new",
+                    onDone = { nav.popBackStack() },
                 )
             }
             composable("messaging") { MessagingScreen(onMenu = openDrawer) }

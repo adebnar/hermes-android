@@ -163,6 +163,39 @@ class HermesRestApi(
     suspend fun resumeCron(jobId: String, profile: String? = null) = cronAction(jobId, "resume", profile)
     suspend fun triggerCron(jobId: String, profile: String? = null) = cronAction(jobId, "trigger", profile)
 
+    suspend fun createCron(prompt: String, schedule: String, name: String, profile: String? = null) =
+        withContext(Dispatchers.IO) {
+            val obj = buildJsonObject {
+                put("prompt", prompt); put("schedule", schedule)
+                if (name.isNotBlank()) put("name", name)
+            }
+            val payload = json.encodeToString(JsonObject.serializer(), obj)
+                .toRequestBody("application/json".toMediaType())
+            okHttp.newCall(builder("/api/cron/jobs${profileParam(profile, first = true)}").post(payload).build())
+                .execute().use { resp ->
+                    if (!resp.isSuccessful) {
+                        val body = resp.body?.string().orEmpty().take(160)
+                        throw HermesApiException(resp.code, "create cron failed: $body")
+                    }
+                }
+        }
+
+    suspend fun updateCron(jobId: String, prompt: String, schedule: String, name: String, profile: String? = null) =
+        withContext(Dispatchers.IO) {
+            val obj = buildJsonObject {
+                put("prompt", prompt); put("schedule", schedule); put("name", name)
+            }
+            val payload = json.encodeToString(JsonObject.serializer(), obj)
+                .toRequestBody("application/json".toMediaType())
+            okHttp.newCall(builder("/api/cron/jobs/$jobId${profileParam(profile, first = true)}").put(payload).build())
+                .execute().use { resp ->
+                    if (!resp.isSuccessful) {
+                        val body = resp.body?.string().orEmpty().take(160)
+                        throw HermesApiException(resp.code, "update cron failed: $body")
+                    }
+                }
+        }
+
     suspend fun deleteCron(jobId: String, profile: String? = null) = withContext(Dispatchers.IO) {
         okHttp.newCall(builder("/api/cron/jobs/$jobId${profileParam(profile, first = true)}").delete().build())
             .execute().use { resp ->
@@ -246,6 +279,19 @@ class HermesRestApi(
 
     suspend fun messagingPlatforms(): List<MessagingPlatformDto> =
         get<MessagingPlatformsDto>("/api/messaging/platforms").platforms
+
+    suspend fun setMessagingEnabled(platformId: String, enabled: Boolean) = withContext(Dispatchers.IO) {
+        val obj = buildJsonObject { put("enabled", enabled) }
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+            .toRequestBody("application/json".toMediaType())
+        okHttp.newCall(builder("/api/messaging/platforms/$platformId").put(payload).build())
+            .execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    val body = resp.body?.string().orEmpty().take(160)
+                    throw HermesApiException(resp.code, "toggle platform failed: $body")
+                }
+            }
+    }
 
     suspend fun setActiveProfile(name: String) = withContext(Dispatchers.IO) {
         val obj: JsonObject = buildJsonObject { put("name", name) }
