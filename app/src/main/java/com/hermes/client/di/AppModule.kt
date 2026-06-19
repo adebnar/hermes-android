@@ -115,4 +115,14 @@ object AppModule {
     @Singleton
     fun provideSettingsStore(@ApplicationContext context: Context): com.hermes.client.data.repository.SettingsStore =
         com.hermes.client.data.repository.SettingsStore(context)
+
+    @Provides
+    @Singleton
+    fun provideConfigRepository(rest: HermesRestApi): com.hermes.client.data.repository.ConfigRepository =
+        com.hermes.client.data.repository.ConfigRepository(rest)
+
+    @Provides
+    @Singleton
+    fun provideEnvRepository(rest: HermesRestApi): com.hermes.client.data.repository.EnvRepository =
+        com.hermes.client.data.repository.EnvRepository(rest)
 }

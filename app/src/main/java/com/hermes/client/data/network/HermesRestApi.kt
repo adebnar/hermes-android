@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -174,6 +175,61 @@ class HermesRestApi(
 
     suspend fun analyticsModels(profile: String? = null): List<ModelUsageDto> =
         get<ModelsUsageDto>("/api/analytics/models${profileParam(profile, first = true)}").models
+
+    // ---- Config (whole-object GET-modify-PUT so no fields are ever dropped) ----
+
+    suspend fun getConfig(profile: String? = null): JsonObject =
+        get("/api/config${profileParam(profile, first = true)}")
+
+    suspend fun putConfig(config: JsonObject, profile: String? = null) = withContext(Dispatchers.IO) {
+        // PUT /api/config expects the config wrapped as {"config": {...}} (422 otherwise).
+        val wrapped = JsonObject(mapOf("config" to config))
+        val payload = json.encodeToString(JsonObject.serializer(), wrapped)
+            .toRequestBody("application/json".toMediaType())
+        okHttp.newCall(builder("/api/config${profileParam(profile, first = true)}").put(payload).build())
+            .execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    val body = resp.body?.string().orEmpty().take(180)
+                    throw HermesApiException(resp.code, "HTTP ${resp.code}: $body")
+                }
+            }
+    }
+
+    suspend fun setProfileModel(name: String, provider: String, model: String) = withContext(Dispatchers.IO) {
+        val obj = buildJsonObject { put("provider", provider); put("model", model) }
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+            .toRequestBody("application/json".toMediaType())
+        okHttp.newCall(builder("/api/profiles/$name/model").put(payload).build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw HermesApiException(resp.code, "set profile model failed")
+        }
+    }
+
+    // ---- Env / API keys (per-key endpoints — safe by design) ----
+
+    suspend fun envVars(profile: String? = null): Map<String, EnvVarDto> =
+        get("/api/env${profileParam(profile, first = true)}")
+
+    suspend fun setEnv(key: String, value: String, profile: String? = null) = withContext(Dispatchers.IO) {
+        val obj = buildJsonObject {
+            put("key", key); put("value", value); if (profile != null) put("profile", profile)
+        }
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+            .toRequestBody("application/json".toMediaType())
+        okHttp.newCall(builder("/api/env").put(payload).build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw HermesApiException(resp.code, "set env failed")
+        }
+    }
+
+    suspend fun revealEnv(key: String, profile: String? = null): String = withContext(Dispatchers.IO) {
+        val obj = buildJsonObject { put("key", key); if (profile != null) put("profile", profile) }
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+            .toRequestBody("application/json".toMediaType())
+        okHttp.newCall(builder("/api/env/reveal").post(payload).build()).execute().use { resp ->
+            val body = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw HermesApiException(resp.code, "reveal env failed")
+            json.decodeFromString<JsonObject>(body)["value"]?.jsonPrimitive?.content ?: ""
+        }
+    }
 
     suspend fun skills(): List<SkillDto> = get("/api/skills")
 

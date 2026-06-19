@@ -21,6 +21,9 @@ import com.hermes.client.ui.profiles.ProfilesScreen
 import com.hermes.client.ui.sessions.SessionsScreen
 import com.hermes.client.ui.settings.AboutScreen
 import com.hermes.client.ui.settings.AppearanceScreen
+import com.hermes.client.ui.settings.EnvScreen
+import com.hermes.client.ui.settings.McpSettingsScreen
+import com.hermes.client.ui.settings.MemorySettingsScreen
 import com.hermes.client.ui.settings.SettingsScreen
 import com.hermes.client.ui.setup.SetupScreen
 import com.hermes.client.ui.tools.AgentsToolsScreen
@@ -111,6 +114,9 @@ fun HermesNav(hasConfig: Boolean) {
                 )
             }
             composable("settings_appearance") { AppearanceScreen(onBack = { nav.popBackStack() }) }
+            composable("settings_memory") { MemorySettingsScreen(onBack = { nav.popBackStack() }) }
+            composable("settings_mcp") { McpSettingsScreen(onBack = { nav.popBackStack() }) }
+            composable("settings_env") { EnvScreen(onBack = { nav.popBackStack() }) }
             composable("settings_about") { AboutScreen(onBack = { nav.popBackStack() }) }
             composable("management") {
                 ManagementScreen(

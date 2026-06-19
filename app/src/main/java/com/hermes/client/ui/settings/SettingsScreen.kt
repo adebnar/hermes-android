@@ -34,11 +34,11 @@ fun SettingsScreen(
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
             Entry("Appearance", "Theme, light/dark, tool-call display") { onNavigate("settings_appearance") }
             HorizontalDivider()
-            Entry("Models & defaults", "Default model, reasoning, memory — coming next") {}
+            Entry("Models & memory", "Default model, memory toggles & budgets") { onNavigate("settings_memory") }
             HorizontalDivider()
-            Entry("MCP servers", "Connected MCP servers — coming next") {}
+            Entry("MCP servers", "View and edit connected MCP servers") { onNavigate("settings_mcp") }
             HorizontalDivider()
-            Entry("API keys & env", "Provider keys and tool env vars — coming next") {}
+            Entry("API keys & env", "Provider keys and tool env vars") { onNavigate("settings_env") }
             HorizontalDivider()
             Entry("About", "App and gateway version") { onNavigate("settings_about") }
         }

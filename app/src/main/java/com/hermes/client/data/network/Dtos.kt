@@ -145,6 +145,15 @@ data class ModelOptionDto(
 )
 @Serializable data class ModelsUsageDto(val models: List<ModelUsageDto> = emptyList())
 
+@Serializable data class EnvVarDto(
+    @SerialName("is_set") val isSet: Boolean = false,
+    @SerialName("redacted_value") val redactedValue: String? = null,
+    val description: String? = null,
+    val category: String? = null,
+    @SerialName("is_password") val isPassword: Boolean = false,
+    val advanced: Boolean = false,
+)
+
 @Serializable data class ToolsetDto(
     val name: String,
     val label: String? = null,
