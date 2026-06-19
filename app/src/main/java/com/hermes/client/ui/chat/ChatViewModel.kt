@@ -8,6 +8,7 @@ import com.hermes.client.data.network.ModelOptionDto
 import com.hermes.client.data.network.ProfileDto
 import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.ModelRepository
+import com.hermes.client.data.repository.ProfileManager
 import com.hermes.client.data.repository.ProfileRepository
 import com.hermes.client.data.repository.SessionRepository
 import com.hermes.client.domain.ChatMessage
@@ -28,6 +29,7 @@ class ChatViewModel @Inject constructor(
     private val sessions: SessionRepository,
     private val modelRepo: ModelRepository,
     private val profileRepo: ProfileRepository,
+    private val profileManager: ProfileManager,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChatUiState.empty())
@@ -54,7 +56,7 @@ class ChatViewModel @Inject constructor(
         connJob?.cancel()
         viewModelScope.launch {
             try {
-                val history = sessions.history(id)
+                val history = sessions.history(id, profileManager.active.value)
                 _state.value = ChatUiState(messages = history)
             } catch (e: HermesApiException) {
                 if (e.code == 401) { _unauthorized.value = true; return@launch }

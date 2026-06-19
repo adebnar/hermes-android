@@ -37,6 +37,7 @@ class ChatViewModelTest {
     private val sessionRepo = mockk<SessionRepository>(relaxed = true)
     private val modelRepo = mockk<ModelRepository>(relaxed = true)
     private val profileRepo = mockk<ProfileRepository>(relaxed = true)
+    private val profileManager = mockk<com.hermes.client.data.repository.ProfileManager>(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
@@ -45,12 +46,13 @@ class ChatViewModelTest {
         // resume returns null here so the ViewModel keeps the opened id stable for these tests
         // (production switches to the live handle resume returns).
         coEvery { chatRepo.resume(any()) } returns null
-        coEvery { sessionRepo.history(any()) } returns emptyList()
+        every { profileManager.active } returns MutableStateFlow<String?>(null)
+        coEvery { sessionRepo.history(any(), any()) } returns emptyList()
         coEvery { modelRepo.options() } returns emptyList()
         coEvery { profileRepo.list() } returns emptyList()
     }
 
-    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo)
+    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager)
 
     @Test fun streamed_delta_appears_in_state() = runTest {
         val vm = buildVm()

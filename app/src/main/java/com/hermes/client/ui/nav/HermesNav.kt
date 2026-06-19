@@ -12,6 +12,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.hermes.client.ui.admin.SessionAdminScreen
 import com.hermes.client.ui.chat.ChatScreen
+import com.hermes.client.ui.cron.CronScreen
 import com.hermes.client.ui.management.ManagementScreen
 import com.hermes.client.ui.models.ModelsScreen
 import com.hermes.client.ui.profiles.ProfilesScreen
@@ -83,6 +84,7 @@ fun HermesNav(hasConfig: Boolean) {
             }
             composable("models") { ModelsScreen(onMenu = openDrawer) }
             composable("profiles") { ProfilesScreen(onMenu = openDrawer) }
+            composable("cron") { CronScreen(onMenu = openDrawer) }
             composable("management") {
                 ManagementScreen(
                     onMenu = openDrawer,

@@ -11,7 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.drop
+
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -37,16 +37,19 @@ class SessionsViewModel @Inject constructor(
 
     init {
         chat.connect()
-        refresh()
         viewModelScope.launch { profileManager.refresh() }
-        // When the active profile changes (via the drawer), reload this profile's sessions.
-        viewModelScope.launch { profileManager.changed.drop(1).collect { refresh() } }
+        // Reload this profile's sessions whenever the selected profile changes (including the
+        // first value once it's loaded). Sessions are scoped server-side via ?profile=, so the
+        // list always reflects the profile picked in the drawer.
+        viewModelScope.launch {
+            profileManager.active.collect { refresh() }
+        }
     }
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
         try {
-            val list = sessions.list()
+            val list = sessions.list(profileManager.active.value)
             _state.value = SessionsUiState(sessions = list)
         } catch (e: HermesApiException) {
             if (e.code == 401) {

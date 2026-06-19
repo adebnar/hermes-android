@@ -24,6 +24,7 @@ private val DESTINATIONS = listOf(
     "sessions" to "Sessions",
     "models" to "Models",
     "profiles" to "Profiles",
+    "cron" to "Cron jobs",
     "management" to "Management",
 )
 

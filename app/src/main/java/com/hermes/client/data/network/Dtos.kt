@@ -70,6 +70,20 @@ data class ModelOptionDto(
     val enabled: Boolean = false,
 )
 
+@Serializable data class CronScheduleDto(
+    val kind: String? = null,
+    val expr: String? = null,
+    val display: String? = null,
+)
+@Serializable data class CronJobDto(
+    val id: String,
+    val name: String? = null,
+    val schedule: CronScheduleDto? = null,
+    val enabled: Boolean = true,
+    val profile: String? = null,
+    val prompt: String? = null,
+)
+
 @Serializable data class ToolsetDto(
     val name: String,
     val label: String? = null,

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hermes.client.data.network.SearchResultDto
 import com.hermes.client.data.network.SessionStatsDto
+import com.hermes.client.data.repository.ProfileManager
 import com.hermes.client.data.repository.SessionRepository
 import com.hermes.client.domain.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,15 +25,18 @@ data class SessionAdminUiState(
 @HiltViewModel
 class SessionAdminViewModel @Inject constructor(
     private val sessions: SessionRepository,
+    private val profileManager: ProfileManager,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SessionAdminUiState())
     val state: StateFlow<SessionAdminUiState> = _state.asStateFlow()
 
+    private val profile: String? get() = profileManager.active.value
+
     init { load() }
 
     fun load() = viewModelScope.launch {
-        runCatching { sessions.stats() }.onSuccess { _state.value = _state.value.copy(stats = it) }
-        runCatching { sessions.archived() }.onSuccess { _state.value = _state.value.copy(archived = it) }
+        runCatching { sessions.stats(profile) }.onSuccess { _state.value = _state.value.copy(stats = it) }
+        runCatching { sessions.archived(profile) }.onSuccess { _state.value = _state.value.copy(archived = it) }
     }
 
     fun onQueryChange(q: String) { _state.value = _state.value.copy(query = q) }
@@ -41,7 +45,7 @@ class SessionAdminViewModel @Inject constructor(
         val q = _state.value.query.trim()
         if (q.isBlank()) { _state.value = _state.value.copy(results = emptyList()); return@launch }
         _state.value = _state.value.copy(searching = true)
-        runCatching { sessions.search(q) }
+        runCatching { sessions.search(q, profile) }
             .onSuccess { _state.value = _state.value.copy(results = it, searching = false) }
             .onFailure { _state.value = _state.value.copy(results = emptyList(), searching = false) }
     }

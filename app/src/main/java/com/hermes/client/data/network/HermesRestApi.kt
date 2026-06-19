@@ -57,11 +57,20 @@ class HermesRestApi(
         return statusFor(cfg.baseUrl, cfg.token)
     }
 
-    suspend fun sessions(limit: Int, offset: Int): List<SessionDto> =
-        get<SessionListDto>("/api/sessions?limit=$limit&offset=$offset&order=recent").sessions
+    suspend fun sessions(limit: Int, offset: Int, profile: String? = null): List<SessionDto> =
+        get<SessionListDto>(
+            "/api/sessions?limit=$limit&offset=$offset&order=recent${profileParam(profile)}",
+        ).sessions
 
-    suspend fun messages(sessionId: String): List<MessageDto> =
-        get<MessagesDto>("/api/sessions/$sessionId/messages").messages
+    suspend fun messages(sessionId: String, profile: String? = null): List<MessageDto> =
+        get<MessagesDto>("/api/sessions/$sessionId/messages${profileParam(profile, first = true)}").messages
+
+    /** "&profile=x" (or "?profile=x" when [first]) — empty when profile is null/blank. */
+    private fun profileParam(profile: String?, first: Boolean = false): String {
+        if (profile.isNullOrBlank()) return ""
+        val sep = if (first) "?" else "&"
+        return "${sep}profile=${java.net.URLEncoder.encode(profile, "UTF-8")}"
+    }
 
     suspend fun profiles(): List<ProfileDto> = get<ProfilesDto>("/api/profiles").profiles
 
@@ -114,15 +123,21 @@ class HermesRestApi(
         }
     }
 
-    suspend fun sessionStats(): SessionStatsDto = get("/api/sessions/stats")
+    suspend fun sessionStats(profile: String? = null): SessionStatsDto =
+        get("/api/sessions/stats${profileParam(profile, first = true)}")
 
-    suspend fun searchSessions(query: String): List<SearchResultDto> {
+    suspend fun searchSessions(query: String, profile: String? = null): List<SearchResultDto> {
         val q = java.net.URLEncoder.encode(query, "UTF-8")
-        return get<SearchResultsDto>("/api/sessions/search?q=$q&limit=30").results
+        return get<SearchResultsDto>("/api/sessions/search?q=$q&limit=30${profileParam(profile)}").results
     }
 
-    suspend fun archivedSessions(): List<SessionDto> =
-        get<SessionListDto>("/api/sessions?archived=only&limit=50&order=recent").sessions
+    suspend fun archivedSessions(profile: String? = null): List<SessionDto> =
+        get<SessionListDto>(
+            "/api/sessions?archived=only&limit=50&order=recent${profileParam(profile)}",
+        ).sessions
+
+    suspend fun cronJobs(profile: String? = null): List<CronJobDto> =
+        get("/api/cron/jobs${profileParam(profile, first = true)}")
 
     suspend fun skills(): List<SkillDto> = get("/api/skills")
 
