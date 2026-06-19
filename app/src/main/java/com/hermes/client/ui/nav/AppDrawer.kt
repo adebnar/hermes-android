@@ -33,6 +33,7 @@ private val DESTINATIONS = listOf(
     "messaging" to "Messaging",
     "usage" to "Usage",
     "management" to "Management",
+    "settings" to "Settings",
 )
 
 @Composable

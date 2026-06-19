@@ -19,6 +19,9 @@ import com.hermes.client.ui.messaging.MessagingScreen
 import com.hermes.client.ui.models.ModelsScreen
 import com.hermes.client.ui.profiles.ProfilesScreen
 import com.hermes.client.ui.sessions.SessionsScreen
+import com.hermes.client.ui.settings.AboutScreen
+import com.hermes.client.ui.settings.AppearanceScreen
+import com.hermes.client.ui.settings.SettingsScreen
 import com.hermes.client.ui.setup.SetupScreen
 import com.hermes.client.ui.tools.AgentsToolsScreen
 import com.hermes.client.ui.usage.UsageScreen
@@ -101,6 +104,14 @@ fun HermesNav(hasConfig: Boolean) {
             }
             composable("messaging") { MessagingScreen(onMenu = openDrawer) }
             composable("usage") { UsageScreen(onMenu = openDrawer) }
+            composable("settings") {
+                SettingsScreen(
+                    onMenu = openDrawer,
+                    onNavigate = { dest -> nav.navigate(dest) { launchSingleTop = true } },
+                )
+            }
+            composable("settings_appearance") { AppearanceScreen(onBack = { nav.popBackStack() }) }
+            composable("settings_about") { AboutScreen(onBack = { nav.popBackStack() }) }
             composable("management") {
                 ManagementScreen(
                     onMenu = openDrawer,

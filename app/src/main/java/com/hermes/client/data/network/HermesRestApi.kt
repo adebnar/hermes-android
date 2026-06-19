@@ -57,6 +57,9 @@ class HermesRestApi(
         return statusFor(cfg.baseUrl, cfg.token)
     }
 
+    /** Public /api/status — gateway version + running state. */
+    suspend fun gatewayStatus(): GatewayStatusDto = get("/api/status")
+
     suspend fun sessions(limit: Int, offset: Int, profile: String? = null): List<SessionDto> =
         get<SessionListDto>(
             "/api/sessions?limit=$limit&offset=$offset&order=recent${profileParam(profile)}",

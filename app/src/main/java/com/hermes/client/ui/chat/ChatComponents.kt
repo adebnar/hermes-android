@@ -145,6 +145,8 @@ private fun ThinkingCard(text: String) {
 
 @Composable
 private fun ToolCard(tool: ToolCall) {
+    // Product mode hides raw tool payloads; Technical shows them.
+    val technical = com.hermes.client.ui.theme.LocalToolCallTechnical.current
     Surface(
         tonalElevation = 2.dp,
         shape = RoundedCornerShape(8.dp),
@@ -155,7 +157,7 @@ private fun ToolCard(tool: ToolCall) {
                 text = if (tool.status == ToolStatus.RUNNING) "▶ ${tool.name}…" else "✓ ${tool.name}",
                 style = MaterialTheme.typography.labelMedium,
             )
-            if (tool.output.isNotBlank()) {
+            if (technical && tool.output.isNotBlank()) {
                 Text(tool.output, style = MaterialTheme.typography.bodySmall, maxLines = 6)
             }
         }

@@ -5,6 +5,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class StatusDto(val ok: Boolean = true)
 
+@Serializable data class GatewayStatusDto(
+    val version: String? = null,
+    @SerialName("gateway_running") val gatewayRunning: Boolean = false,
+    @SerialName("gateway_state") val gatewayState: String? = null,
+)
+
 @Serializable data class SessionDto(
     // The gateway returns the session id under "id" (not "session_id").
     @SerialName("id") val sessionId: String,
