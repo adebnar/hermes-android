@@ -1,7 +1,10 @@
 package com.hermes.client.ui.chat
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +30,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import com.hermes.client.domain.ChatMessage
 import com.hermes.client.domain.Role
 import com.hermes.client.domain.ToolCall
@@ -52,6 +59,17 @@ fun ChatMessageList(state: ChatUiState, modifier: Modifier = Modifier) {
         if (atBottom) listState.animateScrollToItem(lastIndex)
     }
 
+    if (state.messages.isEmpty()) {
+        Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Text(
+                "Send a message to start the conversation.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize().padding(horizontal = 12.dp),
@@ -61,6 +79,7 @@ fun ChatMessageList(state: ChatUiState, modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubble(msg: ChatMessage) {
     val isUser = msg.role == Role.USER
@@ -69,6 +88,8 @@ private fun MessageBubble(msg: ChatMessage) {
         isUser -> MaterialTheme.colorScheme.primaryContainer
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -78,6 +99,16 @@ private fun MessageBubble(msg: ChatMessage) {
                 .widthIn(max = 320.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(bubbleColor)
+                // Long-press any bubble to copy its text to the clipboard.
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = {
+                        if (msg.text.isNotBlank()) {
+                            clipboard.setText(AnnotatedString(msg.text))
+                            Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                )
                 .padding(12.dp),
         ) {
             if (msg.thinking.isNotBlank()) ThinkingCard(msg.thinking)
