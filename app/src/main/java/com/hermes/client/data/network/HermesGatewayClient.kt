@@ -55,6 +55,10 @@ open class HermesGatewayClient(
     @Volatile private var ws: WebSocket? = null
     @Volatile protected var manuallyClosed = false
     private val attempt = AtomicInteger(0)
+    // Monotonic socket generation. Each openSocket() bumps it; a socket's callbacks are
+    // ignored once a newer socket has been opened, so an in-flight backoff reopen can never
+    // race a manual reconnectNow() into two live sockets.
+    private val generation = AtomicInteger(0)
 
     // Readiness gate: awaited by call() before sending RPCs.
     // Recreated (uncompleted) on each openSocket(); completed when gateway.ready arrives;
@@ -71,20 +75,35 @@ open class HermesGatewayClient(
     }
 
     protected fun openSocket() {
+        val gen = generation.incrementAndGet()
         // Install a fresh, uncompleted readiness gate for this new socket attempt.
         readyGate = CompletableDeferred()
         _state.value = ConnectionState.Connecting
         val request = Request.Builder().url(wsUrlProvider()).build()
-        ws = okHttp.newWebSocket(request, listener)
+        ws = okHttp.newWebSocket(request, makeListener(gen))
     }
 
-    private val listener = object : WebSocketListener() {
+    /**
+     * Force an immediate reconnect, bypassing any pending backoff wait. The previous socket is
+     * cancelled; because openSocket() bumps the generation first, the old socket's close callback
+     * is ignored and cannot schedule a competing reopen.
+     */
+    fun reconnectNow() {
+        manuallyClosed = false
+        attempt.set(0)
+        val old = ws
+        openSocket()
+        old?.cancel()
+    }
+
+    private fun makeListener(gen: Int) = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
             // Do NOT set state to Connected here. Wait for gateway.ready event.
             // Do NOT reset the attempt counter here either.
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            if (gen != generation.get()) return // superseded socket — drop late frames
             text.lineSequence().filter { it.isNotBlank() }.forEach { line ->
                 when (val msg = parseInbound(json, line)) {
                     is RpcResult -> pending.remove(msg.id)?.complete(msg.result)
@@ -104,15 +123,17 @@ open class HermesGatewayClient(
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            onSocketClosed(t.message ?: "connection failed")
+            onSocketClosed(gen, t.message ?: "connection failed")
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-            onSocketClosed(reason.ifBlank { "closed" })
+            onSocketClosed(gen, reason.ifBlank { "closed" })
         }
     }
 
-    protected open fun onSocketClosed(reason: String) {
+    protected open fun onSocketClosed(gen: Int, reason: String) {
+        // A newer socket has superseded this one (e.g. reconnectNow()) — ignore its death.
+        if (gen != generation.get()) return
         // Fail any call() that is currently awaiting readiness so it throws immediately.
         readyGate.completeExceptionally(GatewayRpcException(0, reason))
         failAllPending(reason)
@@ -124,7 +145,7 @@ open class HermesGatewayClient(
         val delayMs = backoff.delayFor(attempt.getAndIncrement())
         scope.launch {
             kotlinx.coroutines.delay(delayMs)
-            if (!manuallyClosed) openSocket()
+            if (!manuallyClosed && gen == generation.get()) openSocket()
         }
     }
 

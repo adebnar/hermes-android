@@ -111,6 +111,9 @@ class ChatViewModel @Inject constructor(
 
     fun stop() { viewModelScope.launch { runCatching { chat.interrupt(sessionId) } } }
 
+    /** User tapped "Retry" on the offline banner — force an immediate reconnect. */
+    fun reconnect() { runCatching { chat.reconnect() } }
+
     fun approve(approve: Boolean) {
         _state.value = _state.value.copy(pendingApproval = null)
         viewModelScope.launch { runCatching { chat.respondApproval(sessionId, approve) } }

@@ -17,6 +17,9 @@ class ChatRepository(private val client: HermesGatewayClient) {
     fun connect() = client.connect()
     fun disconnect() = client.close()
 
+    /** Force an immediate reconnect, skipping the backoff wait (user tapped "Retry"). */
+    fun reconnect() = client.reconnectNow()
+
     suspend fun createSession(): String {
         val result = client.call("session.create", buildJsonObject {})
         return result.jsonObject["session_id"]?.jsonPrimitive?.content

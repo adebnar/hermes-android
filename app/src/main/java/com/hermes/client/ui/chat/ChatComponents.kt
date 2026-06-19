@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -18,6 +19,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,7 +38,22 @@ import com.mikepenz.markdown.m3.markdownTypography
 
 @Composable
 fun ChatMessageList(state: ChatUiState, modifier: Modifier = Modifier) {
+    val listState = rememberLazyListState()
+    val lastIndex = state.messages.lastIndex
+    // Length of the last (streaming) message: changes on every delta so we follow the stream.
+    val tailLen = state.messages.lastOrNull()?.text?.length ?: 0
+
+    // Auto-scroll to the newest content — but only when the user is already pinned near the
+    // bottom, so scrolling back through history isn't yanked away mid-stream.
+    LaunchedEffect(state.messages.size, tailLen) {
+        if (lastIndex < 0) return@LaunchedEffect
+        val visible = listState.layoutInfo.visibleItemsInfo
+        val atBottom = visible.isEmpty() || (visible.lastOrNull()?.index ?: 0) >= lastIndex - 1
+        if (atBottom) listState.animateScrollToItem(lastIndex)
+    }
+
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize().padding(horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
