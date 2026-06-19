@@ -1,5 +1,6 @@
 package com.hermes.client.ui.messaging
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,6 +75,7 @@ class MessagingViewModel @Inject constructor(
 @Composable
 fun MessagingScreen(
     onMenu: () -> Unit,
+    onSetup: (String) -> Unit = {},
     vm: MessagingViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -107,7 +109,7 @@ fun MessagingScreen(
                             headlineContent = { Text(p.name ?: p.id) },
                             supportingContent = {
                                 Column {
-                                    Text(p.description ?: "")
+                                    Text("${p.description ?: ""}  ·  Tap to set up")
                                     Text(status, style = MaterialTheme.typography.labelSmall,
                                         color = if (p.enabled) MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -116,9 +118,11 @@ fun MessagingScreen(
                             trailingContent = {
                                 androidx.compose.material3.Switch(
                                     checked = p.enabled,
-                                    onCheckedChange = { vm.toggle(p.id, it) },
+                                    // Only allow the quick toggle once configured; otherwise open setup.
+                                    onCheckedChange = { if (p.configured) vm.toggle(p.id, it) else onSetup(p.id) },
                                 )
                             },
+                            modifier = Modifier.clickable { onSetup(p.id) },
                         )
                         HorizontalDivider()
                     }

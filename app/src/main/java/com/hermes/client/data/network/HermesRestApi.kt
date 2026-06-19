@@ -280,15 +280,26 @@ class HermesRestApi(
     suspend fun messagingPlatforms(): List<MessagingPlatformDto> =
         get<MessagingPlatformsDto>("/api/messaging/platforms").platforms
 
-    suspend fun setMessagingEnabled(platformId: String, enabled: Boolean) = withContext(Dispatchers.IO) {
-        val obj = buildJsonObject { put("enabled", enabled) }
+    suspend fun setMessagingEnabled(platformId: String, enabled: Boolean) =
+        configureMessaging(platformId, emptyMap(), enabled)
+
+    /** Configure a messaging platform: set env vars and/or enable/disable it. */
+    suspend fun configureMessaging(
+        platformId: String,
+        env: Map<String, String>,
+        enabled: Boolean?,
+    ) = withContext(Dispatchers.IO) {
+        val obj = buildJsonObject {
+            if (enabled != null) put("enabled", enabled)
+            if (env.isNotEmpty()) put("env", buildJsonObject { env.forEach { (k, v) -> put(k, v) } })
+        }
         val payload = json.encodeToString(JsonObject.serializer(), obj)
             .toRequestBody("application/json".toMediaType())
         okHttp.newCall(builder("/api/messaging/platforms/$platformId").put(payload).build())
             .execute().use { resp ->
                 if (!resp.isSuccessful) {
-                    val body = resp.body?.string().orEmpty().take(160)
-                    throw HermesApiException(resp.code, "toggle platform failed: $body")
+                    val body = resp.body?.string().orEmpty().take(180)
+                    throw HermesApiException(resp.code, "configure platform failed: $body")
                 }
             }
     }

@@ -17,6 +17,7 @@ import com.hermes.client.ui.cron.CronEditScreen
 import com.hermes.client.ui.cron.CronScreen
 import com.hermes.client.ui.management.ManagementScreen
 import com.hermes.client.ui.messaging.MessagingScreen
+import com.hermes.client.ui.messaging.MessagingSetupScreen
 import com.hermes.client.ui.models.ModelsScreen
 import com.hermes.client.ui.profiles.ProfilesScreen
 import com.hermes.client.ui.sessions.SessionsScreen
@@ -116,7 +117,18 @@ fun HermesNav(hasConfig: Boolean) {
                     onDone = { nav.popBackStack() },
                 )
             }
-            composable("messaging") { MessagingScreen(onMenu = openDrawer) }
+            composable("messaging") {
+                MessagingScreen(
+                    onMenu = openDrawer,
+                    onSetup = { id -> nav.navigate("messaging_setup/$id") },
+                )
+            }
+            composable("messaging_setup/{id}") { entry ->
+                MessagingSetupScreen(
+                    platformId = entry.arguments?.getString("id") ?: "",
+                    onDone = { nav.popBackStack() },
+                )
+            }
             composable("usage") { UsageScreen(onMenu = openDrawer) }
             composable("settings") {
                 SettingsScreen(

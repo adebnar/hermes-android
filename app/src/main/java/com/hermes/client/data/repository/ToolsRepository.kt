@@ -26,4 +26,6 @@ class ToolsRepository(private val rest: HermesRestApi) {
     suspend fun messagingPlatforms(): List<MessagingPlatformDto> = rest.messagingPlatforms()
     suspend fun setMessagingEnabled(platformId: String, enabled: Boolean) =
         rest.setMessagingEnabled(platformId, enabled)
+    suspend fun configureMessaging(platformId: String, env: Map<String, String>, enabled: Boolean?) =
+        rest.configureMessaging(platformId, env, enabled)
 }

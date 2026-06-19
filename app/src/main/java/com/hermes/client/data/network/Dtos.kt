@@ -113,6 +113,15 @@ data class ModelOptionDto(
 )
 @Serializable data class CronRunsDto(val runs: List<CronRunDto> = emptyList())
 
+@Serializable data class MessagingEnvVarDto(
+    val key: String,
+    val required: Boolean = false,
+    @SerialName("is_set") val isSet: Boolean = false,
+    val description: String? = null,
+    val prompt: String? = null,
+    val url: String? = null,
+    @SerialName("is_password") val isPassword: Boolean = false,
+)
 @Serializable data class MessagingPlatformDto(
     val id: String,
     val name: String? = null,
@@ -121,6 +130,8 @@ data class ModelOptionDto(
     val configured: Boolean = false,
     @SerialName("gateway_running") val gatewayRunning: Boolean = false,
     val state: String? = null,
+    @SerialName("docs_url") val docsUrl: String? = null,
+    @SerialName("env_vars") val envVars: List<MessagingEnvVarDto> = emptyList(),
 )
 @Serializable data class MessagingPlatformsDto(val platforms: List<MessagingPlatformDto> = emptyList())
 
