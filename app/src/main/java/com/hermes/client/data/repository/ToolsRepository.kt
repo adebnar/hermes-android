@@ -2,6 +2,7 @@ package com.hermes.client.data.repository
 
 import com.hermes.client.data.network.CronJobDto
 import com.hermes.client.data.network.HermesRestApi
+import com.hermes.client.data.network.MessagingPlatformDto
 import com.hermes.client.data.network.SkillDto
 import com.hermes.client.data.network.ToolsetDto
 
@@ -10,4 +11,5 @@ class ToolsRepository(private val rest: HermesRestApi) {
     suspend fun toggleSkill(name: String, enabled: Boolean) = rest.toggleSkill(name, enabled)
     suspend fun toolsets(): List<ToolsetDto> = rest.toolsets()
     suspend fun cronJobs(profile: String? = null): List<CronJobDto> = rest.cronJobs(profile)
+    suspend fun messagingPlatforms(): List<MessagingPlatformDto> = rest.messagingPlatforms()
 }

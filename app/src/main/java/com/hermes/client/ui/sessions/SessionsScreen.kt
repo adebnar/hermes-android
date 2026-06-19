@@ -5,7 +5,9 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -45,6 +47,7 @@ fun SessionsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
+    val pinnedIds by vm.pinnedIds.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     // I1: route to Setup when a 401 is received
@@ -81,15 +84,42 @@ fun SessionsScreen(
             when {
                 state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
-                else -> LazyColumn {
-                    items(state.sessions, key = { it.id }) { s ->
-                        SessionRow(
-                            session = s,
-                            onOpen = { onOpen(s.id) },
-                            onRename = { vm.rename(s.id, it) },
-                            onArchive = { vm.archive(s.id) },
-                            onDelete = { vm.delete(s.id) },
-                        )
+                else -> {
+                    val pinned = state.sessions.filter { it.id in pinnedIds }
+                    // Group the rest by workspace; "No workspace" sorts last.
+                    val groups = state.sessions.filterNot { it.id in pinnedIds }
+                        .groupBy { it.workspace }
+                        .toSortedMap(compareBy({ it == "No workspace" }, { it }))
+
+                    LazyColumn {
+                        if (pinned.isNotEmpty()) {
+                            item(key = "h-pinned") { SectionHeader("Pinned", pinned.size) }
+                            items(pinned, key = { "p-${it.id}" }) { s ->
+                                SessionRow(
+                                    session = s,
+                                    isPinned = true,
+                                    onOpen = { onOpen(s.id) },
+                                    onTogglePin = { vm.togglePin(s.id) },
+                                    onRename = { vm.rename(s.id, it) },
+                                    onArchive = { vm.archive(s.id) },
+                                    onDelete = { vm.delete(s.id) },
+                                )
+                            }
+                        }
+                        groups.forEach { (workspace, list) ->
+                            item(key = "h-$workspace") { SectionHeader(workspace, list.size) }
+                            items(list, key = { it.id }) { s ->
+                                SessionRow(
+                                    session = s,
+                                    isPinned = false,
+                                    onOpen = { onOpen(s.id) },
+                                    onTogglePin = { vm.togglePin(s.id) },
+                                    onRename = { vm.rename(s.id, it) },
+                                    onArchive = { vm.archive(s.id) },
+                                    onDelete = { vm.delete(s.id) },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -97,11 +127,33 @@ fun SessionsScreen(
     }
 }
 
+@Composable
+private fun SectionHeader(label: String, count: Int) {
+    androidx.compose.foundation.layout.Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label.uppercase(),
+            style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            count.toString(),
+            style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SessionRow(
     session: Session,
+    isPinned: Boolean,
     onOpen: () -> Unit,
+    onTogglePin: () -> Unit,
     onRename: (String) -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
@@ -112,7 +164,7 @@ private fun SessionRow(
 
     Box {
         ListItem(
-            headlineContent = { Text(session.title) },
+            headlineContent = { Text(if (isPinned) "📌  ${session.title}" else session.title) },
             supportingContent = { Text(session.model ?: "") },
             // Tap opens the session; long-press opens the management menu.
             modifier = Modifier.combinedClickable(
@@ -121,6 +173,10 @@ private fun SessionRow(
             ),
         )
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text(if (isPinned) "Unpin" else "Pin") },
+                onClick = { menuOpen = false; onTogglePin() },
+            )
             DropdownMenuItem(
                 text = { Text("Rename") },
                 onClick = { menuOpen = false; renaming = true },

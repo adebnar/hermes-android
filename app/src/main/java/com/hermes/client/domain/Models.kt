@@ -10,6 +10,9 @@ data class Session(
     val provider: String?,
     val messageCount: Int,
     val profile: String?,
+    // Workspace = basename of the session's cwd ("No workspace" when none), used for grouping.
+    val workspace: String = "No workspace",
+    val source: String? = null,
 )
 
 data class ToolCall(

@@ -10,6 +10,8 @@ fun SessionDto.toDomain() = Session(
     provider = provider,
     messageCount = messageCount,
     profile = profile,
+    workspace = cwd?.trimEnd('/')?.substringAfterLast('/')?.ifBlank { null } ?: "No workspace",
+    source = source,
 )
 
 fun MessageDto.toDomain() = ChatMessage(

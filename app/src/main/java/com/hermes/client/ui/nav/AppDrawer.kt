@@ -25,6 +25,7 @@ private val DESTINATIONS = listOf(
     "models" to "Models",
     "profiles" to "Profiles",
     "cron" to "Cron jobs",
+    "messaging" to "Messaging",
     "management" to "Management",
 )
 

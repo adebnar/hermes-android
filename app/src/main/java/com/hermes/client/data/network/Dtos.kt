@@ -14,6 +14,8 @@ import kotlinx.serialization.Serializable
     @SerialName("last_active") val lastActive: Double? = null,
     @SerialName("message_count") val messageCount: Int = 0,
     val profile: String? = null,
+    val cwd: String? = null,
+    val source: String? = null,
 )
 @Serializable data class SessionListDto(val sessions: List<SessionDto> = emptyList())
 
@@ -83,6 +85,17 @@ data class ModelOptionDto(
     val profile: String? = null,
     val prompt: String? = null,
 )
+
+@Serializable data class MessagingPlatformDto(
+    val id: String,
+    val name: String? = null,
+    val description: String? = null,
+    val enabled: Boolean = false,
+    val configured: Boolean = false,
+    @SerialName("gateway_running") val gatewayRunning: Boolean = false,
+    val state: String? = null,
+)
+@Serializable data class MessagingPlatformsDto(val platforms: List<MessagingPlatformDto> = emptyList())
 
 @Serializable data class ToolsetDto(
     val name: String,

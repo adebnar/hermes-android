@@ -4,14 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hermes.client.data.network.HermesApiException
 import com.hermes.client.data.repository.ChatRepository
+import com.hermes.client.data.repository.PinStore
 import com.hermes.client.data.repository.ProfileManager
 import com.hermes.client.data.repository.SessionRepository
 import com.hermes.client.domain.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -28,12 +31,20 @@ class SessionsViewModel @Inject constructor(
     private val sessions: SessionRepository,
     private val chat: ChatRepository,
     private val profileManager: ProfileManager,
+    private val pinStore: PinStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SessionsUiState())
     val state: StateFlow<SessionsUiState> = _state.asStateFlow()
 
     /** The active profile, shown as a subtitle so the tenant context is always visible. */
     val activeProfile: StateFlow<String?> = profileManager.active
+
+    /** Session ids pinned in the current profile (device-local). */
+    val pinnedIds: StateFlow<Set<String>> =
+        combine(pinStore.pinned, profileManager.active) { tokens, profile ->
+            val prefix = "${profile ?: "default"}/"
+            tokens.filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }.toSet()
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     init {
         chat.connect()
@@ -76,5 +87,9 @@ class SessionsViewModel @Inject constructor(
 
     fun delete(sessionId: String) = viewModelScope.launch {
         runCatching { sessions.delete(sessionId) }.onSuccess { refresh() }
+    }
+
+    fun togglePin(sessionId: String) = viewModelScope.launch {
+        pinStore.toggle(PinStore.token(profileManager.active.value, sessionId))
     }
 }

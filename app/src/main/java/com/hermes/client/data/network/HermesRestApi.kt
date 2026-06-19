@@ -152,6 +152,9 @@ class HermesRestApi(
 
     suspend fun toolsets(): List<ToolsetDto> = get("/api/tools/toolsets")
 
+    suspend fun messagingPlatforms(): List<MessagingPlatformDto> =
+        get<MessagingPlatformsDto>("/api/messaging/platforms").platforms
+
     suspend fun setActiveProfile(name: String) = withContext(Dispatchers.IO) {
         val obj: JsonObject = buildJsonObject { put("name", name) }
         val payload = json.encodeToString(JsonObject.serializer(), obj)
