@@ -83,6 +83,29 @@ class HermesRestApi(
         }
     }
 
+    /** Rename and/or archive a session via PATCH /api/sessions/{id}. */
+    suspend fun patchSession(
+        sessionId: String,
+        title: String? = null,
+        archived: Boolean? = null,
+    ) = withContext(Dispatchers.IO) {
+        val obj: JsonObject = buildJsonObject {
+            if (title != null) put("title", title)
+            if (archived != null) put("archived", archived)
+        }
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+            .toRequestBody("application/json".toMediaType())
+        okHttp.newCall(builder("/api/sessions/$sessionId").patch(payload).build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw HermesApiException(resp.code, "update session failed")
+        }
+    }
+
+    suspend fun deleteSession(sessionId: String) = withContext(Dispatchers.IO) {
+        okHttp.newCall(builder("/api/sessions/$sessionId").delete().build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw HermesApiException(resp.code, "delete session failed")
+        }
+    }
+
     suspend fun setActiveProfile(name: String) = withContext(Dispatchers.IO) {
         val obj: JsonObject = buildJsonObject { put("name", name) }
         val payload = json.encodeToString(JsonObject.serializer(), obj)
