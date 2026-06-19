@@ -105,4 +105,9 @@ object AppModule {
     @Singleton
     fun providePinStore(@ApplicationContext context: Context): com.hermes.client.data.repository.PinStore =
         com.hermes.client.data.repository.PinStore(context)
+
+    @Provides
+    @Singleton
+    fun provideAnalyticsRepository(rest: HermesRestApi): com.hermes.client.data.repository.AnalyticsRepository =
+        com.hermes.client.data.repository.AnalyticsRepository(rest)
 }

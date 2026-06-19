@@ -12,6 +12,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.hermes.client.ui.admin.SessionAdminScreen
 import com.hermes.client.ui.chat.ChatScreen
+import com.hermes.client.ui.cron.CronDetailScreen
 import com.hermes.client.ui.cron.CronScreen
 import com.hermes.client.ui.management.ManagementScreen
 import com.hermes.client.ui.messaging.MessagingScreen
@@ -20,6 +21,7 @@ import com.hermes.client.ui.profiles.ProfilesScreen
 import com.hermes.client.ui.sessions.SessionsScreen
 import com.hermes.client.ui.setup.SetupScreen
 import com.hermes.client.ui.tools.AgentsToolsScreen
+import com.hermes.client.ui.usage.UsageScreen
 import kotlinx.coroutines.launch
 
 /**
@@ -85,8 +87,20 @@ fun HermesNav(hasConfig: Boolean) {
             }
             composable("models") { ModelsScreen(onMenu = openDrawer) }
             composable("profiles") { ProfilesScreen(onMenu = openDrawer) }
-            composable("cron") { CronScreen(onMenu = openDrawer) }
+            composable("cron") {
+                CronScreen(
+                    onMenu = openDrawer,
+                    onOpen = { id -> nav.navigate("cron_detail/$id") },
+                )
+            }
+            composable("cron_detail/{id}") { entry ->
+                CronDetailScreen(
+                    jobId = entry.arguments?.getString("id") ?: "",
+                    onBack = { nav.popBackStack() },
+                )
+            }
             composable("messaging") { MessagingScreen(onMenu = openDrawer) }
+            composable("usage") { UsageScreen(onMenu = openDrawer) }
             composable("management") {
                 ManagementScreen(
                     onMenu = openDrawer,

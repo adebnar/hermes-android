@@ -139,6 +139,39 @@ class HermesRestApi(
     suspend fun cronJobs(profile: String? = null): List<CronJobDto> =
         get("/api/cron/jobs${profileParam(profile, first = true)}")
 
+    suspend fun cronJob(jobId: String, profile: String? = null): CronJobDto =
+        get("/api/cron/jobs/$jobId${profileParam(profile, first = true)}")
+
+    suspend fun cronRuns(jobId: String, profile: String? = null): List<CronRunDto> =
+        get<CronRunsDto>("/api/cron/jobs/$jobId/runs${profileParam(profile, first = true)}").runs
+
+    /** POST a cron action (pause | resume | trigger); empty body. */
+    private suspend fun cronAction(jobId: String, action: String, profile: String?) =
+        withContext(Dispatchers.IO) {
+            val body = "{}".toRequestBody("application/json".toMediaType())
+            val path = "/api/cron/jobs/$jobId/$action${profileParam(profile, first = true)}"
+            okHttp.newCall(builder(path).post(body).build()).execute().use { resp ->
+                if (!resp.isSuccessful) throw HermesApiException(resp.code, "$action failed")
+            }
+        }
+
+    suspend fun pauseCron(jobId: String, profile: String? = null) = cronAction(jobId, "pause", profile)
+    suspend fun resumeCron(jobId: String, profile: String? = null) = cronAction(jobId, "resume", profile)
+    suspend fun triggerCron(jobId: String, profile: String? = null) = cronAction(jobId, "trigger", profile)
+
+    suspend fun deleteCron(jobId: String, profile: String? = null) = withContext(Dispatchers.IO) {
+        okHttp.newCall(builder("/api/cron/jobs/$jobId${profileParam(profile, first = true)}").delete().build())
+            .execute().use { resp ->
+                if (!resp.isSuccessful) throw HermesApiException(resp.code, "delete cron failed")
+            }
+    }
+
+    suspend fun analyticsUsage(profile: String? = null): UsageDto =
+        get("/api/analytics/usage${profileParam(profile, first = true)}")
+
+    suspend fun analyticsModels(profile: String? = null): List<ModelUsageDto> =
+        get<ModelsUsageDto>("/api/analytics/models${profileParam(profile, first = true)}").models
+
     suspend fun skills(): List<SkillDto> = get("/api/skills")
 
     suspend fun toggleSkill(name: String, enabled: Boolean) = withContext(Dispatchers.IO) {

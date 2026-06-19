@@ -81,10 +81,31 @@ data class ModelOptionDto(
     val id: String,
     val name: String? = null,
     val schedule: CronScheduleDto? = null,
+    @SerialName("schedule_display") val scheduleDisplay: String? = null,
     val enabled: Boolean = true,
+    val state: String? = null,
+    // These arrive as ISO-8601 strings (e.g. "2026-06-20T09:00:00-05:00"), not epoch numbers.
+    @SerialName("paused_at") val pausedAt: String? = null,
+    @SerialName("next_run_at") val nextRunAt: String? = null,
+    @SerialName("last_run_at") val lastRunAt: String? = null,
+    @SerialName("last_status") val lastStatus: String? = null,
+    @SerialName("last_error") val lastError: String? = null,
     val profile: String? = null,
+    val model: String? = null,
     val prompt: String? = null,
+) {
+    val scheduleText: String get() = scheduleDisplay ?: schedule?.display ?: schedule?.expr ?: "—"
+    val isPaused: Boolean get() = pausedAt != null || state == "paused"
+}
+
+@Serializable data class CronRunDto(
+    val id: String,
+    @SerialName("started_at") val startedAt: Double? = null,
+    @SerialName("ended_at") val endedAt: Double? = null,
+    @SerialName("end_reason") val endReason: String? = null,
+    @SerialName("output_tokens") val outputTokens: Int? = null,
 )
+@Serializable data class CronRunsDto(val runs: List<CronRunDto> = emptyList())
 
 @Serializable data class MessagingPlatformDto(
     val id: String,
@@ -96,6 +117,27 @@ data class ModelOptionDto(
     val state: String? = null,
 )
 @Serializable data class MessagingPlatformsDto(val platforms: List<MessagingPlatformDto> = emptyList())
+
+@Serializable data class UsageDayDto(
+    val day: String,
+    @SerialName("input_tokens") val inputTokens: Long = 0,
+    @SerialName("output_tokens") val outputTokens: Long = 0,
+    @SerialName("estimated_cost") val estimatedCost: Double = 0.0,
+    val sessions: Int = 0,
+    @SerialName("api_calls") val apiCalls: Int = 0,
+)
+@Serializable data class UsageDto(val daily: List<UsageDayDto> = emptyList())
+
+@Serializable data class ModelUsageDto(
+    val model: String,
+    val provider: String? = null,
+    @SerialName("input_tokens") val inputTokens: Long = 0,
+    @SerialName("output_tokens") val outputTokens: Long = 0,
+    @SerialName("estimated_cost") val estimatedCost: Double = 0.0,
+    val sessions: Int = 0,
+    @SerialName("api_calls") val apiCalls: Int = 0,
+)
+@Serializable data class ModelsUsageDto(val models: List<ModelUsageDto> = emptyList())
 
 @Serializable data class ToolsetDto(
     val name: String,

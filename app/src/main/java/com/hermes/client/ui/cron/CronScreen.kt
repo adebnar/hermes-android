@@ -1,5 +1,6 @@
 package com.hermes.client.ui.cron
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -26,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun CronScreen(
     onMenu: () -> Unit,
+    onOpen: (String) -> Unit = {},
     vm: CronViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -59,16 +61,21 @@ fun CronScreen(
                         ListItem(
                             overlineContent = {
                                 Text(
-                                    (job.schedule?.display ?: job.schedule?.expr ?: "—") +
-                                        if (!job.enabled) "  · disabled" else "",
-                                    color = if (job.enabled) MaterialTheme.colorScheme.primary
+                                    job.scheduleText + when {
+                                        job.isPaused -> "  · paused"
+                                        !job.enabled -> "  · disabled"
+                                        else -> ""
+                                    },
+                                    color = if (job.enabled && !job.isPaused) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.error,
                                 )
                             },
                             headlineContent = { Text(job.name ?: job.id) },
                             supportingContent = {
-                                job.prompt?.replace("\n", " ")?.trim()?.take(120)?.let { Text(it) }
+                                val next = job.nextRunAt?.let { "Next: " + com.hermes.client.ui.util.formatIso(it) }
+                                Text(next ?: job.prompt?.replace("\n", " ")?.trim()?.take(100).orEmpty())
                             },
+                            modifier = Modifier.clickable { onOpen(job.id) },
                         )
                         HorizontalDivider()
                     }
