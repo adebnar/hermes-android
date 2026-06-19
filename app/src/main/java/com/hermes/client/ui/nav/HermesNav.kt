@@ -10,12 +10,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.hermes.client.ui.admin.SessionAdminScreen
 import com.hermes.client.ui.chat.ChatScreen
 import com.hermes.client.ui.management.ManagementScreen
 import com.hermes.client.ui.models.ModelsScreen
 import com.hermes.client.ui.profiles.ProfilesScreen
 import com.hermes.client.ui.sessions.SessionsScreen
 import com.hermes.client.ui.setup.SetupScreen
+import com.hermes.client.ui.tools.AgentsToolsScreen
 import kotlinx.coroutines.launch
 
 /**
@@ -81,7 +83,19 @@ fun HermesNav(hasConfig: Boolean) {
             }
             composable("models") { ModelsScreen(onMenu = openDrawer) }
             composable("profiles") { ProfilesScreen(onMenu = openDrawer) }
-            composable("management") { ManagementScreen(onMenu = openDrawer) }
+            composable("management") {
+                ManagementScreen(
+                    onMenu = openDrawer,
+                    onNavigate = { dest -> nav.navigate(dest) { launchSingleTop = true } },
+                )
+            }
+            composable("session_admin") {
+                SessionAdminScreen(
+                    onMenu = openDrawer,
+                    onOpen = { id -> nav.navigate("chat/$id") },
+                )
+            }
+            composable("agents_tools") { AgentsToolsScreen(onMenu = openDrawer) }
         }
     }
 }

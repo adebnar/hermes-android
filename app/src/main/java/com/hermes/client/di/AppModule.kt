@@ -9,6 +9,7 @@ import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.ModelRepository
 import com.hermes.client.data.repository.ProfileRepository
 import com.hermes.client.data.repository.SessionRepository
+import com.hermes.client.data.repository.ToolsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -94,4 +95,9 @@ object AppModule {
     @Singleton
     fun provideProfileRepository(rest: HermesRestApi): ProfileRepository =
         ProfileRepository(rest)
+
+    @Provides
+    @Singleton
+    fun provideToolsRepository(rest: HermesRestApi): ToolsRepository =
+        ToolsRepository(rest)
 }

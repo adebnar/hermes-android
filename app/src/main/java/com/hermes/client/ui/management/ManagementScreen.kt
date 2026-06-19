@@ -1,5 +1,6 @@
 package com.hermes.client.ui.management
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -15,7 +16,10 @@ import androidx.compose.ui.Modifier
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ManagementScreen(onMenu: () -> Unit) {
+fun ManagementScreen(
+    onMenu: () -> Unit,
+    onNavigate: (String) -> Unit = {},
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -27,12 +31,14 @@ fun ManagementScreen(onMenu: () -> Unit) {
         Column(Modifier.padding(padding).fillMaxSize()) {
             ListItem(
                 headlineContent = { Text("Session admin") },
-                supportingContent = { Text("Search, archived sessions, usage — coming next") },
+                supportingContent = { Text("Search messages, archived sessions, stats") },
+                modifier = Modifier.clickable { onNavigate("session_admin") },
             )
             HorizontalDivider()
             ListItem(
                 headlineContent = { Text("Agents & tools") },
-                supportingContent = { Text("Tools, skills, MCP servers — coming next") },
+                supportingContent = { Text("Toggle skills, view toolsets") },
+                modifier = Modifier.clickable { onNavigate("agents_tools") },
             )
         }
     }

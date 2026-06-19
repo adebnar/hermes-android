@@ -114,6 +114,29 @@ class HermesRestApi(
         }
     }
 
+    suspend fun sessionStats(): SessionStatsDto = get("/api/sessions/stats")
+
+    suspend fun searchSessions(query: String): List<SearchResultDto> {
+        val q = java.net.URLEncoder.encode(query, "UTF-8")
+        return get<SearchResultsDto>("/api/sessions/search?q=$q&limit=30").results
+    }
+
+    suspend fun archivedSessions(): List<SessionDto> =
+        get<SessionListDto>("/api/sessions?archived=only&limit=50&order=recent").sessions
+
+    suspend fun skills(): List<SkillDto> = get("/api/skills")
+
+    suspend fun toggleSkill(name: String, enabled: Boolean) = withContext(Dispatchers.IO) {
+        val obj: JsonObject = buildJsonObject { put("name", name); put("enabled", enabled) }
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+            .toRequestBody("application/json".toMediaType())
+        okHttp.newCall(builder("/api/skills/toggle").put(payload).build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw HermesApiException(resp.code, "toggle skill failed")
+        }
+    }
+
+    suspend fun toolsets(): List<ToolsetDto> = get("/api/tools/toolsets")
+
     suspend fun setActiveProfile(name: String) = withContext(Dispatchers.IO) {
         val obj: JsonObject = buildJsonObject { put("name", name) }
         val payload = json.encodeToString(JsonObject.serializer(), obj)

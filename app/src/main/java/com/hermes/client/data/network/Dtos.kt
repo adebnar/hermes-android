@@ -47,3 +47,34 @@ data class ModelOptionDto(
     val models: List<String> = emptyList(),
 )
 @Serializable data class ModelOptionsDto(val providers: List<ModelProviderDto> = emptyList())
+
+@Serializable data class SessionStatsDto(
+    val total: Int = 0,
+    @SerialName("active_store") val activeStore: Int = 0,
+    val archived: Int = 0,
+    val messages: Int = 0,
+)
+
+@Serializable data class SearchResultDto(
+    @SerialName("session_id") val sessionId: String,
+    val snippet: String? = null,
+    val model: String? = null,
+    val role: String? = null,
+)
+@Serializable data class SearchResultsDto(val results: List<SearchResultDto> = emptyList())
+
+@Serializable data class SkillDto(
+    val name: String,
+    val description: String? = null,
+    val category: String? = null,
+    val enabled: Boolean = false,
+)
+
+@Serializable data class ToolsetDto(
+    val name: String,
+    val label: String? = null,
+    val description: String? = null,
+    val enabled: Boolean = false,
+    val available: Boolean = true,
+    val tools: List<String> = emptyList(),
+)
