@@ -50,6 +50,10 @@ class ChatViewModel @Inject constructor(
     /** Active profile name — shown in the chat top bar so the user knows which tenant they're in. */
     val activeProfile: StateFlow<String?> = profileManager.active
 
+    /** Slash-command catalog (name to description) for the composer palette. */
+    private val _commands = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+    val commands: StateFlow<List<Pair<String, String>>> = _commands.asStateFlow()
+
     private var sessionId: String = ""
     private var collectJob: Job? = null
     private var connJob: Job? = null
@@ -71,9 +75,10 @@ class ChatViewModel @Inject constructor(
             // resume() returns the live socket handle for this session; switch to it so
             // submit/interrupt and event filtering use the id the gateway actually knows.
             runCatching { chat.resume(id) }.getOrNull()?.let { sessionId = it }
-            // Load model options and profiles; failures are non-fatal
+            // Load model options, profiles, and the slash-command catalog; failures are non-fatal
             launch { runCatching { _models.value = modelRepo.options() } }
             launch { runCatching { _profiles.value = profileRepo.list() } }
+            launch { runCatching { _commands.value = chat.commandsCatalog() } }
         }
         collectJob?.cancel()
         collectJob = viewModelScope.launch {
@@ -103,10 +108,14 @@ class ChatViewModel @Inject constructor(
 
     fun send(text: String) {
         if (text.isBlank()) return
+        val isSlash = text.trimStart().startsWith("/")
         _state.value = _state.value.withUserMessage(text)
         viewModelScope.launch {
             try {
-                chat.submit(sessionId, text)
+                // A leading "/" is a slash command — execute it (the gateway strips the slash)
+                // rather than prompting the model.
+                if (isSlash) chat.slashExec(sessionId, text.trim())
+                else chat.submit(sessionId, text)
             } catch (e: Exception) {
                 // A gateway error (e.g. "session not found") must surface, not crash the app.
                 appendError(e.message ?: "Failed to send message")
@@ -115,6 +124,21 @@ class ChatViewModel @Inject constructor(
     }
 
     fun stop() { viewModelScope.launch { runCatching { chat.interrupt(sessionId) } } }
+
+    /** Attach an image (base64) to the session; surfaces a system note when done. */
+    fun attachImage(dataBase64: String, mimeType: String) = viewModelScope.launch {
+        runCatching { chat.attachImageBytes(sessionId, dataBase64, mimeType) }
+            .onSuccess { appendSystem("📎 Image attached — it will be sent with your next message.") }
+            .onFailure { appendError("Attach failed: ${it.message}") }
+    }
+
+    private fun appendSystem(text: String) {
+        _state.value = _state.value.copy(
+            messages = _state.value.messages + ChatMessage(
+                id = "s-${_state.value.messages.size}", role = Role.SYSTEM, text = text,
+            ),
+        )
+    }
 
     /** User tapped "Retry" on the offline banner — force an immediate reconnect. */
     fun reconnect() { runCatching { chat.reconnect() } }

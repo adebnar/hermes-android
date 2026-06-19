@@ -5,7 +5,9 @@ import com.hermes.client.data.network.HermesGatewayClient
 import com.hermes.client.data.network.ServerEvent
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -43,8 +45,37 @@ class ChatRepository(private val client: HermesGatewayClient) {
         })
     }
 
+    /** Execute a slash command (e.g. "/help"). The response streams back via the event flow. */
+    suspend fun slashExec(sessionId: String, command: String) {
+        client.call("slash.exec", buildJsonObject {
+            put("session_id", sessionId)
+            put("command", command)
+        })
+    }
+
+    /** Fetch the slash-command catalog for the composer palette ("pairs" = [[name, desc], …]). */
+    suspend fun commandsCatalog(): List<Pair<String, String>> {
+        val result = client.call("commands.catalog", buildJsonObject {})
+        val arr = result.jsonObject["pairs"]?.let { runCatching { it.jsonArray }.getOrNull() } ?: return emptyList()
+        return arr.mapNotNull { el ->
+            val pair = runCatching { el.jsonArray }.getOrNull() ?: return@mapNotNull null
+            val name = pair.getOrNull(0)?.jsonPrimitive?.content ?: return@mapNotNull null
+            val desc = pair.getOrNull(1)?.jsonPrimitive?.content ?: ""
+            name to desc
+        }
+    }
+
     suspend fun interrupt(sessionId: String) {
         client.call("session.interrupt", buildJsonObject { put("session_id", sessionId) })
+    }
+
+    /** Attach an image (base64 data) to the session; included with the next prompt. */
+    suspend fun attachImageBytes(sessionId: String, dataBase64: String, mimeType: String) {
+        client.call("image.attach_bytes", buildJsonObject {
+            put("session_id", sessionId)
+            put("data", dataBase64)
+            put("mime_type", mimeType)
+        })
     }
 
     suspend fun respondApproval(sessionId: String, approve: Boolean) {

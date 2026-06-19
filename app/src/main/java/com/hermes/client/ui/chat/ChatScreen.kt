@@ -1,6 +1,7 @@
 package com.hermes.client.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -54,7 +55,13 @@ fun ChatScreen(
     val unauthorized by vm.unauthorized.collectAsStateWithLifecycle()
     val models by vm.models.collectAsStateWithLifecycle()
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
+    val commands by vm.commands.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
+    // Slash-command palette: when the draft is a "/query", show matching commands.
+    val slashMatches = if (draft.startsWith("/") && !draft.contains(' ')) {
+        val q = draft.drop(1).lowercase()
+        commands.filter { it.first.removePrefix("/").lowercase().startsWith(q) }.take(6)
+    } else emptyList()
     val connected = connState is ConnectionState.Connected
     val canSend = connected && draft.isNotBlank() && !state.isGenerating
 
@@ -62,6 +69,21 @@ fun ChatScreen(
         if (!canSend) return
         vm.send(draft)
         draft = ""
+    }
+
+    // Image attach: pick an image, base64-encode its bytes, attach to the session.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val pickImage = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                val mime = context.contentResolver.getType(uri) ?: "image/*"
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching
+                val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                vm.attachImage(b64, mime)
+            }
+        }
     }
 
     // I1: route back to Setup when the server returns 401
@@ -93,24 +115,41 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            Row(
-                Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Message Hermes…") },
-                    maxLines = 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { submit() }),
-                )
-                Spacer(Modifier.width(8.dp))
-                if (state.isGenerating) {
-                    IconButton(onClick = { vm.stop() }) { Text("■") }
-                } else {
-                    IconButton(onClick = { submit() }, enabled = canSend) { Text("➤") }
+            Column(Modifier.navigationBarsPadding().imePadding()) {
+                if (slashMatches.isNotEmpty()) {
+                    androidx.compose.material3.Surface(tonalElevation = 3.dp) {
+                        Column(Modifier.fillMaxWidth()) {
+                            slashMatches.forEach { (name, desc) ->
+                                val cmd = if (name.startsWith("/")) name else "/$name"
+                                androidx.compose.material3.ListItem(
+                                    headlineContent = { Text(cmd) },
+                                    supportingContent = { if (desc.isNotBlank()) Text(desc) },
+                                    modifier = Modifier.clickable { draft = "$cmd " },
+                                )
+                            }
+                        }
+                    }
+                }
+                Row(
+                    Modifier.fillMaxWidth().padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = { pickImage.launch("image/*") }, enabled = connected) { Text("＋") }
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Message Hermes…  (/ for commands)") },
+                        maxLines = 5,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { submit() }),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    if (state.isGenerating) {
+                        IconButton(onClick = { vm.stop() }) { Text("■") }
+                    } else {
+                        IconButton(onClick = { submit() }, enabled = canSend) { Text("➤") }
+                    }
                 }
             }
         },
