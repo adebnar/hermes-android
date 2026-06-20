@@ -17,7 +17,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - run: chmod +x ./gradlew
       - name: Build & unit test (unsigned debug)
         run: ./gradlew :app:assembleDebug :app:testDebugUnitTest --no-daemon
