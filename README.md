@@ -7,6 +7,9 @@ profiles, scheduled jobs, usage analytics, messaging integrations, and settings.
 
 Built with Kotlin and Jetpack Compose (Material 3).
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20the%20project-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/andrew65386)
+
 ---
 
 ## Download & install
@@ -182,6 +185,19 @@ network. A commercial exit VPN (e.g. Proton VPN) routes traffic to the public in
 ./gradlew :app:testDebugUnitTest          # JVM unit tests
 ./gradlew :app:connectedDebugAndroidTest  # instrumented (device/emulator)
 ```
+
+---
+
+## Support this project
+
+If Hermes for Android is useful to you, please consider supporting development:
+
+**[☕ Buy me a coffee on Ko-fi →](https://ko-fi.com/andrew65386)**
+
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/andrew65386)
+
+Every contribution helps fund new features and ongoing maintenance. GitHub Sponsors is
+coming soon — until then, Ko-fi is the best way to chip in. Thank you! 🙏
 
 ---
 
