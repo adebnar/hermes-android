@@ -27,7 +27,7 @@ mockk = "1.13.13"
 junit = "4.13.2"
 androidxTestCore = "1.6.1"
 androidxTestJunit = "1.2.1"
-androidxTestRunner = "1.6.2"
+androidxTestRunner = "1.7.0"
 
 [libraries]
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
