@@ -6,8 +6,8 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
 
 A native Android client for the **Hermes agent gateway** — a phone-friendly companion to
-the Hermes Desktop app. It connects to a remote Hermes gateway over Tailscale or another
-VPN — or your local network — and gives you full chat plus the management surface: sessions, models,
+the Hermes Desktop app. It connects to a remote Hermes gateway over Tailscale, another
+private VPN, or your local network, and gives you full chat plus the management surface: sessions, models,
 profiles, scheduled jobs, usage analytics, messaging integrations, and settings.
 
 Built with Kotlin and Jetpack Compose (Material 3).
@@ -192,7 +192,7 @@ the same Wi-Fi.
 
 > Note: this means a *mesh / private* VPN that actually routes to your gateway. A commercial
 > **exit VPN** (e.g. Proton VPN, Mullvad) only tunnels your traffic to the public internet
-> and **cannot** reach a private gateway — it's not a substitute for Tailscale.
+> and **cannot** reach a private gateway — it's not a substitute for a private network connection.
 
 ---
 
