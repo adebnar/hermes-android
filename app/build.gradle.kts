@@ -1,4 +1,12 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+// Release signing is driven by a gitignored keystore.properties at the repo root.
+// When absent (e.g. a fresh clone or CI without secrets), release builds stay unsigned.
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
+}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -21,8 +29,22 @@ android {
         versionName = "0.1.0"
         testInstrumentationRunner = "com.hermes.client.HiltTestRunner"
     }
+    signingConfigs {
+        if (keystorePropsFile.exists()) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = false
+            // Sign with the release config only when the keystore is present.
+            signingConfig = signingConfigs.findByName("release")
+        }
     }
     buildFeatures { compose = true }
 

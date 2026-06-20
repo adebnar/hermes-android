@@ -10,5 +10,11 @@ captures/
 .cxx/
 .kotlin/
 
+# Signing secrets — never commit
+keystore.properties
+keystore/
+*.jks
+*.keystore
+
 # Local tooling
 .claude/
