@@ -9,6 +9,24 @@ Built with Kotlin and Jetpack Compose (Material 3).
 
 ---
 
+## Download & install
+
+**[⬇️ Download the latest APK](https://github.com/adebnar/hermes-android/releases/latest)**
+
+No build tools or developer setup needed — just grab the signed APK from the
+[latest release](https://github.com/adebnar/hermes-android/releases/latest) and install it
+on your phone:
+
+1. On your Android phone, open the release link above and tap the `.apk` file to download it.
+2. When prompted, allow installs from your browser or Files app ("Install unknown apps").
+3. Open the downloaded `.apk` and tap **Install**.
+4. Launch **Hermes** and complete the one-time [setup](#first-run-setup) (gateway URL + token).
+
+> The APK is signed with the project's release key. Because it's installed outside the
+> Play Store, Android may warn about an app from an unknown developer — that's expected.
+
+---
+
 ## Features
 
 - **Chat** — streaming responses, model picker, slash commands (`/…`) with an inline
@@ -121,13 +139,40 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 
 ## First-run setup
 
-On first launch the app shows a **Setup** screen. Enter:
+On first launch the app shows a **Setup** screen with two fields:
 
-1. **Gateway URL** — the base URL of your Hermes gateway (e.g. its Tailscale address).
-2. **Session token** — sent as the `X-Hermes-Session-Token` header.
+1. **Gateway URL** — where your Hermes gateway is reachable from the phone, e.g.
+   `http://100.x.x.x:9119` (its Tailscale address) or `http://192.168.x.x:9119` on the
+   same Wi-Fi. See [Connecting](#connecting) below.
+2. **Session token** — sent to the gateway as the `X-Hermes-Session-Token` header.
 
-Credentials are stored locally via DataStore. An expired/invalid token (HTTP 401) routes
-you back to Setup automatically.
+Credentials are stored locally on the device (DataStore). An expired/invalid token
+(HTTP 401) routes you back to Setup automatically.
+
+### Getting your Hermes token
+
+The app authenticates to the gateway with its **dashboard session token**. By default the
+gateway mints a *new random token every time it starts*, which is awkward to copy. To get a
+**stable** token you can paste into the app, set it yourself before starting the Hermes
+dashboard / gateway:
+
+```bash
+export HERMES_DASHBOARD_SESSION_TOKEN="choose-a-long-random-string"
+# then start the Hermes dashboard / web gateway as usual
+```
+
+Use that same value as the **Session token** in the app's Setup screen. Treat it like a
+password — anyone with the token and network access to the gateway can drive your agent.
+
+📖 Full Hermes installation, gateway, and token docs:
+**[hermes-agent.nousresearch.com/docs](https://hermes-agent.nousresearch.com/docs/)**
+
+### Connecting
+
+The gateway is reachable from the phone over **Tailscale** (recommended — works from
+anywhere) or over your **local Wi-Fi** when the phone and the gateway host are on the same
+network. A commercial exit VPN (e.g. Proton VPN) routes traffic to the public internet and
+**cannot** reach a private gateway, so it is not a substitute for Tailscale.
 
 ---
 
@@ -142,4 +187,9 @@ you back to Setup automatically.
 
 ## License
 
-Private project — all rights reserved.
+[GNU General Public License v3.0](LICENSE). You are free to use, study, share, and modify
+this software under the terms of the GPL-3.0 — see the [LICENSE](LICENSE) file for the full
+text.
+
+Hermes Agent and the Hermes mascot are property of their respective owners; this is an
+independent, unofficial Android client.
