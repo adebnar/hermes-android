@@ -18,9 +18,11 @@ updates:
       # packages whose newer versions require AGP 9.x / a newer Kotlin metadata.
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-      - dependency-name: "com.android.application"
-      - dependency-name: "org.jetbrains.kotlin*"
-      - dependency-name: "com.google.dagger:hilt*"
+      - dependency-name: "com.android.application*"   # AGP plugin id + marker artifact
+      - dependency-name: "org.jetbrains.kotlin:*"     # Kotlin libs (NOT kotlinx serialization/coroutines)
+      - dependency-name: "org.jetbrains.kotlin.*"     # Kotlin Gradle plugin ids
+      - dependency-name: "com.google.dagger:hilt*"    # Hilt libraries
+      - dependency-name: "com.google.dagger.hilt*"    # Hilt Gradle plugin id
       - dependency-name: "androidx.core:core-ktx"
   - package-ecosystem: github-actions
     directory: "/"
