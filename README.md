@@ -1,14 +1,16 @@
 # Hermes for Android
 
+> 💜 **Enjoying Hermes for Android?** [**☕ Support development on Ko-fi →**](https://ko-fi.com/andrew65386) — donations fund new features and keep the project alive. (GitHub Sponsors coming soon.)
+
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20the%20project-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/andrew65386)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
+
 A native Android client for the **Hermes agent gateway** — a phone-friendly companion to
 the Hermes Desktop app. It connects to a remote Hermes gateway over your private network
 (Tailscale) and gives you full chat plus the management surface: sessions, models,
 profiles, scheduled jobs, usage analytics, messaging integrations, and settings.
 
 Built with Kotlin and Jetpack Compose (Material 3).
-
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20the%20project-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/andrew65386)
 
 ---
 
@@ -185,6 +187,59 @@ network. A commercial exit VPN (e.g. Proton VPN) routes traffic to the public in
 ./gradlew :app:testDebugUnitTest          # JVM unit tests
 ./gradlew :app:connectedDebugAndroidTest  # instrumented (device/emulator)
 ```
+
+---
+
+## Development & release workflow
+
+**Branches**
+
+| Branch | Role | Distribution |
+|--------|------|--------------|
+| `master` | Production / stable. Always releasable. | Stable releases (`v1.2.3`) |
+| `develop` | Beta / integration. New features land here first. | Beta pre-releases (`v1.2.3-beta.1`) |
+| `feature/*` | Short-lived work branches. | — (open a PR into `develop`) |
+
+Day-to-day flow:
+
+```
+feature/x ──PR──▶ develop ──(stabilize)──▶ master
+                    │                         │
+              beta pre-release          stable release
+              v0.2.0-beta.1               v0.2.0
+```
+
+1. Branch from `develop`: `git switch develop && git switch -c feature/my-change`.
+2. Open a PR into `develop`. CI (`.github/workflows/ci.yml`) builds and unit-tests every push/PR.
+3. Cut a **beta** for testers: tag a commit on `develop`, e.g. `git tag v0.2.0-beta.1 && git push --tags`.
+4. When stable, merge `develop` → `master` and tag the release: `git tag v0.2.0 && git push --tags`.
+
+**Automated releases** (`.github/workflows/release.yml`) — pushing a `v*` tag builds a
+signed APK and publishes a GitHub Release:
+
+- `vX.Y.Z` → **production** release (`assembleRelease`), shown as *Latest*.
+- `vX.Y.Z-beta.N` → **beta** pre-release (`assembleBeta`), *not* marked Latest, so
+  `releases/latest` keeps pointing at the stable build.
+
+The **beta build installs side-by-side** with production: it has a separate application id
+(`com.hermes.client.beta`) and the label **"Hermes Beta"**, so testers can keep the stable
+app and try betas without losing it. Anyone who wants the newest changes grabs the latest
+*pre-release* APK from the [Releases page](https://github.com/adebnar/hermes-android/releases);
+everyone else gets the stable [latest release](https://github.com/adebnar/hermes-android/releases/latest).
+
+**CI signing secrets** — the release workflow signs in CI using these repository secrets
+(*Settings → Secrets and variables → Actions*):
+
+| Secret | Value |
+|--------|-------|
+| `KEYSTORE_BASE64` | `base64 -i keystore/hermes-release.jks` (the whole keystore, base64-encoded) |
+| `KEYSTORE_PASSWORD` | keystore (store) password |
+| `KEY_ALIAS` | key alias (e.g. `hermes`) |
+| `KEY_PASSWORD` | key password |
+
+Until those are set, tag-triggered builds will fail to sign — build/release locally with
+`./gradlew :app:assembleRelease` (or `:app:assembleBeta`) instead, which reads the
+gitignored `keystore.properties`.
 
 ---
 
