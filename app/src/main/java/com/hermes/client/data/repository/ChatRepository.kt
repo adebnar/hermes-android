@@ -12,6 +12,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+/** A "@" completion item: [text] is inserted, [display] shown, [meta] is a hint. */
+data class PathItem(val text: String, val display: String, val meta: String)
+
 class ChatRepository(private val client: HermesGatewayClient) {
     val events: SharedFlow<ServerEvent> get() = client.events
     val connectionState: StateFlow<ConnectionState> get() = client.connectionState
@@ -51,6 +54,24 @@ class ChatRepository(private val client: HermesGatewayClient) {
             put("session_id", sessionId)
             put("command", command)
         })
+    }
+
+    /** "@" path/mention completions (complete.path → {items:[{text,display,meta}]}). */
+    suspend fun completePath(sessionId: String, word: String): List<PathItem> {
+        val result = client.call("complete.path", buildJsonObject {
+            put("session_id", sessionId)
+            put("word", word)
+        })
+        val items = result.jsonObject["items"]?.let { runCatching { it.jsonArray }.getOrNull() } ?: return emptyList()
+        return items.mapNotNull { el ->
+            val o = el as? JsonObject ?: return@mapNotNull null
+            val text = o["text"]?.jsonPrimitive?.content ?: return@mapNotNull null
+            PathItem(
+                text = text,
+                display = o["display"]?.jsonPrimitive?.content ?: text,
+                meta = o["meta"]?.jsonPrimitive?.content ?: "",
+            )
+        }
     }
 
     /** Fetch the slash-command catalog for the composer palette ("pairs" = [[name, desc], …]). */

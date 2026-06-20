@@ -54,6 +54,10 @@ class ChatViewModel @Inject constructor(
     private val _commands = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val commands: StateFlow<List<Pair<String, String>>> = _commands.asStateFlow()
 
+    /** "@" mention completions for the current @-word in the composer. */
+    private val _pathItems = MutableStateFlow<List<com.hermes.client.data.repository.PathItem>>(emptyList())
+    val pathItems: StateFlow<List<com.hermes.client.data.repository.PathItem>> = _pathItems.asStateFlow()
+
     private var sessionId: String = ""
     private var collectJob: Job? = null
     private var connJob: Job? = null
@@ -142,6 +146,16 @@ class ChatViewModel @Inject constructor(
 
     /** User tapped "Retry" on the offline banner — force an immediate reconnect. */
     fun reconnect() { runCatching { chat.reconnect() } }
+
+    /** Fetch "@" completions for [word] (empty word clears them). */
+    fun completePath(word: String) = viewModelScope.launch {
+        if (!word.startsWith("@")) { _pathItems.value = emptyList(); return@launch }
+        runCatching { chat.completePath(sessionId, word) }
+            .onSuccess { _pathItems.value = it }
+            .onFailure { _pathItems.value = emptyList() }
+    }
+
+    fun clearPathItems() { _pathItems.value = emptyList() }
 
     fun approve(approve: Boolean) {
         _state.value = _state.value.copy(pendingApproval = null)

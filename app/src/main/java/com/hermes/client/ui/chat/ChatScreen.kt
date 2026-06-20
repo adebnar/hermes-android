@@ -59,12 +59,22 @@ fun ChatScreen(
     val models by vm.models.collectAsStateWithLifecycle()
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
     val commands by vm.commands.collectAsStateWithLifecycle()
+    val pathItems by vm.pathItems.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
     // Slash-command palette: when the draft is a "/query", show matching commands.
     val slashMatches = if (draft.startsWith("/") && !draft.contains(' ')) {
         val q = draft.drop(1).lowercase()
         commands.filter { it.first.removePrefix("/").lowercase().startsWith(q) }
     } else emptyList()
+    // "@" mention picker: the last whitespace-separated token starting with "@".
+    val atWord = draft.substringAfterLast(' ').takeIf { it.startsWith("@") }
+    LaunchedEffect(atWord) { if (atWord != null) vm.completePath(atWord) else vm.clearPathItems() }
+    val showPath = slashMatches.isEmpty() && atWord != null && pathItems.isNotEmpty()
+
+    fun insertAt(text: String) {
+        val base = draft.dropLast(atWord?.length ?: 0)
+        draft = base + text + (if (text.endsWith(":")) "" else " ")
+    }
     val connected = connState is ConnectionState.Connected
     val canSend = connected && draft.isNotBlank() && !state.isGenerating
 
@@ -127,7 +137,7 @@ fun ChatScreen(
                     value = draft,
                     onValueChange = { draft = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Message Hermes…  (/ for commands)") },
+                    placeholder = { Text("Message Hermes…  (/ commands · @ attach)") },
                     maxLines = 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { submit() }),
@@ -160,6 +170,22 @@ fun ChatScreen(
                             headlineContent = { Text(cmd) },
                             supportingContent = { if (desc.isNotBlank()) Text(desc) },
                             modifier = Modifier.clickable { draft = "$cmd " },
+                        )
+                    }
+                }
+            } else if (showPath) {
+                Text(
+                    "ATTACH / MENTION",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
+                )
+                LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                    items(pathItems) { item ->
+                        androidx.compose.material3.ListItem(
+                            headlineContent = { Text(item.display) },
+                            supportingContent = { if (item.meta.isNotBlank()) Text(item.meta) },
+                            modifier = Modifier.clickable { insertAt(item.text) },
                         )
                     }
                 }
