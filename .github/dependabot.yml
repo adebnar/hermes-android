@@ -1,16 +1,33 @@
-# Dependabot: weekly checks for vulnerable / outdated dependencies.
+# Dependabot: weekly dependency checks, grouped into a single PR per ecosystem
+# to avoid PR noise. Security alerts stay enabled separately (repo settings).
 version: 2
 updates:
   - package-ecosystem: gradle
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
     target-branch: develop
     labels: ["dependencies"]
+    open-pull-requests-limit: 5
+    groups:
+      gradle:
+        patterns: ["*"]
+    ignore:
+      # The toolchain is intentionally pinned for AGP 8.x compatibility
+      # (see gradle/libs.versions.toml). Skip breaking majors and the specific
+      # packages whose newer versions require AGP 9.x / a newer Kotlin metadata.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "com.android.application"
+      - dependency-name: "org.jetbrains.kotlin*"
+      - dependency-name: "com.google.dagger:hilt*"
+      - dependency-name: "androidx.core:core-ktx"
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
     target-branch: develop
     labels: ["dependencies", "ci"]
+    groups:
+      actions:
+        patterns: ["*"]
