@@ -6,8 +6,8 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
 
 A native Android client for the **Hermes agent gateway** — a phone-friendly companion to
-the Hermes Desktop app. It connects to a remote Hermes gateway over your private network
-(Tailscale) and gives you full chat plus the management surface: sessions, models,
+the Hermes Desktop app. It connects to a remote Hermes gateway over Tailscale or another
+VPN — or your local network — and gives you full chat plus the management surface: sessions, models,
 profiles, scheduled jobs, usage analytics, messaging integrations, and settings.
 
 Built with Kotlin and Jetpack Compose (Material 3).
@@ -29,6 +29,17 @@ on your phone:
 
 > The APK is signed with the project's release key. Because it's installed outside the
 > Play Store, Android may warn about an app from an unknown developer — that's expected.
+
+---
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/01-connect.png" width="24%" alt="Connect to your Hermes gateway" />
+  <img src="docs/screenshots/02-features.png" width="24%" alt="Full management surface — sessions, models, cron, usage, settings" />
+  <img src="docs/screenshots/03-settings.png" width="24%" alt="Settings" />
+  <img src="docs/screenshots/04-dark-theme.png" width="24%" alt="Light & dark themes" />
+</p>
 
 ---
 
@@ -174,10 +185,14 @@ password — anyone with the token and network access to the gateway can drive y
 
 ### Connecting
 
-The gateway is reachable from the phone over **Tailscale** (recommended — works from
-anywhere) or over your **local Wi-Fi** when the phone and the gateway host are on the same
-network. A commercial exit VPN (e.g. Proton VPN) routes traffic to the public internet and
-**cannot** reach a private gateway, so it is not a substitute for Tailscale.
+Reach the gateway from your phone over **Tailscale** (recommended — works from anywhere),
+**another VPN that puts the phone and gateway on the same private network** (e.g. a
+self-hosted WireGuard or ZeroTier mesh), or your **local network (LAN)** when both are on
+the same Wi-Fi.
+
+> Note: this means a *mesh / private* VPN that actually routes to your gateway. A commercial
+> **exit VPN** (e.g. Proton VPN, Mullvad) only tunnels your traffic to the public internet
+> and **cannot** reach a private gateway — it's not a substitute for Tailscale.
 
 ---
 

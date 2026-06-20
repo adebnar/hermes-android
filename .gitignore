@@ -21,3 +21,6 @@ keystore/
 
 # Local tooling
 .claude/
+
+# Local-only agent standards (not shared)
+CLAUDE.md
