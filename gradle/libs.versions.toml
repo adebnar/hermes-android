@@ -5,7 +5,7 @@
 # with the proven mid-2025 AndroidX set below.
 # Kotlin pinned to 2.2.21 (NOT 2.3.x/2.4.0): Hilt 2.57.1 (the last Hilt that supports AGP 8.x;
 # Hilt 2.59.2 requires AGP 9) caps at Kotlin metadata 2.2.0, which Kotlin 2.2.x emits.
-agp = "8.13.2"
+agp = "9.2.1"
 kotlin = "2.2.21"
 ksp = "2.2.21-2.0.5"
 coreKtx = "1.16.0"
