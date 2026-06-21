@@ -25,4 +25,19 @@ class ChatScreenTest {
         rule.onNodeWithText("Hello").assertIsDisplayed()
         rule.onNodeWithText("Hi there").assertIsDisplayed()
     }
+
+    // Regression: the gateway reuses the model name as the message id across a
+    // session's turns, so loaded history can contain several messages with the same
+    // id. The chat list must not crash on duplicate ids ("Key X was already used").
+    @Test fun duplicate_message_ids_do_not_crash() {
+        val state = ChatUiState(
+            messages = listOf(
+                ChatMessage(id = "gemma", role = Role.ASSISTANT, text = "first reply"),
+                ChatMessage(id = "gemma", role = Role.ASSISTANT, text = "second reply"),
+            ),
+        )
+        rule.setContent { HermesTheme { ChatMessageList(state = state) } }
+        rule.onNodeWithText("first reply").assertIsDisplayed()
+        rule.onNodeWithText("second reply").assertIsDisplayed()
+    }
 }

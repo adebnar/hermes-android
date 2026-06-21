@@ -15,8 +15,14 @@ class SessionRepository(private val rest: HermesRestApi) {
         rest.searchSessions(query, profile)
     suspend fun archived(profile: String? = null): List<Session> =
         rest.archivedSessions(profile).map { it.toDomain() }
+    // The gateway reuses the model name as a message id across a session's turns, so
+    // it can't be a unique list key on its own. Prefix the position to guarantee
+    // unique, stable ids for the loaded history (the id is display-only).
     suspend fun history(sessionId: String, profile: String? = null): List<ChatMessage> =
-        rest.messages(sessionId, profile).map { it.toDomain() }
+        rest.messages(sessionId, profile).mapIndexed { i, dto ->
+            val m = dto.toDomain()
+            m.copy(id = "h-$i-${m.id}")
+        }
 
     suspend fun rename(sessionId: String, title: String) = rest.patchSession(sessionId, title = title)
     suspend fun archive(sessionId: String, archived: Boolean) =

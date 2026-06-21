@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -75,7 +75,14 @@ fun ChatMessageList(state: ChatUiState, modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxSize().padding(horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(state.messages, key = { it.id }) { msg -> MessageBubble(msg) }
+        // Key by position as well as id: the gateway reuses the model name as the
+        // message id across a session's turns, so ids are NOT guaranteed unique.
+        // The index makes the key collision-proof regardless of id source (the list
+        // is append-only, so an item's index is stable across recompositions).
+        itemsIndexed(
+            state.messages,
+            key = { index, msg -> "$index:${msg.id}" },
+        ) { _, msg -> MessageBubble(msg) }
     }
 }
 
