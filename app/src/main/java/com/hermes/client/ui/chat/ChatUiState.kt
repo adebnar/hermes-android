@@ -50,7 +50,13 @@ fun reduce(state: ChatUiState, event: ServerEvent): ChatUiState {
     return when (event.type) {
         "message.start" -> state.copy(
             messages = state.messages + ChatMessage(
-                id = event.str("message_id") ?: "a-${state.messages.size}",
+                // The gateway's message_id is NOT unique across turns — it sends the
+                // model/agent name (e.g. "gemma"), reused every turn. Used alone as a
+                // LazyColumn key it collides on the second turn and crashes the app, so
+                // prefix the message position (monotonic) to guarantee a unique, stable
+                // id. message_id isn't read anywhere else (deltas/tools route by
+                // indexOfLast / tool_id), so this is the only place it matters.
+                id = "a-${state.messages.size}-${event.str("message_id") ?: "msg"}",
                 role = Role.ASSISTANT, text = "", isStreaming = true,
             ),
             isGenerating = true,

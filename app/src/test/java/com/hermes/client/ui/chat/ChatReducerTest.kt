@@ -39,6 +39,23 @@ class ChatReducerTest {
         assertEquals("found", tools[0].output)
     }
 
+    // Crash repro: the gateway reuses message_id across turns (it sends the
+    // model/agent name, e.g. "gemma"). Two distinct assistant turns must still get
+    // distinct message ids — otherwise the chat LazyColumn key collides and the app
+    // crashes with IllegalArgumentException: Key "gemma" was already used.
+    @Test fun reused_message_id_across_turns_yields_unique_ids() {
+        var s = ChatUiState.empty()
+        s = s.withUserMessage("hi")
+        s = reduce(s, ev("message.start") { put("message_id", "gemma") })
+        s = reduce(s, ev("message.complete") { put("text", "hello") })
+        s = s.withUserMessage("again")
+        s = reduce(s, ev("message.start") { put("message_id", "gemma") })
+        s = reduce(s, ev("message.complete") { put("text", "hi again") })
+
+        val ids = s.messages.map { it.id }
+        assertEquals("every message must have a unique list key", ids.size, ids.toSet().size)
+    }
+
     @Test fun approval_request_sets_pending() {
         var s = ChatUiState.empty()
         s = reduce(s, ev("approval.request") { put("prompt", "Run rm -rf?") })
