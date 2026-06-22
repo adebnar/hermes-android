@@ -26,7 +26,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,19 +49,50 @@ import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 
 @Composable
-fun ChatMessageList(state: ChatUiState, modifier: Modifier = Modifier) {
-    val listState = rememberLazyListState()
+fun ChatMessageList(
+    state: ChatUiState,
+    modifier: Modifier = Modifier,
+    listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
+) {
     val lastIndex = state.messages.lastIndex
     // Length of the last (streaming) message: changes on every delta so we follow the stream.
     val tailLen = state.messages.lastOrNull()?.text?.length ?: 0
 
-    // Auto-scroll to the newest content — but only when the user is already pinned near the
+    // On first load of a non-empty thread (opening an existing session), jump straight to the
+    // newest message so the latest reply is visible immediately — otherwise the list stays at
+    // the top and the most recent response looks missing until you scroll down by hand.
+    var landed by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.messages.isNotEmpty()) {
+        if (state.messages.isEmpty() || landed) return@LaunchedEffect
+        // History loads after the list is already composed, so wait until the LazyColumn has
+        // actually measured the loaded items before scrolling — jumping before first layout
+        // lands short of the bottom.
+        snapshotFlow { listState.layoutInfo.totalItemsCount }
+            .filter { it >= state.messages.size }
+            .first()
+        // Converge to the true bottom. A single scrollToItem on a freshly-loaded list
+        // undershoots: it can only measure items up to the current extent, and the off-screen
+        // bubbles wrap taller than the estimate. Re-scroll after each frame (which measures
+        // more items) until the last one is actually visible.
+        var guard = 0
+        while (guard++ < 20) {
+            listState.scrollToItem(state.messages.lastIndex)
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            if (lastVisible >= state.messages.lastIndex) break
+            withFrameNanos {} // let a layout pass run so more items get measured
+        }
+        landed = true
+    }
+
+    // After the initial jump, follow new content. Always follow right after the user sends
+    // (they want to see their message and the reply); otherwise only when already near the
     // bottom, so scrolling back through history isn't yanked away mid-stream.
     LaunchedEffect(state.messages.size, tailLen) {
-        if (lastIndex < 0) return@LaunchedEffect
+        if (lastIndex < 0 || !landed) return@LaunchedEffect
+        val justSent = state.messages.lastOrNull()?.role == Role.USER
         val visible = listState.layoutInfo.visibleItemsInfo
         val atBottom = visible.isEmpty() || (visible.lastOrNull()?.index ?: 0) >= lastIndex - 1
-        if (atBottom) listState.animateScrollToItem(lastIndex)
+        if (justSent || atBottom) listState.animateScrollToItem(lastIndex)
     }
 
     if (state.messages.isEmpty()) {
