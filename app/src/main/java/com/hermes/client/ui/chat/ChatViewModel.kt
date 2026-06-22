@@ -82,7 +82,9 @@ class ChatViewModel @Inject constructor(
             }
             // resume() returns the live socket handle for this session; switch to it so
             // submit/interrupt and event filtering use the id the gateway actually knows.
-            val handle = runCatching { chat.resume(id) }.getOrNull()
+            // Pass the active profile: the gateway resolves resume against a per-profile DB,
+            // so a session in a non-default profile is "session not found" without it.
+            val handle = runCatching { chat.resume(id, profileManager.active.value) }.getOrNull()
             handle?.let { sessionId = it }
             com.hermes.client.data.diagnostics.DebugLog.log("session", "resume($id) → handle=${handle ?: "none"}")
             // Load model options, profiles, and the slash-command catalog; failures are non-fatal
@@ -111,7 +113,10 @@ class ChatViewModel @Inject constructor(
                 // C2: reconnect cycle completed (Reconnecting → Connected) → re-attach agent stream
                 // Guard: prev must be Reconnecting (not null) to skip the very first Connected transition
                 if (cur is ConnectionState.Connected && prev is ConnectionState.Reconnecting) {
-                    launch { runCatching { chat.resume(sessionId) }.getOrNull()?.let { sessionId = it } }
+                    launch {
+                        runCatching { chat.resume(sessionId, profileManager.active.value) }
+                            .getOrNull()?.let { sessionId = it }
+                    }
                 }
                 prev = cur
             }
