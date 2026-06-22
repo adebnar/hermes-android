@@ -87,7 +87,9 @@ class ChatViewModel @Inject constructor(
         collectJob?.cancel()
         collectJob = viewModelScope.launch {
             chat.events.filter { it.sessionId == null || it.sessionId == sessionId }
-                .onEach { event -> _state.value = reduce(_state.value, event) }
+                // Defense in depth: a single malformed event must never crash the chat.
+                // reduce() is pure, so on a bad event keep the prior state and drop it.
+                .onEach { event -> runCatching { reduce(_state.value, event) }.onSuccess { _state.value = it } }
                 .collect {}
         }
         // C2 + I3: watch connection transitions

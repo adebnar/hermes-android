@@ -3,8 +3,11 @@ package com.hermes.client.ui.chat
 import com.hermes.client.data.network.ServerEvent
 import com.hermes.client.domain.Role
 import com.hermes.client.domain.ToolStatus
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -54,6 +57,44 @@ class ChatReducerTest {
 
         val ids = s.messages.map { it.id }
         assertEquals("every message must have a unique list key", ids.size, ids.toSet().size)
+    }
+
+    // Crash repro: a tool's result is frequently structured JSON, not a string — e.g. the
+    // "summarize my unread email" flow calls a Gmail tool that returns an object/array of
+    // messages. reduce() reads payload.result via jsonPrimitive, which THROWS on a
+    // JsonObject/JsonArray. The throw escapes the (uncaught) event collector and crashes
+    // the app mid-stream, exactly when "synthesizing" finishes. Must never throw; the
+    // structured result should survive as text on the tool card.
+    @Test fun tool_complete_with_object_result_does_not_crash() {
+        var s = ChatUiState.empty()
+        s = reduce(s, ev("message.start") { put("message_id", "gemma") })
+        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("name", "gmail.search") })
+        s = reduce(s, ev("tool.complete") {
+            put("tool_id", "t1")
+            putJsonObject("result") { put("unread", 3); put("subject", "Citizenship update") }
+        })
+        val tools = s.messages.last().tools
+        assertEquals(ToolStatus.DONE, tools[0].status)
+        assertTrue("structured result must be preserved as text", tools[0].output.contains("unread"))
+    }
+
+    @Test fun tool_complete_with_array_result_does_not_crash() {
+        var s = ChatUiState.empty()
+        s = reduce(s, ev("message.start") { put("message_id", "gemma") })
+        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("name", "gmail.list") })
+        s = reduce(s, ev("tool.complete") {
+            put("tool_id", "t1")
+            putJsonArray("result") { add("a@x.com"); add("b@y.com") }
+        })
+        assertEquals(ToolStatus.DONE, s.messages.last().tools[0].status)
+    }
+
+    // The same non-primitive hazard applies to message text fields, not just tool results.
+    @Test fun message_complete_with_object_text_does_not_crash() {
+        var s = ChatUiState.empty()
+        s = reduce(s, ev("message.start") { put("message_id", "gemma") })
+        s = reduce(s, ev("message.complete") { putJsonObject("text") { put("v", "hi") } })
+        assertFalse(s.isGenerating)
     }
 
     @Test fun approval_request_sets_pending() {
