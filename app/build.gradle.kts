@@ -25,8 +25,8 @@ android {
         applicationId = "com.hermes.client"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 9
+        versionName = "0.1.8"
         testInstrumentationRunner = "com.hermes.client.HiltTestRunner"
         // App name; the beta build type overrides this so both can be installed at once.
         manifestPlaceholders["appLabel"] = "Hermes"
@@ -59,6 +59,10 @@ android {
         }
     }
     buildFeatures { compose = true }
+
+    // Let stubbed android.* calls (e.g. android.util.Log) return defaults instead of throwing
+    // in local JVM unit tests, so pure logic that mirrors to logcat stays unit-testable.
+    testOptions { unitTests.isReturnDefaultValues = true }
 
     // Build daemon runs on JBR (JDK 21); emit JVM 17 bytecode for Android.
     compileOptions {

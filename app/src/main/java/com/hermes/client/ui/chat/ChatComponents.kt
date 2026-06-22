@@ -2,6 +2,7 @@ package com.hermes.client.ui.chat
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -26,7 +27,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,19 +50,49 @@ import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 
 @Composable
-fun ChatMessageList(state: ChatUiState, modifier: Modifier = Modifier) {
-    val listState = rememberLazyListState()
+fun ChatMessageList(
+    state: ChatUiState,
+    modifier: Modifier = Modifier,
+    listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
+) {
     val lastIndex = state.messages.lastIndex
     // Length of the last (streaming) message: changes on every delta so we follow the stream.
     val tailLen = state.messages.lastOrNull()?.text?.length ?: 0
 
-    // Auto-scroll to the newest content — but only when the user is already pinned near the
+    // On first load of a non-empty thread (opening an existing session), jump straight to the
+    // newest message so the latest reply is visible immediately — otherwise the list stays at
+    // the top and the most recent response looks missing until you scroll down by hand.
+    var landed by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.messages.isNotEmpty()) {
+        if (state.messages.isEmpty() || landed) return@LaunchedEffect
+        // History loads after the list is already composed, so wait until the LazyColumn has
+        // actually measured the loaded items before scrolling — jumping before first layout
+        // lands short of the bottom.
+        snapshotFlow { listState.layoutInfo.totalItemsCount }
+            .filter { it >= state.messages.size }
+            .first()
+        // Converge to the ABSOLUTE bottom — the end of the newest message, not just the last
+        // item's top. Scroll purely by the list's own "can I still scroll down?" signal rather
+        // than a captured message index (which could go stale if the thread changes mid-loop):
+        // keep scrolling until nothing remains below, letting a frame measure the next items
+        // between steps.
+        var guard = 0
+        while (guard++ < 60 && listState.canScrollForward) {
+            listState.scrollBy(100_000f)
+            withFrameNanos {} // let a layout pass measure the next items, then continue
+        }
+        landed = true
+    }
+
+    // After the initial jump, follow new content. Always follow right after the user sends
+    // (they want to see their message and the reply); otherwise only when already near the
     // bottom, so scrolling back through history isn't yanked away mid-stream.
     LaunchedEffect(state.messages.size, tailLen) {
-        if (lastIndex < 0) return@LaunchedEffect
+        if (lastIndex < 0 || !landed) return@LaunchedEffect
+        val justSent = state.messages.lastOrNull()?.role == Role.USER
         val visible = listState.layoutInfo.visibleItemsInfo
         val atBottom = visible.isEmpty() || (visible.lastOrNull()?.index ?: 0) >= lastIndex - 1
-        if (atBottom) listState.animateScrollToItem(lastIndex)
+        if (justSent || atBottom) listState.animateScrollToItem(lastIndex)
     }
 
     if (state.messages.isEmpty()) {
@@ -75,7 +111,14 @@ fun ChatMessageList(state: ChatUiState, modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxSize().padding(horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(state.messages, key = { it.id }) { msg -> MessageBubble(msg) }
+        // Key by position as well as id: the gateway reuses the model name as the
+        // message id across a session's turns, so ids are NOT guaranteed unique.
+        // The index makes the key collision-proof regardless of id source (the list
+        // is append-only, so an item's index is stable across recompositions).
+        itemsIndexed(
+            state.messages,
+            key = { index, msg -> "$index:${msg.id}" },
+        ) { _, msg -> MessageBubble(msg) }
     }
 }
 

@@ -65,20 +65,28 @@ class ChatViewModel @Inject constructor(
     fun open(id: String) {
         sessionId = id
         connJob?.cancel()
+        com.hermes.client.data.diagnostics.DebugLog.log("session", "open($id)")
         viewModelScope.launch {
             try {
                 val history = sessions.history(id, profileManager.active.value)
+                com.hermes.client.data.diagnostics.DebugLog.log("session", "history($id) → ${history.size} messages")
                 _state.value = ChatUiState(messages = history)
             } catch (e: HermesApiException) {
+                com.hermes.client.data.diagnostics.DebugLog.log("error", "history($id) failed: ${e.code} ${e.message}")
                 if (e.code == 401) { _unauthorized.value = true; return@launch }
                 _state.value = ChatUiState(messages = emptyList())
             } catch (e: Exception) {
                 // History load failed (network/parse) — start with an empty thread rather than crash.
+                com.hermes.client.data.diagnostics.DebugLog.log("error", "history($id) failed: ${e.message}")
                 _state.value = ChatUiState(messages = emptyList())
             }
             // resume() returns the live socket handle for this session; switch to it so
             // submit/interrupt and event filtering use the id the gateway actually knows.
-            runCatching { chat.resume(id) }.getOrNull()?.let { sessionId = it }
+            // Pass the active profile: the gateway resolves resume against a per-profile DB,
+            // so a session in a non-default profile is "session not found" without it.
+            val handle = runCatching { chat.resume(id, profileManager.active.value) }.getOrNull()
+            handle?.let { sessionId = it }
+            com.hermes.client.data.diagnostics.DebugLog.log("session", "resume($id) → handle=${handle ?: "none"}")
             // Load model options, profiles, and the slash-command catalog; failures are non-fatal
             launch { runCatching { _models.value = modelRepo.options() } }
             launch { runCatching { _profiles.value = profileRepo.list() } }
@@ -87,7 +95,9 @@ class ChatViewModel @Inject constructor(
         collectJob?.cancel()
         collectJob = viewModelScope.launch {
             chat.events.filter { it.sessionId == null || it.sessionId == sessionId }
-                .onEach { event -> _state.value = reduce(_state.value, event) }
+                // Defense in depth: a single malformed event must never crash the chat.
+                // reduce() is pure, so on a bad event keep the prior state and drop it.
+                .onEach { event -> runCatching { reduce(_state.value, event) }.onSuccess { _state.value = it } }
                 .collect {}
         }
         // C2 + I3: watch connection transitions
@@ -103,7 +113,10 @@ class ChatViewModel @Inject constructor(
                 // C2: reconnect cycle completed (Reconnecting → Connected) → re-attach agent stream
                 // Guard: prev must be Reconnecting (not null) to skip the very first Connected transition
                 if (cur is ConnectionState.Connected && prev is ConnectionState.Reconnecting) {
-                    launch { runCatching { chat.resume(sessionId) }.getOrNull()?.let { sessionId = it } }
+                    launch {
+                        runCatching { chat.resume(sessionId, profileManager.active.value) }
+                            .getOrNull()?.let { sessionId = it }
+                    }
                 }
                 prev = cur
             }
@@ -181,7 +194,15 @@ class ChatViewModel @Inject constructor(
     }
 
     fun selectModel(provider: String, model: String) {
-        viewModelScope.launch { runCatching { modelRepo.set(provider, model) } }
+        // Switch THIS conversation's model, not the global default. The gateway pins a session
+        // to its own model (model_override); setting only the global model leaves a resumed
+        // session on its original — possibly unavailable — model ("model is not available in
+        // session"), and the error persists no matter how often the picker is used. The
+        // `/model … --session` slash overrides just this session, which is what the user means
+        // by changing the model inside a chat.
+        viewModelScope.launch {
+            runCatching { chat.slashExec(sessionId, "/model $model --provider $provider --session") }
+        }
     }
 
     fun selectProfile(name: String) {

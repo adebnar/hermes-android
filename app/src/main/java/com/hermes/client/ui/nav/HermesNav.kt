@@ -140,6 +140,9 @@ fun HermesNav(hasConfig: Boolean) {
             composable("settings_memory") { MemorySettingsScreen(onBack = { nav.popBackStack() }) }
             composable("settings_mcp") { McpSettingsScreen(onBack = { nav.popBackStack() }) }
             composable("settings_env") { EnvScreen(onBack = { nav.popBackStack() }) }
+            composable("settings_diagnostics") {
+                com.hermes.client.ui.settings.DiagnosticsScreen(onBack = { nav.popBackStack() })
+            }
             composable("settings_about") { AboutScreen(onBack = { nav.popBackStack() }) }
             composable("management") {
                 ManagementScreen(

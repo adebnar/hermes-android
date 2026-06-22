@@ -45,7 +45,7 @@ class ChatViewModelTest {
         every { chatRepo.connectionState } returns connectionStateFlow
         // resume returns null here so the ViewModel keeps the opened id stable for these tests
         // (production switches to the live handle resume returns).
-        coEvery { chatRepo.resume(any()) } returns null
+        coEvery { chatRepo.resume(any(), any()) } returns null
         every { profileManager.active } returns MutableStateFlow<String?>(null)
         coEvery { sessionRepo.history(any(), any()) } returns emptyList()
         coEvery { modelRepo.options() } returns emptyList()
@@ -84,7 +84,21 @@ class ChatViewModelTest {
         advanceUntilIdle()
 
         // resume must have been called exactly twice: once in open(), once on reconnect
-        coVerify(exactly = 2) { chatRepo.resume("s1") }
+        coVerify(exactly = 2) { chatRepo.resume("s1", null) }
+    }
+
+    /**
+     * Profile bug: session-scoped WebSocket RPCs must carry the active profile, or the gateway
+     * resolves session.resume against the wrong profile's DB and returns "session not found"
+     * (4007) — which then makes the next prompt.submit fail too. open() must pass the active
+     * profile to resume so a session that lives in a non-default profile can be reattached.
+     */
+    @Test fun open_resumes_with_active_profile() = runTest {
+        every { profileManager.active } returns MutableStateFlow<String?>("personal")
+        val vm = buildVm()
+        vm.open("s1")
+        advanceUntilIdle()
+        coVerify { chatRepo.resume("s1", "personal") }
     }
 
     /**
@@ -124,10 +138,13 @@ class ChatViewModelTest {
         advanceUntilIdle()
 
         // Only one resume from open(); the Connected transition had prev==Connecting (not Reconnecting)
-        coVerify(exactly = 1) { chatRepo.resume("s1") }
+        coVerify(exactly = 1) { chatRepo.resume("s1", null) }
     }
 
-    @Test fun selectModel_calls_modelRepo_set() = runTest {
+    // Changing the model inside a chat must switch THIS session's model (a `/model … --session`
+    // slash), not the global default — otherwise a session pinned to an unavailable model keeps
+    // failing with "model is not available in session" no matter how often the picker is used.
+    @Test fun selectModel_switches_session_model_via_slash() = runTest {
         val vm = buildVm()
         vm.open("s1")
         advanceUntilIdle()
@@ -135,7 +152,7 @@ class ChatViewModelTest {
         vm.selectModel("anthropic", "opus")
         advanceUntilIdle()
 
-        coVerify { modelRepo.set("anthropic", "opus") }
+        coVerify { chatRepo.slashExec("s1", "/model opus --provider anthropic --session") }
     }
 
     @Test fun selectProfile_calls_profileRepo_setActive() = runTest {

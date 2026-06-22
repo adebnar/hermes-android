@@ -1,6 +1,7 @@
 package com.hermes.client.data.repository
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -15,6 +16,7 @@ private val Context.settingsDataStore by preferencesDataStore(name = "app_settin
 class SettingsStore(private val context: Context) {
     private val themeKey = stringPreferencesKey("theme_mode")
     private val toolDisplayKey = stringPreferencesKey("tool_call_display") // "product" | "technical"
+    private val debugLoggingKey = booleanPreferencesKey("debug_logging")
 
     val themeMode: Flow<ThemeMode> = context.settingsDataStore.data.map { prefs ->
         runCatching { ThemeMode.valueOf(prefs[themeKey] ?: "SYSTEM") }.getOrDefault(ThemeMode.SYSTEM)
@@ -31,5 +33,12 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setToolCallTechnical(technical: Boolean) {
         context.settingsDataStore.edit { it[toolDisplayKey] = if (technical) "technical" else "product" }
+    }
+
+    /** Diagnostic logging toggle (Settings → Diagnostics). Off by default. */
+    val debugLogging: Flow<Boolean> = context.settingsDataStore.data.map { it[debugLoggingKey] ?: false }
+
+    suspend fun setDebugLogging(enabled: Boolean) {
+        context.settingsDataStore.edit { it[debugLoggingKey] = enabled }
     }
 }

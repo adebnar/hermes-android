@@ -5,7 +5,8 @@ import com.hermes.client.domain.ChatMessage
 import com.hermes.client.domain.Role
 import com.hermes.client.domain.ToolCall
 import com.hermes.client.domain.ToolStatus
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 
 data class ApprovalRequest(val prompt: String)
 data class ClarifyRequest(val question: String, val options: List<String>)
@@ -25,7 +26,16 @@ fun ChatUiState.withUserMessage(text: String): ChatUiState =
         isGenerating = true,
     )
 
-private fun ServerEvent.str(key: String): String? = payload[key]?.jsonPrimitive?.content
+// Reads a payload field as display text. The gateway sends some fields — notably tool
+// results (e.g. a Gmail "read unread" tool returns a JSON object/array of messages) — as
+// structured JSON, not string primitives. Reading those via jsonPrimitive THROWS, and the
+// throw escapes the (uncaught) event collector and crashes the app mid-stream. So unwrap a
+// primitive to its content and render any object/array as its raw JSON text; never throw.
+private fun ServerEvent.str(key: String): String? = when (val el = payload[key]) {
+    null, JsonNull -> null
+    is JsonPrimitive -> el.content
+    else -> el.toString()
+}
 
 /** Pure reducer: folds one server event into the chat state. */
 fun reduce(state: ChatUiState, event: ServerEvent): ChatUiState {
@@ -50,7 +60,13 @@ fun reduce(state: ChatUiState, event: ServerEvent): ChatUiState {
     return when (event.type) {
         "message.start" -> state.copy(
             messages = state.messages + ChatMessage(
-                id = event.str("message_id") ?: "a-${state.messages.size}",
+                // The gateway's message_id is NOT unique across turns — it sends the
+                // model/agent name (e.g. "gemma"), reused every turn. Used alone as a
+                // LazyColumn key it collides on the second turn and crashes the app, so
+                // prefix the message position (monotonic) to guarantee a unique, stable
+                // id. message_id isn't read anywhere else (deltas/tools route by
+                // indexOfLast / tool_id), so this is the only place it matters.
+                id = "a-${state.messages.size}-${event.str("message_id") ?: "msg"}",
                 role = Role.ASSISTANT, text = "", isStreaming = true,
             ),
             isGenerating = true,

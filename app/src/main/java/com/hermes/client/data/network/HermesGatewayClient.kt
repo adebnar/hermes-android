@@ -1,5 +1,6 @@
 package com.hermes.client.data.network
 
+import com.hermes.client.data.diagnostics.DebugLog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
@@ -76,6 +77,7 @@ open class HermesGatewayClient(
 
     protected fun openSocket() {
         val gen = generation.incrementAndGet()
+        DebugLog.log("ws", "opening socket (gen=$gen)")
         // Install a fresh, uncompleted readiness gate for this new socket attempt.
         readyGate = CompletableDeferred()
         _state.value = ConnectionState.Connecting
@@ -107,14 +109,23 @@ open class HermesGatewayClient(
             text.lineSequence().filter { it.isNotBlank() }.forEach { line ->
                 when (val msg = parseInbound(json, line)) {
                     is RpcResult -> pending.remove(msg.id)?.complete(msg.result)
-                    is RpcErrorReply -> pending.remove(msg.id)
-                        ?.completeExceptionally(GatewayRpcException(msg.error.code, msg.error.message))
+                    is RpcErrorReply -> {
+                        DebugLog.log("ws", "rpc#${msg.id} ← error ${msg.error.code}: ${msg.error.message}")
+                        pending.remove(msg.id)
+                            ?.completeExceptionally(GatewayRpcException(msg.error.code, msg.error.message))
+                    }
                     is RpcEvent -> {
                         // Handle gateway.ready: flip to Connected and open the readiness gate.
                         if (msg.event.type == "gateway.ready") {
                             attempt.set(0)
                             _state.value = ConnectionState.Connected
                             readyGate.complete(Unit)
+                        }
+                        // Log every event except the high-frequency streaming deltas, so the
+                        // diagnostic trail stays readable while still capturing errors,
+                        // tool calls, and lifecycle around a failure like "message not found".
+                        if (msg.event.type != "message.delta" && msg.event.type != "reasoning.delta") {
+                            DebugLog.log("ws", "event ${msg.event.type} session=${msg.event.sessionId ?: "-"}")
                         }
                         _events.tryEmit(msg.event)
                     }
@@ -134,6 +145,7 @@ open class HermesGatewayClient(
     protected open fun onSocketClosed(gen: Int, reason: String) {
         // A newer socket has superseded this one (e.g. reconnectNow()) — ignore its death.
         if (gen != generation.get()) return
+        DebugLog.log("ws", "socket closed (gen=$gen): $reason")
         // Fail any call() that is currently awaiting readiness so it throws immediately.
         readyGate.completeExceptionally(GatewayRpcException(0, reason))
         failAllPending(reason)
@@ -168,9 +180,11 @@ open class HermesGatewayClient(
         val id = nextId.getAndIncrement()
         val deferred = CompletableDeferred<JsonElement>()
         pending[id] = deferred
+        DebugLog.log("ws", "rpc#$id → $method")
         val sent = ws?.send(RpcRequest(id, method, params).encode(json)) ?: false
         if (!sent) {
             pending.remove(id)
+            DebugLog.log("ws", "rpc#$id $method failed: not connected")
             throw GatewayRpcException(0, "not connected")
         }
         return deferred.await()

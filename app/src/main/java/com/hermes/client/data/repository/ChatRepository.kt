@@ -35,9 +35,18 @@ class ChatRepository(private val client: HermesGatewayClient) {
      * Resumes a session. The gateway accepts the stored (REST) id but returns a NEW short
      * live handle in `session_id` — callers MUST use that returned id for subsequent
      * submit/interrupt and for filtering streamed events. Returns null if not present.
+     *
+     * [profile] MUST be the active profile: the gateway resolves session.resume against a
+     * per-profile state.db, and without it a session that lives in a non-default profile is
+     * reported "session not found" (4007) — which then fails the next prompt.submit too. Once
+     * resume succeeds, the live handle it returns is profile-independent (resolved in-memory),
+     * so only resume needs the profile.
      */
-    suspend fun resume(sessionId: String): String? {
-        val result = client.call("session.resume", buildJsonObject { put("session_id", sessionId) })
+    suspend fun resume(sessionId: String, profile: String? = null): String? {
+        val result = client.call("session.resume", buildJsonObject {
+            put("session_id", sessionId)
+            if (!profile.isNullOrBlank()) put("profile", profile)
+        })
         return result.jsonObject["session_id"]?.jsonPrimitive?.content
     }
 
