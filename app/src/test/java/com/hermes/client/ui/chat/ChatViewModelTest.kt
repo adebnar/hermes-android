@@ -141,7 +141,10 @@ class ChatViewModelTest {
         coVerify(exactly = 1) { chatRepo.resume("s1", null) }
     }
 
-    @Test fun selectModel_calls_modelRepo_set() = runTest {
+    // Changing the model inside a chat must switch THIS session's model (a `/model … --session`
+    // slash), not the global default — otherwise a session pinned to an unavailable model keeps
+    // failing with "model is not available in session" no matter how often the picker is used.
+    @Test fun selectModel_switches_session_model_via_slash() = runTest {
         val vm = buildVm()
         vm.open("s1")
         advanceUntilIdle()
@@ -149,7 +152,7 @@ class ChatViewModelTest {
         vm.selectModel("anthropic", "opus")
         advanceUntilIdle()
 
-        coVerify { modelRepo.set("anthropic", "opus") }
+        coVerify { chatRepo.slashExec("s1", "/model opus --provider anthropic --session") }
     }
 
     @Test fun selectProfile_calls_profileRepo_setActive() = runTest {

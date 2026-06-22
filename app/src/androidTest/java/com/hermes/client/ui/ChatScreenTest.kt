@@ -49,9 +49,11 @@ class ChatScreenTest {
         rule.waitForIdle()
         state.value = ChatUiState(messages = msgs)
         // The scroll-to-bottom converges across layout passes (item heights are measured
-        // lazily), so drive frames until the newest message is actually visible.
+        // lazily), so drive frames until the list reaches the absolute bottom — the newest
+        // message is the last visible item and there is nothing left to scroll past.
         rule.waitUntil(timeoutMillis = 5_000) {
-            (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= 119
+            (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= 119 &&
+                !listState.canScrollForward
         }
     }
 

@@ -194,7 +194,15 @@ class ChatViewModel @Inject constructor(
     }
 
     fun selectModel(provider: String, model: String) {
-        viewModelScope.launch { runCatching { modelRepo.set(provider, model) } }
+        // Switch THIS conversation's model, not the global default. The gateway pins a session
+        // to its own model (model_override); setting only the global model leaves a resumed
+        // session on its original — possibly unavailable — model ("model is not available in
+        // session"), and the error persists no matter how often the picker is used. The
+        // `/model … --session` slash overrides just this session, which is what the user means
+        // by changing the model inside a chat.
+        viewModelScope.launch {
+            runCatching { chat.slashExec(sessionId, "/model $model --provider $provider --session") }
+        }
     }
 
     fun selectProfile(name: String) {

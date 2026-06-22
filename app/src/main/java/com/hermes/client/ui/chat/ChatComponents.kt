@@ -2,6 +2,7 @@ package com.hermes.client.ui.chat
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,16 +71,15 @@ fun ChatMessageList(
         snapshotFlow { listState.layoutInfo.totalItemsCount }
             .filter { it >= state.messages.size }
             .first()
-        // Converge to the true bottom. A single scrollToItem on a freshly-loaded list
-        // undershoots: it can only measure items up to the current extent, and the off-screen
-        // bubbles wrap taller than the estimate. Re-scroll after each frame (which measures
-        // more items) until the last one is actually visible.
+        // Converge to the ABSOLUTE bottom — the end of the newest message, not just the last
+        // item's top. scrollToItem lands on an item's top, and a long last message can be
+        // taller than the viewport, so jump to the last item then keep scrolling until there
+        // is nothing left below (item heights are measured lazily as we go).
+        listState.scrollToItem(state.messages.lastIndex)
         var guard = 0
-        while (guard++ < 20) {
-            listState.scrollToItem(state.messages.lastIndex)
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-            if (lastVisible >= state.messages.lastIndex) break
-            withFrameNanos {} // let a layout pass run so more items get measured
+        while (guard++ < 40 && listState.canScrollForward) {
+            listState.scrollBy(100_000f)
+            withFrameNanos {} // let a layout pass measure the next items, then continue
         }
         landed = true
     }
