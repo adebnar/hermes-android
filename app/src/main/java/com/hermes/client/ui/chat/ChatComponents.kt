@@ -72,12 +72,12 @@ fun ChatMessageList(
             .filter { it >= state.messages.size }
             .first()
         // Converge to the ABSOLUTE bottom — the end of the newest message, not just the last
-        // item's top. scrollToItem lands on an item's top, and a long last message can be
-        // taller than the viewport, so jump to the last item then keep scrolling until there
-        // is nothing left below (item heights are measured lazily as we go).
-        listState.scrollToItem(state.messages.lastIndex)
+        // item's top. Scroll purely by the list's own "can I still scroll down?" signal rather
+        // than a captured message index (which could go stale if the thread changes mid-loop):
+        // keep scrolling until nothing remains below, letting a frame measure the next items
+        // between steps.
         var guard = 0
-        while (guard++ < 40 && listState.canScrollForward) {
+        while (guard++ < 60 && listState.canScrollForward) {
             listState.scrollBy(100_000f)
             withFrameNanos {} // let a layout pass measure the next items, then continue
         }

@@ -29,9 +29,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermes.client.data.diagnostics.DebugLog
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,13 +100,14 @@ fun DiagnosticsScreen(
     }
 }
 
-private val timeFmt = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
+private val timeFmt =
+    DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(ZoneId.systemDefault())
 
 @Composable
 private fun LogRow(e: DebugLog.LogEntry) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
         Text(
-            "${timeFmt.format(Date(e.timeMillis))}  ${e.category}",
+            "${timeFmt.format(Instant.ofEpochMilli(e.timeMillis))}  ${e.category}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
         )

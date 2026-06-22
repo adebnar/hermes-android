@@ -1,6 +1,9 @@
 package com.hermes.client.data.diagnostics
 
 import android.util.Log
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -23,6 +26,10 @@ object DebugLog {
 
     @Volatile private var enabled = false
     @Volatile private var tokenToRedact: String? = null
+
+    // Thread-safe (unlike SimpleDateFormat); the log is written from background threads.
+    private val exportFmt =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.systemDefault())
 
     private val lock = Any()
     private val buffer = ArrayDeque<LogEntry>(MAX_ENTRIES)
@@ -66,7 +73,9 @@ object DebugLog {
         if (snapshot.isEmpty()) return "(no diagnostic entries)"
         return buildString {
             append("Hermes diagnostic log — ${snapshot.size} entries\n")
-            snapshot.forEach { e -> append("${e.timeMillis} [${e.category}] ${e.message}\n") }
+            snapshot.forEach { e ->
+                append("${exportFmt.format(Instant.ofEpochMilli(e.timeMillis))} [${e.category}] ${e.message}\n")
+            }
         }
     }
 
