@@ -65,20 +65,26 @@ class ChatViewModel @Inject constructor(
     fun open(id: String) {
         sessionId = id
         connJob?.cancel()
+        com.hermes.client.data.diagnostics.DebugLog.log("session", "open($id)")
         viewModelScope.launch {
             try {
                 val history = sessions.history(id, profileManager.active.value)
+                com.hermes.client.data.diagnostics.DebugLog.log("session", "history($id) → ${history.size} messages")
                 _state.value = ChatUiState(messages = history)
             } catch (e: HermesApiException) {
+                com.hermes.client.data.diagnostics.DebugLog.log("error", "history($id) failed: ${e.code} ${e.message}")
                 if (e.code == 401) { _unauthorized.value = true; return@launch }
                 _state.value = ChatUiState(messages = emptyList())
             } catch (e: Exception) {
                 // History load failed (network/parse) — start with an empty thread rather than crash.
+                com.hermes.client.data.diagnostics.DebugLog.log("error", "history($id) failed: ${e.message}")
                 _state.value = ChatUiState(messages = emptyList())
             }
             // resume() returns the live socket handle for this session; switch to it so
             // submit/interrupt and event filtering use the id the gateway actually knows.
-            runCatching { chat.resume(id) }.getOrNull()?.let { sessionId = it }
+            val handle = runCatching { chat.resume(id) }.getOrNull()
+            handle?.let { sessionId = it }
+            com.hermes.client.data.diagnostics.DebugLog.log("session", "resume($id) → handle=${handle ?: "none"}")
             // Load model options, profiles, and the slash-command catalog; failures are non-fatal
             launch { runCatching { _models.value = modelRepo.options() } }
             launch { runCatching { _profiles.value = profileRepo.list() } }

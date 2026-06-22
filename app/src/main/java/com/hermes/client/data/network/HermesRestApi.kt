@@ -25,6 +25,9 @@ class HermesRestApi(
 
     private fun builder(path: String): Request.Builder {
         val cfg = config()
+        // Keep the diagnostic log's redaction current with whatever token is active, so a
+        // shared log can never contain the session token in plain text.
+        com.hermes.client.data.diagnostics.DebugLog.setTokenToRedact(cfg.token)
         // Trim trailing slashes so a user-entered "http://host:9119/" doesn't produce
         // "//api/..." — the gateway routes a double slash to its web UI (HTML), not the API.
         val b = Request.Builder().url("${cfg.baseUrl.trimEnd('/')}$path")
@@ -33,9 +36,16 @@ class HermesRestApi(
     }
 
     private suspend inline fun <reified T> get(path: String): T = withContext(Dispatchers.IO) {
+        com.hermes.client.data.diagnostics.DebugLog.log("rest", "GET $path")
         okHttp.newCall(builder(path).get().build()).execute().use { resp ->
             val body = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) throw HermesApiException(resp.code, body.ifBlank { "HTTP ${resp.code}" })
+            if (!resp.isSuccessful) {
+                com.hermes.client.data.diagnostics.DebugLog.log(
+                    "rest", "GET $path ← ${resp.code} ${body.take(200)}",
+                )
+                throw HermesApiException(resp.code, body.ifBlank { "HTTP ${resp.code}" })
+            }
+            com.hermes.client.data.diagnostics.DebugLog.log("rest", "GET $path ← ${resp.code}")
             json.decodeFromString<T>(body)
         }
     }
