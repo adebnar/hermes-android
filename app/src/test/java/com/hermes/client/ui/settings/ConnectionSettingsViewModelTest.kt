@@ -24,10 +24,11 @@ class ConnectionSettingsViewModelTest {
     private val store = mockk<CredentialStore>(relaxed = true)
     private val rest = mockk<HermesRestApi>(relaxed = true)
     private val chat = mockk<ChatRepository>(relaxed = true)
+    private val gatedAuth = mockk<com.hermes.client.data.network.GatedAuth>(relaxed = true)
 
     @Before fun setUp() { Dispatchers.setMain(StandardTestDispatcher()) }
 
-    private fun buildVm() = ConnectionSettingsViewModel(store, rest, chat)
+    private fun buildVm() = ConnectionSettingsViewModel(store, rest, chat, gatedAuth)
 
     @Test fun prefills_fields_from_stored_config() {
         every { store.load() } returns GatewayConfig("https://host.ts.net", "tok123")

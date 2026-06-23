@@ -43,22 +43,38 @@ fun ConnectionSettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "The Hermes gateway this app connects to. Update the URL or token here if the " +
-                    "server moved or the token changed, then Save to reconnect.",
+                "The Hermes dashboard this app connects to. For a password-protected (network) " +
+                    "dashboard, set the URL plus username + password. For a local/loopback setup, " +
+                    "use the URL and token. Save to reconnect.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedTextField(
                 value = state.url,
                 onValueChange = vm::onUrlChange,
-                label = { Text("Gateway URL (e.g. https://my-mac.ts.net)") },
+                label = { Text("Gateway URL (e.g. http://100.x.x.x:9119)") },
                 singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = state.username,
+                onValueChange = vm::onUsernameChange,
+                label = { Text("Username (for password-protected dashboards)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = state.password,
+                onValueChange = vm::onPasswordChange,
+                label = { Text("Password") },
+                singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = state.token,
                 onValueChange = vm::onTokenChange,
-                label = { Text("Token (optional)") },
+                label = { Text("Token (loopback only — leave blank if using a password)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
