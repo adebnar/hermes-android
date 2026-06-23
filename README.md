@@ -106,7 +106,14 @@ vector in `app/src/main/res/drawable/`.
   password-protected dashboard)
 
 Toolchain is pinned in `gradle/libs.versions.toml`: AGP 8.13.2, Kotlin 2.2.21,
-Gradle 8.14.5. `minSdk` 26, `targetSdk` 36.
+Gradle 8.14.5. `minSdk` 26, `targetSdk` 36. These are the newest mutually-compatible
+versions — AGP 9.x drops the `kotlin-android` plugin and Hilt 2.59 requires it, so the set
+is held here on purpose.
+
+The root `build.gradle.kts` **forces patched versions of a few transitive build-classpath
+dependencies** (gRPC/Google-Cloud tooling the Android Gradle Plugin bundles — netty,
+protobuf, jose4j, jdom2, bouncycastle) to close known advisories. These are build-time only
+and **never shipped in the APK**; the forces touch no app runtime dependency.
 
 ---
 
