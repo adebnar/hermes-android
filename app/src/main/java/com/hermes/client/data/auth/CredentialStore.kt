@@ -1,17 +1,29 @@
 package com.hermes.client.data.auth
 
-data class GatewayConfig(val baseUrl: String, val token: String) {
-    /**
-     * Derived WebSocket URL, e.g. http://host:9119 -> ws://host:9119/api/ws?token=...
-     * The token query param is omitted when no token is configured (gateways that
-     * don't enforce a session token, e.g. trusted tailnet setups).
-     */
-    val wsUrl: String
+data class GatewayConfig(
+    val baseUrl: String,
+    val token: String = "",
+    // Set for a network-exposed (gated) dashboard that requires a password provider. When a
+    // username is present the app authenticates via POST /auth/password-login (session cookies)
+    // plus a per-socket WS ticket, instead of the loopback session token.
+    val username: String = "",
+    val password: String = "",
+) {
+    /** True when this targets a gated dashboard (basic-auth); false for a loopback/token setup. */
+    val isGated: Boolean get() = username.isNotBlank()
+
+    /** Base WS endpoint with no auth query — the auth param (?token / ?ticket) is appended later. */
+    val wsBase: String
         get() {
             val ws = baseUrl.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://")
-            val base = "${ws.trimEnd('/')}/api/ws"
-            return if (token.isBlank()) base else "$base?token=$token"
+            return "${ws.trimEnd('/')}/api/ws"
         }
+
+    /**
+     * Loopback WS URL using the session token, e.g. ws://host:9119/api/ws?token=...
+     * Only used in non-gated mode; gated mode appends a per-connect ?ticket= instead.
+     */
+    val wsUrl: String get() = if (token.isBlank()) wsBase else "$wsBase?token=$token"
 }
 
 interface CredentialStore {

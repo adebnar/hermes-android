@@ -42,7 +42,9 @@ open class HermesGatewayClient(
     private val json: Json,
     private val scope: CoroutineScope,
     private val backoff: BackoffPolicy = BackoffPolicy(),
-    private val wsUrlProvider: () -> String,
+    // suspend so gated mode can fetch a fresh single-use WS ticket (an HTTP round trip) before
+    // each connect; loopback mode returns immediately.
+    private val wsUrlProvider: suspend () -> String,
 ) {
     private val _events = MutableSharedFlow<ServerEvent>(extraBufferCapacity = 256)
     val events: SharedFlow<ServerEvent> = _events.asSharedFlow()
@@ -81,8 +83,22 @@ open class HermesGatewayClient(
         // Install a fresh, uncompleted readiness gate for this new socket attempt.
         readyGate = CompletableDeferred()
         _state.value = ConnectionState.Connecting
-        val request = Request.Builder().url(wsUrlProvider()).build()
-        ws = okHttp.newWebSocket(request, makeListener(gen))
+        // Resolve the URL off the calling thread: gated mode mints a WS ticket (HTTP) here. A
+        // failure (e.g. login/ticket error) routes through onSocketClosed so backoff retries.
+        scope.launch {
+            val url = try {
+                wsUrlProvider()
+            } catch (e: Exception) {
+                DebugLog.log("ws", "ws url/ticket failed (gen=$gen): ${e.message}")
+                onSocketClosed(gen, e.message ?: "ws url failed")
+                return@launch
+            }
+            // A newer socket may have superseded this one — or the client was closed — while we
+            // fetched the ticket. Either way, don't open a now-orphaned socket.
+            if (gen != generation.get() || manuallyClosed) return@launch
+            val request = Request.Builder().url(url).build()
+            ws = okHttp.newWebSocket(request, makeListener(gen))
+        }
     }
 
     /**

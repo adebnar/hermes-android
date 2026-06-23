@@ -84,6 +84,14 @@ fun HermesNav(hasConfig: Boolean) {
                 SessionsScreen(
                     onOpen = { id -> nav.navigate("chat/$id") },
                     onMenu = openDrawer,
+                    onOpenArchived = { nav.navigate("archived") },
+                    onUnauthorized = onUnauthorized,
+                )
+            }
+            composable("archived") {
+                com.hermes.client.ui.sessions.ArchivedSessionsScreen(
+                    onOpen = { id -> nav.navigate("chat/$id") },
+                    onBack = { nav.popBackStack() },
                     onUnauthorized = onUnauthorized,
                 )
             }
@@ -140,6 +148,9 @@ fun HermesNav(hasConfig: Boolean) {
             composable("settings_memory") { MemorySettingsScreen(onBack = { nav.popBackStack() }) }
             composable("settings_mcp") { McpSettingsScreen(onBack = { nav.popBackStack() }) }
             composable("settings_env") { EnvScreen(onBack = { nav.popBackStack() }) }
+            composable("settings_connection") {
+                com.hermes.client.ui.settings.ConnectionSettingsScreen(onBack = { nav.popBackStack() })
+            }
             composable("settings_diagnostics") {
                 com.hermes.client.ui.settings.DiagnosticsScreen(onBack = { nav.popBackStack() })
             }

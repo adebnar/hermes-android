@@ -23,14 +23,20 @@ class EncryptedCredentialStore(context: Context) : CredentialStore {
 
     override fun load(): GatewayConfig? {
         val url = prefs.getString("base_url", null) ?: return null
-        val token = prefs.getString("token", null) ?: return null
-        return GatewayConfig(url, token)
+        return GatewayConfig(
+            baseUrl = url,
+            token = prefs.getString("token", null) ?: "",
+            username = prefs.getString("username", null) ?: "",
+            password = prefs.getString("password", null) ?: "",
+        )
     }
 
     override fun save(config: GatewayConfig) {
         prefs.edit()
             .putString("base_url", config.baseUrl)
             .putString("token", config.token)
+            .putString("username", config.username)
+            .putString("password", config.password)
             .apply()
     }
 

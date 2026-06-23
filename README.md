@@ -25,7 +25,8 @@ on your phone:
 1. On your Android phone, open the release link above and tap the `.apk` file to download it.
 2. When prompted, allow installs from your browser or Files app ("Install unknown apps").
 3. Open the downloaded `.apk` and tap **Install**.
-4. Launch **Hermes** and complete the one-time [setup](#first-run-setup) (gateway URL + token).
+4. Launch **Hermes** and complete the one-time [setup](#first-run-setup) — gateway URL plus
+   either a session token (loopback) or a username/password (password-protected dashboard).
 
 > The APK is signed with the project's release key. Because it's installed outside the
 > Play Store, Android may warn about an app from an unknown developer — that's expected.
@@ -48,7 +49,9 @@ on your phone:
 - **Chat** — streaming responses, model picker, slash commands (`/…`) with an inline
   command palette, `@` file mentions/path completion, image attachments, tool-call
   approval and clarification prompts.
-- **Sessions** — grouped by workspace, with pinning and a session-admin view.
+- **Sessions** — grouped by workspace, with **search** (instant title filter + gateway
+  message-content search), pinning, **archive / unarchive / delete** (an Archived view from
+  the Sessions top bar), and a session-admin view. Opening a session lands on the newest reply.
 - **Models & profiles** — switch the active model or tenant profile on the fly; the active
   profile is shown in the chat top bar.
 - **Cron** — list, create, edit, pause/resume, run-now, and delete scheduled jobs, with
@@ -56,8 +59,10 @@ on your phone:
 - **Usage** — daily token chart and per-model breakdown.
 - **Messaging** — enable/disable platform integrations with a guided setup flow for the
   required credentials.
-- **Settings** — appearance (System/Light/Dark + tool-call verbosity), memory, MCP
-  servers, and API keys/environment variables. Configuration edits are written to the
+- **Settings** — **Server & token** (edit the gateway URL and token, or username/password for
+  a password-protected dashboard, then reconnect), appearance (System/Light/Dark + tool-call
+  verbosity), memory, MCP servers, API keys/environment variables, and **Diagnostics** (a
+  toggleable, token-redacted, shareable debug log). Configuration edits are written to the
   live gateway config.
 - **Reliability** — automatic reconnect with offline banner and manual retry; expired
   tokens route back to the setup screen.
@@ -71,8 +76,8 @@ on your phone:
 | UI | Jetpack Compose + Material 3, `ModalNavigationDrawer` wrapping a Navigation-Compose `NavHost` |
 | State | MVVM — `ViewModel` + `StateFlow`, `collectAsStateWithLifecycle` |
 | DI | Hilt |
-| Networking | OkHttp — REST over HTTP and a WebSocket JSON-RPC stream to the gateway |
-| Local storage | DataStore (device-local prefs: token, theme, tool-call display) |
+| Networking | OkHttp — REST + a WebSocket JSON-RPC stream to the gateway. Auth is either the loopback session token, or (gated dashboard) a cookie-jar session with 401 re-login and per-socket WS tickets |
+| Local storage | EncryptedSharedPreferences (credentials: URL, token, username/password); DataStore (theme, tool-call display, diagnostics toggle) |
 
 Package layout under `app/src/main/java/com/hermes/client/`:
 
@@ -97,7 +102,8 @@ vector in `app/src/main/res/drawable/`.
 
 - Android Studio (bundled JBR / JDK 21)
 - Android SDK with `compileSdk` 36 / build-tools 36.x
-- A reachable Hermes gateway and a session token
+- A reachable Hermes gateway and credentials (a session token, or username/password for a
+  password-protected dashboard)
 
 Toolchain is pinned in `gradle/libs.versions.toml`: AGP 8.13.2, Kotlin 2.2.21,
 Gradle 8.14.5. `minSdk` 26, `targetSdk` 36.
@@ -155,30 +161,46 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 
 ## First-run setup
 
-On first launch the app shows a **Setup** screen with two fields:
+On first launch the app shows a **Setup** screen. You can change any of these later from
+**Settings → Server & token** (URL, token, or username/password), then **Save & reconnect**.
 
-1. **Gateway URL** — where your Hermes gateway is reachable from the phone, e.g.
+1. **Gateway URL** — where your Hermes dashboard is reachable from the phone, e.g.
    `http://100.x.x.x:9119` (its Tailscale address) or `http://192.168.x.x:9119` on the
    same Wi-Fi. See [Connecting](#connecting) below.
-2. **Session token** — sent to the gateway as the `X-Hermes-Session-Token` header.
+2. **Auth** — depends on how the dashboard is bound:
+   - **Token mode** — a dashboard bound to **loopback** (`--host 127.0.0.1`) accepts the
+     **session token** (sent as `X-Hermes-Session-Token`). Leave username/password blank.
+     See [Getting your token](#getting-your-hermes-token).
+   - **Password mode (gated)** — a dashboard bound to a **network address** (e.g. its
+     Tailscale IP) refuses the loopback token and requires an auth provider, so set
+     **Username + Password**. The app logs in (`POST /auth/password-login`), holds the
+     rotating session cookie, and mints a per-connection WebSocket ticket automatically.
+     Leave the token blank.
 
-Credentials are stored locally on the device (DataStore). An expired/invalid token
-(HTTP 401) routes you back to Setup automatically.
+Credentials are stored **encrypted** on the device. On an expired/invalid session (HTTP 401)
+the app re-authenticates automatically in password mode, or routes back to Setup in token mode.
 
 ### Getting your Hermes token
 
-The app authenticates to the gateway with its **dashboard session token**. By default the
-gateway mints a *new random token every time it starts*, which is awkward to copy. To get a
-**stable** token you can paste into the app, set it yourself before starting the Hermes
-dashboard / gateway:
+For a **loopback** dashboard, the app authenticates with the **dashboard session token**. By
+default the gateway mints a *new random token every time it starts*, which is awkward to copy.
+For a **stable** token, set it yourself before starting the dashboard:
 
 ```bash
 export HERMES_DASHBOARD_SESSION_TOKEN="choose-a-long-random-string"
 # then start the Hermes dashboard / web gateway as usual
 ```
 
-Use that same value as the **Session token** in the app's Setup screen. Treat it like a
-password — anyone with the token and network access to the gateway can drive your agent.
+Use that value as the **Token** in Setup. Treat it like a password — anyone with the token
+and network access to the gateway can drive your agent.
+
+### Password-protected (network-bound) dashboard
+
+Recent Hermes refuses to expose the dashboard on a non-loopback address without a configured
+auth provider. Enable the **basic-auth** provider in `~/.hermes/config.yaml`
+(`dashboard.basic_auth.username` + `password_hash`), bind the dashboard to your private
+address, then enter that username/password in the app. The app handles the cookie/refresh and
+WebSocket-ticket flow for you.
 
 📖 Full Hermes installation, gateway, and token docs:
 **[hermes-agent.nousresearch.com/docs](https://hermes-agent.nousresearch.com/docs/)**

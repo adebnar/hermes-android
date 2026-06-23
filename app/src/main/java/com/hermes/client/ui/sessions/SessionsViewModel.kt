@@ -3,6 +3,7 @@ package com.hermes.client.ui.sessions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hermes.client.data.network.HermesApiException
+import com.hermes.client.data.network.SearchResultDto
 import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.PinStore
 import com.hermes.client.data.repository.ProfileManager
@@ -70,6 +71,35 @@ class SessionsViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             _state.value = SessionsUiState(error = e.message ?: "Failed to load")
+        }
+    }
+
+    // ── Search ──────────────────────────────────────────────────────────────────────────
+    // The title filter is applied to [state.sessions] in the UI as the query changes (instant,
+    // offline). A message-content search hits the gateway only on the explicit Search action.
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query.asStateFlow()
+
+    private val _messageResults = MutableStateFlow<List<SearchResultDto>>(emptyList())
+    val messageResults: StateFlow<List<SearchResultDto>> = _messageResults.asStateFlow()
+
+    fun onQueryChange(q: String) {
+        _query.value = q
+        if (q.isBlank()) _messageResults.value = emptyList()
+    }
+
+    private var searchJob: kotlinx.coroutines.Job? = null
+
+    /** Full-text search of message content across this profile's sessions. Cancels any in-flight
+     *  search first so a slow older query can't overwrite newer results. */
+    fun searchMessages() {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            val q = _query.value.trim()
+            if (q.isBlank()) { _messageResults.value = emptyList(); return@launch }
+            runCatching { sessions.search(q, profileManager.active.value) }
+                .onSuccess { _messageResults.value = it }
+                .onFailure { _messageResults.value = emptyList() }
         }
     }
 

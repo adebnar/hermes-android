@@ -34,13 +34,28 @@ fun SetupScreen(vm: SetupViewModel = hiltViewModel(), onSaved: () -> Unit) {
         OutlinedTextField(
             value = state.url,
             onValueChange = vm::onUrlChange,
-            label = { Text("Gateway URL (e.g. https://my-mac.ts.net:8443)") },
+            label = { Text("Gateway URL (e.g. http://100.x.x.x:9119)") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = state.username,
+            onValueChange = vm::onUsernameChange,
+            label = { Text("Username (for password-protected dashboards)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = state.password,
+            onValueChange = vm::onPasswordChange,
+            label = { Text("Password") },
+            singleLine = true,
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = state.token,
             onValueChange = vm::onTokenChange,
-            label = { Text("Token (optional)") },
+            label = { Text("Token (loopback only — blank if using a password)") },
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

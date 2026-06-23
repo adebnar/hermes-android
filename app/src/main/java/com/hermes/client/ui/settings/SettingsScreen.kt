@@ -32,6 +32,8 @@ fun SettingsScreen(
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
+            Entry("Server & token", "Gateway URL and token this app connects to") { onNavigate("settings_connection") }
+            HorizontalDivider()
             Entry("Appearance", "Theme, light/dark, tool-call display") { onNavigate("settings_appearance") }
             HorizontalDivider()
             Entry("Models & memory", "Default model, memory toggles & budgets") { onNavigate("settings_memory") }
