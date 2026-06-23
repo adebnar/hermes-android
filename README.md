@@ -4,6 +4,7 @@
 
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20the%20project-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/andrew65386)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/adebnar/hermes-android?style=for-the-badge&label=latest)](https://github.com/adebnar/hermes-android/releases/latest)
 
 A native Android client for the **Hermes agent gateway** — a phone-friendly companion to
 the Hermes Desktop app. It connects to a remote Hermes gateway over Tailscale, another
@@ -64,8 +65,8 @@ on your phone:
   verbosity), memory, MCP servers, API keys/environment variables, and **Diagnostics** (a
   toggleable, token-redacted, shareable debug log). Configuration edits are written to the
   live gateway config.
-- **Reliability** — automatic reconnect with offline banner and manual retry; expired
-  tokens route back to the setup screen.
+- **Reliability** — automatic reconnect with offline banner and manual retry; an expired
+  session re-authenticates automatically (password mode) or routes back to Setup (token mode).
 
 ---
 
@@ -285,6 +286,20 @@ everyone else gets the stable [latest release](https://github.com/adebnar/hermes
 Until those are set, tag-triggered builds will fail to sign — build/release locally with
 `./gradlew :app:assembleRelease` (or `:app:assembleBeta`) instead, which reads the
 gitignored `keystore.properties`.
+
+---
+
+## Contributing
+
+Contributions are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup, the
+architecture/test conventions, and the branch workflow (new work lands on `develop` via PR).
+All participation is governed by the **[Code of Conduct](CODE_OF_CONDUCT.md)**.
+
+## Security
+
+Found a vulnerability? Please report it privately — see **[SECURITY.md](SECURITY.md)** for how
+to report and the app's security posture (encrypted credential storage, the token/basic-auth
+modes, the private-network/cleartext design, and supply-chain hygiene).
 
 ---
 
