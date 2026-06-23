@@ -3,8 +3,8 @@
 ## Reporting a vulnerability
 
 Please report security issues **privately** via GitHub's **"Report a vulnerability"**
-(Security → Advisories) on this repository, or by email to the maintainer. Do not open public
-issues for vulnerabilities. We aim to acknowledge within 72 hours.
+(Security → Advisories) on this repository. Do not open public issues for vulnerabilities.
+We aim to acknowledge within 72 hours.
 
 ## Security posture
 
