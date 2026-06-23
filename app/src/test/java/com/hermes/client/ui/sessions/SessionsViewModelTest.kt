@@ -45,6 +45,27 @@ class SessionsViewModelTest {
     // ViewModel is not recreated when navigating back, so init runs only once). This proves
     // refresh() re-queries the repository and surfaces the newly-added session — the mechanism
     // the resume hook relies on. Without that hook, the user's just-run session never shows.
+    // Typing a query is an instant client-side concern; only the explicit Search action hits
+    // the gateway. searchMessages must populate messageResults from the repo, and clearing the
+    // query must clear results.
+    @Test fun searchMessages_populates_results_and_clear_resets() = runTest {
+        coEvery { sessionRepo.list(any()) } returns emptyList()
+        coEvery { sessionRepo.search(any(), any()) } returns listOf(
+            com.hermes.client.data.network.SearchResultDto(sessionId = "s9", snippet = "found it"),
+        )
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.onQueryChange("invoice")
+        vm.searchMessages()
+        advanceUntilIdle()
+        assertEquals(listOf("s9"), vm.messageResults.value.map { it.sessionId })
+
+        vm.onQueryChange("")
+        advanceUntilIdle()
+        assertTrue("clearing the query clears message results", vm.messageResults.value.isEmpty())
+    }
+
     @Test fun refresh_resurfaces_newly_added_session() = runTest {
         coEvery { sessionRepo.list(any()) } returns listOf(session("s1", "old"))
         val vm = buildVm()

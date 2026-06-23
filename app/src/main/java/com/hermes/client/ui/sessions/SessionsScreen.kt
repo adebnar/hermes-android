@@ -1,6 +1,7 @@
 package com.hermes.client.ui.sessions
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,14 +11,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -32,6 +37,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermes.client.domain.Session
@@ -49,6 +55,8 @@ fun SessionsScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
     val pinnedIds by vm.pinnedIds.collectAsStateWithLifecycle()
+    val query by vm.query.collectAsStateWithLifecycle()
+    val messageResults by vm.messageResults.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     // I1: route to Setup when a 401 is received
@@ -90,18 +98,67 @@ fun SessionsScreen(
             )
         },
     ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize()) {
+        Column(Modifier.padding(padding).fillMaxSize()) {
+            // Search: typing filters the loaded list by title/workspace instantly; the keyboard
+            // Search action runs a full message-content search via the gateway.
+            OutlinedTextField(
+                value = query,
+                onValueChange = vm::onQueryChange,
+                placeholder = { Text("Search sessions…") },
+                singleLine = true,
+                trailingIcon = {
+                    if (query.isNotBlank()) {
+                        IconButton(onClick = { vm.onQueryChange("") }) { Text("✕") }
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { vm.searchMessages() }),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+            Box(Modifier.fillMaxSize()) {
             when {
                 state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
                 else -> {
-                    val pinned = state.sessions.filter { it.id in pinnedIds }
+                    val q = query.trim()
+                    // Instant client-side title/workspace filter over the loaded sessions.
+                    val matches = if (q.isEmpty()) state.sessions
+                    else state.sessions.filter {
+                        it.title.contains(q, ignoreCase = true) ||
+                            it.workspace.contains(q, ignoreCase = true)
+                    }
+                    val pinned = matches.filter { it.id in pinnedIds }
                     // Group the rest by workspace; "No workspace" sorts last.
-                    val groups = state.sessions.filterNot { it.id in pinnedIds }
+                    val groups = matches.filterNot { it.id in pinnedIds }
                         .groupBy { it.workspace }
                         .toSortedMap(compareBy({ it == "No workspace" }, { it }))
 
                     LazyColumn {
+                        // Gateway message-content search results (populated on the Search action).
+                        if (messageResults.isNotEmpty()) {
+                            item(key = "h-msg") { SectionHeader("Message matches", messageResults.size) }
+                            items(messageResults, key = { "m-${it.sessionId}-${it.snippet.orEmpty().take(24)}" }) { r ->
+                                ListItem(
+                                    headlineContent = {
+                                        Text(r.snippet?.take(140)?.replace("\n", " ") ?: r.sessionId)
+                                    },
+                                    supportingContent = { Text(r.model ?: r.role ?: "") },
+                                    modifier = Modifier.clickable { onOpen(r.sessionId) },
+                                )
+                                HorizontalDivider()
+                            }
+                        }
+                        // Hint when nothing matches by title — message search is one tap away.
+                        if (q.isNotEmpty() && matches.isEmpty() && messageResults.isEmpty()) {
+                            item(key = "no-title-match") {
+                                Text(
+                                    "No titles match \"$q\". Press search on the keyboard to search message text.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(16.dp),
+                                )
+                            }
+                        }
                         if (pinned.isNotEmpty()) {
                             item(key = "h-pinned") { SectionHeader("Pinned", pinned.size) }
                             items(pinned, key = { "p-${it.id}" }) { s ->
@@ -132,6 +189,7 @@ fun SessionsScreen(
                         }
                     }
                 }
+            }
             }
         }
     }
