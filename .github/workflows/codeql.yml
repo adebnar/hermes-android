@@ -3,9 +3,9 @@ name: CodeQL
 # Static code-scanning for security vulnerabilities in the Kotlin/Java sources.
 on:
   push:
-    branches: [master, develop]
+    branches: [main, develop]
   pull_request:
-    branches: [master]
+    branches: [main]
   schedule:
     - cron: "0 6 * * 1"   # weekly, Monday 06:00 UTC
 

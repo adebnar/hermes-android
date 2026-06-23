@@ -4,9 +4,9 @@ name: Security
 # (release runtime) dependencies.
 on:
   push:
-    branches: [master, develop]
+    branches: [main, develop]
   pull_request:
-    branches: [master, develop]
+    branches: [main, develop]
 
 jobs:
   secret-scan:
@@ -21,9 +21,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   dependency-graph:
-    # Submit the Gradle dependency graph to GitHub on master so Dependabot evaluates the
+    # Submit the Gradle dependency graph to GitHub on main so Dependabot evaluates the
     # SHIPPED dependency tree for advisories.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -37,7 +37,7 @@ agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Branches & pull requests
 
-New work lands on `develop` first; `master` is the protected, always-releasable branch (see
+New work lands on `develop` first; `main` is the protected, always-releasable branch (see
 [Development & release workflow](README.md#development--release-workflow)).
 
 1. Branch from `develop`: `git switch develop && git switch -c feature/my-change`.
