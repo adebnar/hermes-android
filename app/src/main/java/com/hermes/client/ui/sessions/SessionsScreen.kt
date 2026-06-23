@@ -137,7 +137,9 @@ fun SessionsScreen(
                         // Gateway message-content search results (populated on the Search action).
                         if (messageResults.isNotEmpty()) {
                             item(key = "h-msg") { SectionHeader("Message matches", messageResults.size) }
-                            items(messageResults, key = { "m-${it.sessionId}-${it.snippet.orEmpty().take(24)}" }) { r ->
+                            // No custom key: results are transient and snippets can collide
+                            // (duplicate/empty), which would crash the list. Index keys are safe.
+                            items(messageResults) { r ->
                                 ListItem(
                                     headlineContent = {
                                         Text(r.snippet?.take(140)?.replace("\n", " ") ?: r.sessionId)

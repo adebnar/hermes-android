@@ -93,8 +93,9 @@ open class HermesGatewayClient(
                 onSocketClosed(gen, e.message ?: "ws url failed")
                 return@launch
             }
-            // A newer socket may have superseded this one while we fetched the ticket.
-            if (gen != generation.get()) return@launch
+            // A newer socket may have superseded this one — or the client was closed — while we
+            // fetched the ticket. Either way, don't open a now-orphaned socket.
+            if (gen != generation.get() || manuallyClosed) return@launch
             val request = Request.Builder().url(url).build()
             ws = okHttp.newWebSocket(request, makeListener(gen))
         }

@@ -38,7 +38,8 @@ class InMemoryCookieJar : CookieJar {
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
         val jar = byHost[url.host] ?: return emptyList()
         val now = System.currentTimeMillis()
-        return jar.values.filter { it.expiresAt > now }
+        // matches() enforces path/secure/domain rules; expiry guards rotated-out cookies.
+        return jar.values.filter { it.matches(url) && it.expiresAt > now }
     }
 
     fun clear() = byHost.clear()

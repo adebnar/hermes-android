@@ -88,13 +88,19 @@ class SessionsViewModel @Inject constructor(
         if (q.isBlank()) _messageResults.value = emptyList()
     }
 
-    /** Full-text search of message content across this profile's sessions. */
-    fun searchMessages() = viewModelScope.launch {
-        val q = _query.value.trim()
-        if (q.isBlank()) { _messageResults.value = emptyList(); return@launch }
-        runCatching { sessions.search(q, profileManager.active.value) }
-            .onSuccess { _messageResults.value = it }
-            .onFailure { _messageResults.value = emptyList() }
+    private var searchJob: kotlinx.coroutines.Job? = null
+
+    /** Full-text search of message content across this profile's sessions. Cancels any in-flight
+     *  search first so a slow older query can't overwrite newer results. */
+    fun searchMessages() {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            val q = _query.value.trim()
+            if (q.isBlank()) { _messageResults.value = emptyList(); return@launch }
+            runCatching { sessions.search(q, profileManager.active.value) }
+                .onSuccess { _messageResults.value = it }
+                .onFailure { _messageResults.value = emptyList() }
+        }
     }
 
     /** Returns the new session id, or null if creation failed (so the UI doesn't crash). */
