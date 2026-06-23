@@ -84,6 +84,14 @@ fun HermesNav(hasConfig: Boolean) {
                 SessionsScreen(
                     onOpen = { id -> nav.navigate("chat/$id") },
                     onMenu = openDrawer,
+                    onOpenArchived = { nav.navigate("archived") },
+                    onUnauthorized = onUnauthorized,
+                )
+            }
+            composable("archived") {
+                com.hermes.client.ui.sessions.ArchivedSessionsScreen(
+                    onOpen = { id -> nav.navigate("chat/$id") },
+                    onBack = { nav.popBackStack() },
                     onUnauthorized = onUnauthorized,
                 )
             }

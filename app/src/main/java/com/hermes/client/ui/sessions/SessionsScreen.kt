@@ -43,6 +43,7 @@ fun SessionsScreen(
     vm: SessionsViewModel = hiltViewModel(),
     onOpen: (String) -> Unit,
     onMenu: () -> Unit = {},
+    onOpenArchived: () -> Unit = {},
     onUnauthorized: () -> Unit = {},
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -78,6 +79,7 @@ fun SessionsScreen(
                     }
                 },
                 navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+                actions = { TextButton(onClick = onOpenArchived) { Text("Archived") } },
             )
         },
         floatingActionButton = {
