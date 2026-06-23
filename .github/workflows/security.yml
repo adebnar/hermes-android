@@ -1,6 +1,7 @@
 name: Security
 
-# Secret scanning + dependency-graph submission so Dependabot sees all (transitive) deps.
+# Secret scanning + dependency-graph submission so Dependabot evaluates the app's shipped
+# (release runtime) dependencies.
 on:
   push:
     branches: [master, develop]
@@ -20,8 +21,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   dependency-graph:
-    # Submit the Gradle dependency graph to GitHub on master so Dependabot
-    # evaluates the full (transitive) tree for advisories.
+    # Submit the Gradle dependency graph to GitHub on master so Dependabot evaluates the
+    # SHIPPED dependency tree for advisories.
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
@@ -33,3 +34,9 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/dependency-submission@v4
+        env:
+          # Scan only the app's shipped deps (release runtime classpath), not the Android Gradle
+          # Plugin's build-classpath tooling (gRPC/netty/protobuf/jose4j/jdom2/bouncycastle —
+          # never in the APK, and not upgradable under the deliberately-pinned AGP/Kotlin/Hilt
+          # set). Keeps Dependabot focused on shippable risk instead of unactionable build noise.
+          DEPENDENCY_GRAPH_INCLUDE_CONFIGURATIONS: '^releaseRuntimeClasspath$'
