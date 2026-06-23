@@ -3,17 +3,21 @@
 // that close the open HIGH Dependabot advisories without touching app runtime deps.
 buildscript {
     configurations.classpath {
-        resolutionStrategy.force(
-            "io.netty:netty-handler:4.1.135.Final",
-            "io.netty:netty-codec:4.1.135.Final",
-            "io.netty:netty-codec-http:4.1.135.Final",
-            "io.netty:netty-codec-http2:4.1.135.Final",
-            "com.google.protobuf:protobuf-java:3.25.5",
-            "com.google.protobuf:protobuf-kotlin:3.25.5",
-            "org.bouncycastle:bcpg-jdk18on:1.84",
-            "org.bitbucket.b_c:jose4j:0.9.6",
-            "org.jdom:jdom2:2.0.6.1",
-        )
+        resolutionStrategy {
+            // Pin EVERY netty module to one patched version. Forcing only a subset (codec,
+            // handler, …) would leave netty-common/buffer/transport/resolver on the old version
+            // and skew the set, risking linkage errors — so bump the whole io.netty group.
+            eachDependency {
+                if (requested.group == "io.netty") useVersion("4.1.135.Final")
+            }
+            force(
+                "com.google.protobuf:protobuf-java:3.25.5",
+                "com.google.protobuf:protobuf-kotlin:3.25.5",
+                "org.bouncycastle:bcpg-jdk18on:1.84",
+                "org.bitbucket.b_c:jose4j:0.9.6",
+                "org.jdom:jdom2:2.0.6.1",
+            )
+        }
     }
 }
 
