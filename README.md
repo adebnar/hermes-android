@@ -242,14 +242,14 @@ the same Wi-Fi.
 
 | Branch | Role | Distribution |
 |--------|------|--------------|
-| `master` | Production / stable. Always releasable. | Stable releases (`v1.2.3`) |
+| `main` | Production / stable. Always releasable. | Stable releases (`v1.2.3`) |
 | `develop` | Beta / integration. New features land here first. | Beta pre-releases (`v1.2.3-beta.1`) |
 | `feature/*` | Short-lived work branches. | — (open a PR into `develop`) |
 
 Day-to-day flow:
 
 ```
-feature/x ──PR──▶ develop ──(stabilize)──▶ master
+feature/x ──PR──▶ develop ──(stabilize)──▶ main
                     │                         │
               beta pre-release          stable release
               v0.2.0-beta.1               v0.2.0
@@ -258,7 +258,7 @@ feature/x ──PR──▶ develop ──(stabilize)──▶ master
 1. Branch from `develop`: `git switch develop && git switch -c feature/my-change`.
 2. Open a PR into `develop`. CI (`.github/workflows/ci.yml`) builds and unit-tests every push/PR.
 3. Cut a **beta** for testers: tag a commit on `develop`, e.g. `git tag v0.2.0-beta.1 && git push --tags`.
-4. When stable, merge `develop` → `master` and tag the release: `git tag v0.2.0 && git push --tags`.
+4. When stable, merge `develop` → `main` and tag the release: `git tag v0.2.0 && git push --tags`.
 
 **Automated releases** (`.github/workflows/release.yml`) — pushing a `v*` tag builds a
 signed APK and publishes a GitHub Release:

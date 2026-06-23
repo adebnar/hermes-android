@@ -32,14 +32,14 @@ fi
 
 # 2) Dependency vulnerability check (master/main only)
 if [ "$pushing_master" = "1" ]; then
-  echo "${grn}▶ dependency vulnerability check (master)…${rst}"
+  echo "${grn}▶ dependency vulnerability check (main)…${rst}"
   if command -v gh >/dev/null 2>&1; then
     n=$(gh api "repos/${repo_slug}/dependabot/alerts" --jq \
       '[.[] | select(.state=="open" and (.security_advisory.severity=="high" or .security_advisory.severity=="critical"))] | length' 2>/dev/null || echo "skip")
     if [ "$n" = "skip" ]; then
       echo "${ylw}⚠ could not query Dependabot alerts — verify manually before release.${rst}" >&2
     elif [ "${n:-0}" -gt 0 ] 2>/dev/null; then
-      fail "${n} open HIGH/CRITICAL Dependabot alert(s). Resolve before releasing to master."
+      fail "${n} open HIGH/CRITICAL Dependabot alert(s). Resolve before releasing to main."
     else
       echo "${grn}✓ no open high/critical Dependabot alerts${rst}"
     fi
