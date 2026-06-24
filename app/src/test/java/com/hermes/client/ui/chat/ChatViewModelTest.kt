@@ -155,6 +155,30 @@ class ChatViewModelTest {
         coVerify { chatRepo.slashExec("s1", "/model opus --provider anthropic --session") }
     }
 
+    // The model-switch outcome must be visible, not swallowed: the gateway reports it (success
+    // or e.g. a credentials error) in the slash output, which the app must surface.
+    @Test fun selectModel_surfaces_slash_output() = runTest {
+        coEvery { chatRepo.slashExec("s1", any()) } returns "✗ Could not resolve credentials for provider 'Anthropic'"
+        val vm = buildVm()
+        vm.open("s1"); advanceUntilIdle()
+        vm.selectModel("anthropic", "opus"); advanceUntilIdle()
+        assertTrue(
+            "the slash output must appear in the conversation",
+            vm.state.value.messages.any { it.text.contains("Could not resolve credentials") },
+        )
+    }
+
+    // A worker failure ("slash worker closed pipe") throws — it must surface as an error, not
+    // silently do nothing (the original bug).
+    @Test fun selectModel_surfaces_switch_failure() = runTest {
+        coEvery { chatRepo.slashExec("s1", any()) } throws RuntimeException("slash worker closed pipe")
+        val vm = buildVm()
+        vm.open("s1"); advanceUntilIdle()
+        vm.selectModel("anthropic", "opus"); advanceUntilIdle()
+        val msg = vm.state.value.messages.lastOrNull()
+        assertTrue("a failed switch must show an error", msg?.isError == true && msg.text.contains("Couldn't switch model"))
+    }
+
     @Test fun selectProfile_calls_profileRepo_setActive() = runTest {
         val vm = buildVm()
         vm.open("s1")

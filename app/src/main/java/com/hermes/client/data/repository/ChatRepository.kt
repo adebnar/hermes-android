@@ -57,12 +57,18 @@ class ChatRepository(private val client: HermesGatewayClient) {
         })
     }
 
-    /** Execute a slash command (e.g. "/help"). The response streams back via the event flow. */
-    suspend fun slashExec(sessionId: String, command: String) {
-        client.call("slash.exec", buildJsonObject {
+    /**
+     * Execute a slash command (e.g. "/help", "/model …"). Returns the command's text output
+     * (the gateway's `output` field) so callers can surface the result — a `/model` switch, for
+     * instance, reports success or an error like "Could not resolve credentials for …" here. A
+     * transport/worker failure (e.g. "slash worker closed pipe") throws instead.
+     */
+    suspend fun slashExec(sessionId: String, command: String): String? {
+        val result = client.call("slash.exec", buildJsonObject {
             put("session_id", sessionId)
             put("command", command)
         })
+        return result.jsonObject["output"]?.jsonPrimitive?.content
     }
 
     /** "@" path/mention completions (complete.path → {items:[{text,display,meta}]}). */

@@ -202,6 +202,12 @@ class ChatViewModel @Inject constructor(
         // by changing the model inside a chat.
         viewModelScope.launch {
             runCatching { chat.slashExec(sessionId, "/model $model --provider $provider --session") }
+                // Surface the outcome instead of swallowing it: the gateway reports the switch
+                // result (or an error like "Could not resolve credentials for …") in the slash
+                // output, and a worker failure ("slash worker closed pipe") throws. Previously
+                // both were discarded, so a failed switch looked like nothing happened.
+                .onSuccess { out -> appendSystem(out?.takeIf { it.isNotBlank() } ?: "Model set to $model.") }
+                .onFailure { e -> appendError("Couldn't switch model: ${e.message ?: "the gateway slash worker failed"}") }
         }
     }
 
