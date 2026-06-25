@@ -56,6 +56,19 @@ class HermesRestApiTest {
         assertTrue(recorded.target.startsWith("/api/profiles/sessions"))
     }
 
+    // T4: the archived cross-profile view requests archived=only on the same endpoint.
+    @Test fun profileSessions_archivedOnly_appends_param() = runTest {
+        serverRule.server.enqueue(MockResponse.Builder().code(200).body(
+            """{"sessions":[],"total":0,"profile_totals":{},"errors":[]}"""
+        ).build())
+
+        api(serverRule.server).profileSessions(archivedOnly = true)
+
+        val recorded = serverRule.server.takeRequest()
+        assertTrue(recorded.target.startsWith("/api/profiles/sessions"))
+        assertTrue("must request only archived sessions", recorded.target.contains("archived=only"))
+    }
+
     @Test fun status_returns_true_on_200() = runTest {
         serverRule.server.enqueue(MockResponse.Builder().code(200).body("""{"ok":true}""").build())
         assertTrue(api(serverRule.server).status())

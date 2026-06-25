@@ -36,18 +36,18 @@ class ArchivedSessionsViewModelTest {
     private fun buildVm() = ArchivedSessionsViewModel(sessionRepo, profileManager)
 
     @Test fun loads_archived_sessions_on_init() = runTest {
-        coEvery { sessionRepo.archived(any()) } returns listOf(session("a1"), session("a2"))
+        coEvery { sessionRepo.archivedAllProfiles() } returns listOf(session("a1"), session("a2"))
         val vm = buildVm()
         advanceUntilIdle()
         assertEquals(listOf("a1", "a2"), vm.state.value.sessions.map { it.id })
     }
 
     @Test fun unarchive_restores_then_reloads() = runTest {
-        coEvery { sessionRepo.archived(any()) } returns listOf(session("a1"))
+        coEvery { sessionRepo.archivedAllProfiles() } returns listOf(session("a1"))
         val vm = buildVm()
         advanceUntilIdle()
         // After restoring, the session is no longer archived, so the reloaded list is empty.
-        coEvery { sessionRepo.archived(any()) } returns emptyList()
+        coEvery { sessionRepo.archivedAllProfiles() } returns emptyList()
         vm.unarchive("a1")
         advanceUntilIdle()
         coVerify { sessionRepo.archive("a1", archived = false) }
@@ -55,10 +55,10 @@ class ArchivedSessionsViewModelTest {
     }
 
     @Test fun delete_removes_then_reloads() = runTest {
-        coEvery { sessionRepo.archived(any()) } returns listOf(session("a1"))
+        coEvery { sessionRepo.archivedAllProfiles() } returns listOf(session("a1"))
         val vm = buildVm()
         advanceUntilIdle()
-        coEvery { sessionRepo.archived(any()) } returns emptyList()
+        coEvery { sessionRepo.archivedAllProfiles() } returns emptyList()
         vm.delete("a1")
         advanceUntilIdle()
         coVerify { sessionRepo.delete("a1") }

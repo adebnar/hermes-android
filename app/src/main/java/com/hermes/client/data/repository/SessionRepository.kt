@@ -18,6 +18,10 @@ class SessionRepository(private val rest: HermesRestApi) {
      */
     suspend fun listAllProfiles(): List<Session> =
         rest.profileSessions().sessions.map { it.toDomain() }.filter { !it.archived }
+
+    /** All archived sessions across every profile (the cross-profile archived view). */
+    suspend fun archivedAllProfiles(): List<Session> =
+        rest.profileSessions(archivedOnly = true).sessions.map { it.toDomain() }.filter { it.archived }
     suspend fun stats(profile: String? = null): SessionStatsDto = rest.sessionStats(profile)
     suspend fun search(query: String, profile: String? = null): List<SearchResultDto> =
         rest.searchSessions(query, profile)
