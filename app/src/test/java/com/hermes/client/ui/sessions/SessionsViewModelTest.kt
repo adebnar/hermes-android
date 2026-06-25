@@ -123,6 +123,18 @@ class SessionsViewModelTest {
         io.mockk.coVerify { pinStore.toggle("odos/s2") }
     }
 
+    // Archiving must carry the session's profile, or the gateway PATCH 404s against the wrong
+    // per-profile DB and the session never leaves the list (looks like "refresh doesn't work").
+    @Test fun archive_passes_session_profile() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.archive(session("s1", "mine", profile = "personal"))
+        advanceUntilIdle()
+        io.mockk.coVerify { sessionRepo.archive("s1", archived = true, "personal") }
+    }
+
     // T3: opening a session from another profile must switch the active profile first, so the
     // chat resumes against the correct per-profile DB.
     @Test fun prepareOpen_switches_to_session_profile_when_different() = runTest {

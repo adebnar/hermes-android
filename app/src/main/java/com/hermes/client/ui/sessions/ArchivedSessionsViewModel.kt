@@ -51,11 +51,11 @@ class ArchivedSessionsViewModel @Inject constructor(
     }
 
     /** Restore an archived session to the active list, then refresh so it leaves this view. */
-    fun unarchive(sessionId: String) = viewModelScope.launch {
-        runCatching { sessions.archive(sessionId, archived = false) }.onSuccess { refresh() }
+    fun unarchive(session: Session) = viewModelScope.launch {
+        runCatching { sessions.archive(session.id, archived = false, session.profile) }.onSuccess { refresh() }
     }
 
-    fun delete(sessionId: String) = viewModelScope.launch {
-        runCatching { sessions.delete(sessionId) }.onSuccess { refresh() }
+    fun delete(session: Session) = viewModelScope.launch {
+        runCatching { sessions.delete(session.id, session.profile) }.onSuccess { refresh() }
     }
 }
