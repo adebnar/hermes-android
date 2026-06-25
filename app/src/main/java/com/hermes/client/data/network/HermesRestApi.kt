@@ -76,6 +76,15 @@ class HermesRestApi(
             "/api/sessions?limit=$limit&offset=$offset&order=recent${profileParam(profile)}",
         ).sessions
 
+    /**
+     * Cross-profile session list — every session tagged with its true `profile`, plus
+     * `profile_totals` for group headers. The active list excludes archived by default;
+     * pass [archivedOnly] to fetch only archived sessions (`?archived=only`). One page of
+     * [limit] covers current volume (no offset paging in MVP).
+     */
+    suspend fun profileSessions(limit: Int = 500, archivedOnly: Boolean = false): ProfileSessionsDto =
+        get("/api/profiles/sessions?limit=$limit&order=recent${if (archivedOnly) "&archived=only" else ""}")
+
     suspend fun messages(sessionId: String, profile: String? = null): List<MessageDto> =
         get<MessagesDto>("/api/sessions/$sessionId/messages${profileParam(profile, first = true)}").messages
 

@@ -235,7 +235,11 @@ private fun SessionRow(
     Box {
         ListItem(
             headlineContent = { Text(if (isPinned) "📌  ${session.title}" else session.title) },
-            supportingContent = { Text(session.model ?: "") },
+            // Show the session's true profile (from the cross-profile list) next to its model so
+            // the tenant is unambiguous before the profile grouping lands.
+            supportingContent = {
+                Text(listOfNotNull(session.profile, session.model).joinToString(" · "))
+            },
             // Tap opens the session; long-press opens the management menu.
             modifier = Modifier.combinedClickable(
                 onClick = onOpen,

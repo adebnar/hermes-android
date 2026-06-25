@@ -9,9 +9,13 @@ data class Session(
     val model: String?,
     val provider: String?,
     val messageCount: Int,
+    // The profile this session belongs to. From the cross-profile list this is always set;
+    // the default profile is normalized to "default" so grouping, pin tokens, and profile
+    // switching share one stable key. Used as the top grouping tier.
     val profile: String?,
     // Workspace = basename of the session's cwd ("No workspace" when none), used for grouping.
     val workspace: String = "No workspace",
+    val archived: Boolean = false,
     val source: String? = null,
 )
 

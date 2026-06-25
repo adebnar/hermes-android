@@ -50,18 +50,18 @@ class SessionsViewModel @Inject constructor(
     init {
         chat.connect()
         viewModelScope.launch { profileManager.refresh() }
-        // Reload this profile's sessions whenever the selected profile changes (including the
-        // first value once it's loaded). Sessions are scoped server-side via ?profile=, so the
-        // list always reflects the profile picked in the drawer.
-        viewModelScope.launch {
-            profileManager.active.collect { refresh() }
-        }
+        // The list now spans all profiles (desktop mirror), so it no longer reloads on a profile
+        // switch — the contents are identical regardless of which profile is active. Load once;
+        // the screen's ON_RESUME effect refreshes after creating/updating a session in a chat.
+        refresh()
     }
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
         try {
-            val list = sessions.list(profileManager.active.value)
+            // Cross-profile: every session carries its true profile, so the app no longer guesses
+            // the profile from the active selection (the root cause of "wrong profile shown").
+            val list = sessions.listAllProfiles()
             _state.value = SessionsUiState(sessions = list)
         } catch (e: HermesApiException) {
             if (e.code == 401) {

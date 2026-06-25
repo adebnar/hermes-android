@@ -33,9 +33,9 @@ class SessionsViewModelTest {
         every { pinStore.pinned } returns MutableStateFlow<Set<String>>(emptySet())
     }
 
-    private fun session(id: String, title: String) = Session(
+    private fun session(id: String, title: String, profile: String = "personal") = Session(
         id = id, title = title, model = null, provider = null,
-        messageCount = 1, profile = "personal", workspace = "No workspace", source = "hermes-dispatch",
+        messageCount = 1, profile = profile, workspace = "No workspace", source = "hermes-dispatch",
     )
 
     private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore)
@@ -49,7 +49,7 @@ class SessionsViewModelTest {
     // the gateway. searchMessages must populate messageResults from the repo, and clearing the
     // query must clear results.
     @Test fun searchMessages_populates_results_and_clear_resets() = runTest {
-        coEvery { sessionRepo.list(any()) } returns emptyList()
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
         coEvery { sessionRepo.search(any(), any()) } returns listOf(
             com.hermes.client.data.network.SearchResultDto(sessionId = "s9", snippet = "found it"),
         )
@@ -67,18 +67,35 @@ class SessionsViewModelTest {
     }
 
     @Test fun refresh_resurfaces_newly_added_session() = runTest {
-        coEvery { sessionRepo.list(any()) } returns listOf(session("s1", "old"))
+        coEvery { sessionRepo.listAllProfiles() } returns listOf(session("s1", "old"))
         val vm = buildVm()
         advanceUntilIdle()
         assertEquals(listOf("s1"), vm.state.value.sessions.map { it.id })
 
         // A new session now exists on the gateway, as if a prompt created one while in a chat.
-        coEvery { sessionRepo.list(any()) } returns listOf(session("s2", "new"), session("s1", "old"))
+        coEvery { sessionRepo.listAllProfiles() } returns listOf(session("s2", "new"), session("s1", "old"))
         vm.refresh()
         advanceUntilIdle()
 
         val ids = vm.state.value.sessions.map { it.id }
         assertTrue("refresh must surface the newly-added session", ids.contains("s2"))
         assertEquals(2, ids.size)
+    }
+
+    // T1: the list spans every profile (desktop mirror), and each session keeps its OWN profile
+    // — not the active one. This is the fix for "wrong profile shown": the app no longer guesses
+    // the profile from the active selection.
+    @Test fun list_spans_all_profiles_each_with_its_own_profile() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns listOf(
+            session("s1", "mine", profile = "personal"),
+            session("s2", "client", profile = "odos"),
+        )
+        val vm = buildVm() // active profile is "personal"
+        advanceUntilIdle()
+
+        val byId = vm.state.value.sessions.associateBy { it.id }
+        assertEquals(setOf("s1", "s2"), byId.keys)
+        assertEquals("personal", byId["s1"]?.profile)
+        assertEquals("odos", byId["s2"]?.profile) // not coerced to the active "personal"
     }
 }

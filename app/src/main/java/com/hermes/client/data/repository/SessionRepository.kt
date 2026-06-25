@@ -10,6 +10,14 @@ import com.hermes.client.domain.toDomain
 class SessionRepository(private val rest: HermesRestApi) {
     suspend fun list(profile: String? = null): List<Session> =
         rest.sessions(limit = 50, offset = 0, profile = profile).map { it.toDomain() }
+
+    /**
+     * All non-archived sessions across every profile, each tagged with its true profile.
+     * This is the desktop-mirror list source — it replaces the single-profile [list] for the
+     * sessions screen. The endpoint already excludes archived; the filter is defensive.
+     */
+    suspend fun listAllProfiles(): List<Session> =
+        rest.profileSessions().sessions.map { it.toDomain() }.filter { !it.archived }
     suspend fun stats(profile: String? = null): SessionStatsDto = rest.sessionStats(profile)
     suspend fun search(query: String, profile: String? = null): List<SearchResultDto> =
         rest.searchSessions(query, profile)
