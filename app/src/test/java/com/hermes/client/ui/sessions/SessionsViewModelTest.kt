@@ -85,10 +85,9 @@ class SessionsViewModelTest {
         assertEquals(2, ids.size)
     }
 
-    // T1: the list spans every profile (desktop mirror), and each session keeps its OWN profile
-    // — not the active one. This is the fix for "wrong profile shown": the app no longer guesses
-    // the profile from the active selection.
-    @Test fun list_spans_all_profiles_each_with_its_own_profile() = runTest {
+    // The list is scoped to the active profile (one tenant at a time, like the desktop): a session
+    // from another profile is filtered out, and each shown session keeps its own true profile.
+    @Test fun list_is_scoped_to_active_profile() = runTest {
         coEvery { sessionRepo.listAllProfiles() } returns listOf(
             session("s1", "mine", profile = "personal"),
             session("s2", "client", profile = "odos"),
@@ -96,10 +95,8 @@ class SessionsViewModelTest {
         val vm = buildVm() // active profile is "personal"
         advanceUntilIdle()
 
-        val byId = vm.state.value.sessions.associateBy { it.id }
-        assertEquals(setOf("s1", "s2"), byId.keys)
-        assertEquals("personal", byId["s1"]?.profile)
-        assertEquals("odos", byId["s2"]?.profile) // not coerced to the active "personal"
+        assertEquals(listOf("s1"), vm.state.value.sessions.map { it.id })
+        assertEquals("personal", vm.state.value.sessions.single().profile)
     }
 
     // T5: in the cross-profile list, a session is pinned by its OWN profile token — so a pin made

@@ -71,8 +71,12 @@ profile when opening a session from another profile; archive refresh verified;
   current "wrong profile" bug; use the server's `profile` field instead.
 
 ## Resolved Decisions
-- Default view: **all-profiles** (true desktop mirror), not single-active-profile.
-- Opening a session from another profile: **auto-switch** the active profile to it.
+- View scope: **active profile only** (one tenant at a time, switched via the drawer —
+  how the desktop actually behaves). *Superseded the initial all-profiles choice after
+  hands-on use (0.1.17).*
+- Opening a session from another profile: **auto-switch** the active profile to it
+  (now effectively a no-op since the list is single-profile, but retained for safety).
+- List contents match desktop: **cron** and **empty (0-message)** sessions are hidden (0.1.16).
 
 ## Status — implemented in 0.1.14-beta (branch `feature/session-parity`)
 - T1 ✅ list sources from `/api/profiles/sessions` (all profiles, true per-session profile)
