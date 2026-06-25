@@ -74,6 +74,12 @@ profile when opening a session from another profile; archive refresh verified;
 - Default view: **all-profiles** (true desktop mirror), not single-active-profile.
 - Opening a session from another profile: **auto-switch** the active profile to it.
 
-## Next Step
-Break the recommended direction into tasks via `/plan` (or
-`agent-skills:planning-and-task-breakdown`). No code written yet.
+## Status — implemented in 0.1.14-beta (branch `feature/session-parity`)
+- T1 ✅ list sources from `/api/profiles/sessions` (all profiles, true per-session profile)
+- T2 ✅ two-tier collapsible Profile→Workspace groups, persisted device-local
+- T3 ✅ auto-switch active profile when opening a cross-profile session
+- T4 ✅ archived view spans all profiles (server `archived` field)
+- T5 ✅ pins keyed by each session's own profile + labeled "Device only"
+- Out of scope (blocked): server-synced pins — gateway has no pin concept (upstream Hermes).
+
+Plan + task list: `tasks/plan.md`, `tasks/todo.md`.
