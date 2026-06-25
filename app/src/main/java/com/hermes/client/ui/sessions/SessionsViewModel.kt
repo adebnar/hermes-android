@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -42,12 +41,17 @@ class SessionsViewModel @Inject constructor(
     /** The active profile, shown as a subtitle so the tenant context is always visible. */
     val activeProfile: StateFlow<String?> = profileManager.active
 
-    /** Session ids pinned in the current profile (device-local). */
-    val pinnedIds: StateFlow<Set<String>> =
-        combine(pinStore.pinned, profileManager.active) { tokens, profile ->
-            val prefix = "${profile ?: "default"}/"
-            tokens.filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }.toSet()
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+    /**
+     * Raw pinned tokens ("<profile>/<sessionId>", device-local). The list spans all profiles, so
+     * the UI must test each session against its OWN profile token — not the active profile — or a
+     * pin made in another profile would vanish. Pins do not sync to desktop (no gateway pin API).
+     */
+    val pinnedTokens: StateFlow<Set<String>> =
+        pinStore.pinned.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** True if [session] is pinned, keyed by the session's own profile. */
+    fun isPinned(session: Session, tokens: Set<String> = pinnedTokens.value): Boolean =
+        PinStore.token(session.profile, session.id) in tokens
 
     /** Keys of currently-collapsed Profile/Workspace groups (device-local; default expanded). */
     val collapsedGroups: StateFlow<Set<String>> =
@@ -128,7 +132,8 @@ class SessionsViewModel @Inject constructor(
         runCatching { sessions.delete(sessionId) }.onSuccess { refresh() }
     }
 
-    fun togglePin(sessionId: String) = viewModelScope.launch {
-        pinStore.toggle(PinStore.token(profileManager.active.value, sessionId))
+    /** Pin/unpin keyed by the session's OWN profile, so it works regardless of the active one. */
+    fun togglePin(session: Session) = viewModelScope.launch {
+        pinStore.toggle(PinStore.token(session.profile, session.id))
     }
 }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -99,6 +100,30 @@ class SessionsViewModelTest {
         assertEquals(setOf("s1", "s2"), byId.keys)
         assertEquals("personal", byId["s1"]?.profile)
         assertEquals("odos", byId["s2"]?.profile) // not coerced to the active "personal"
+    }
+
+    // T5: in the cross-profile list, a session is pinned by its OWN profile token — so a pin made
+    // in "odos" still reads as pinned even though the active profile is "personal". Keying by the
+    // active profile (the old behavior) would make cross-profile pins vanish.
+    @Test fun isPinned_keys_off_session_profile_not_active_profile() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm() // active profile is "personal"
+        advanceUntilIdle()
+
+        val odosSession = session("s2", "client", profile = "odos")
+        assertTrue("odos pin matches the odos session", vm.isPinned(odosSession, setOf("odos/s2")))
+        assertFalse("a personal-scoped token must not match", vm.isPinned(odosSession, setOf("personal/s2")))
+    }
+
+    // T5: pinning uses the session's own profile token.
+    @Test fun togglePin_uses_session_profile_token() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.togglePin(session("s2", "client", profile = "odos"))
+        advanceUntilIdle()
+        io.mockk.coVerify { pinStore.toggle("odos/s2") }
     }
 
     // T2: toggling a group delegates to the persisted store (collapse state survives navigation).

@@ -54,7 +54,7 @@ fun SessionsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
-    val pinnedIds by vm.pinnedIds.collectAsStateWithLifecycle()
+    val pinnedTokens by vm.pinnedTokens.collectAsStateWithLifecycle()
     val collapsedGroups by vm.collapsedGroups.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val messageResults by vm.messageResults.collectAsStateWithLifecycle()
@@ -128,11 +128,16 @@ fun SessionsScreen(
                         it.title.contains(q, ignoreCase = true) ||
                             it.workspace.contains(q, ignoreCase = true)
                     }
-                    val pinned = matches.filter { it.id in pinnedIds }
+                    // Pins are keyed by each session's OWN profile (the list spans all profiles),
+                    // so a pin made in another tenant still shows here.
+                    val isPinned = { s: Session ->
+                        com.hermes.client.data.repository.PinStore.token(s.profile, s.id) in pinnedTokens
+                    }
+                    val pinned = matches.filter(isPinned)
                     // Two-tier tree: Profile → Workspace → rows, with collapsed groups already
                     // pruned. The active profile sorts first.
                     val tree = groupSessions(
-                        matches.filterNot { it.id in pinnedIds },
+                        matches.filterNot(isPinned),
                         collapsedGroups,
                         activeProfile,
                     )
@@ -166,13 +171,15 @@ fun SessionsScreen(
                             }
                         }
                         if (pinned.isNotEmpty()) {
-                            item(key = "h-pinned") { SectionHeader("Pinned", pinned.size) }
+                            // "Device only" makes clear pins live on this phone and don't sync to
+                            // the desktop app (the gateway has no pin concept).
+                            item(key = "h-pinned") { SectionHeader("Pinned", pinned.size, note = "Device only") }
                             items(pinned, key = { "p-${it.id}" }) { s ->
                                 SessionRow(
                                     session = s,
                                     isPinned = true,
                                     onOpen = { onOpen(s.id) },
-                                    onTogglePin = { vm.togglePin(s.id) },
+                                    onTogglePin = { vm.togglePin(s) },
                                     onRename = { vm.rename(s.id, it) },
                                     onArchive = { vm.archive(s.id) },
                                     onDelete = { vm.delete(s.id) },
@@ -214,7 +221,7 @@ fun SessionsScreen(
                                         session = s,
                                         isPinned = false,
                                         onOpen = { onOpen(s.id) },
-                                        onTogglePin = { vm.togglePin(s.id) },
+                                        onTogglePin = { vm.togglePin(s) },
                                         onRename = { vm.rename(s.id, it) },
                                         onArchive = { vm.archive(s.id) },
                                         onDelete = { vm.delete(s.id) },
@@ -278,7 +285,7 @@ private fun CollapsibleHeader(
 }
 
 @Composable
-private fun SectionHeader(label: String, count: Int) {
+private fun SectionHeader(label: String, count: Int, note: String? = null) {
     androidx.compose.foundation.layout.Row(
         Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -287,8 +294,15 @@ private fun SectionHeader(label: String, count: Int) {
             label.uppercase(),
             style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
             color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f),
         )
+        note?.let {
+            Text(
+                "  ·  $it",
+                style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
         Text(
             count.toString(),
             style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
