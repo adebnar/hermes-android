@@ -79,7 +79,7 @@ object DebugLog {
         }
     }
 
-    private fun redact(message: String): String {
+    fun redact(message: String): String {
         val token = tokenToRedact ?: return message
         return message.replace(token, "***")
     }

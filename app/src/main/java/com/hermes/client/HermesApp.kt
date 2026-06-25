@@ -1,6 +1,7 @@
 package com.hermes.client
 
 import android.app.Application
+import com.hermes.client.data.diagnostics.CrashReporter
 import com.hermes.client.data.diagnostics.DebugLog
 import com.hermes.client.data.repository.SettingsStore
 import dagger.hilt.android.HiltAndroidApp
@@ -20,6 +21,8 @@ class HermesApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Capture uncaught exceptions to a file so the next launch can surface the trace (no adb).
+        CrashReporter.install(this)
         // Restore the diagnostic-logging toggle at launch so capture is active before the
         // Diagnostics screen is ever opened (e.g. to catch a failure on the first session open).
         settingsStore.debugLogging
