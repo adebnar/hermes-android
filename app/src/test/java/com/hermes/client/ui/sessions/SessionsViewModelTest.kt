@@ -26,11 +26,13 @@ class SessionsViewModelTest {
     private val chatRepo = mockk<ChatRepository>(relaxed = true)
     private val profileManager = mockk<ProfileManager>(relaxed = true)
     private val pinStore = mockk<PinStore>(relaxed = true)
+    private val groupExpansion = mockk<com.hermes.client.data.repository.GroupExpansionStore>(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
         every { profileManager.active } returns MutableStateFlow<String?>("personal")
         every { pinStore.pinned } returns MutableStateFlow<Set<String>>(emptySet())
+        every { groupExpansion.collapsed } returns MutableStateFlow<Set<String>>(emptySet())
     }
 
     private fun session(id: String, title: String, profile: String = "personal") = Session(
@@ -38,7 +40,7 @@ class SessionsViewModelTest {
         messageCount = 1, profile = profile, workspace = "No workspace", source = "hermes-dispatch",
     )
 
-    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore)
+    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore, groupExpansion)
 
     // Regression: a session created or updated while the user was in a chat must appear once
     // the list is re-fetched. The Sessions screen calls refresh() on ON_RESUME (the "sessions"
@@ -97,5 +99,16 @@ class SessionsViewModelTest {
         assertEquals(setOf("s1", "s2"), byId.keys)
         assertEquals("personal", byId["s1"]?.profile)
         assertEquals("odos", byId["s2"]?.profile) // not coerced to the active "personal"
+    }
+
+    // T2: toggling a group delegates to the persisted store (collapse state survives navigation).
+    @Test fun toggleGroup_persists_via_store() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.toggleGroup("p:odos")
+        advanceUntilIdle()
+        io.mockk.coVerify { groupExpansion.toggle("p:odos") }
     }
 }

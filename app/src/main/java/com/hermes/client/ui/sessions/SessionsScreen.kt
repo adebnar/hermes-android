@@ -55,6 +55,7 @@ fun SessionsScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
     val pinnedIds by vm.pinnedIds.collectAsStateWithLifecycle()
+    val collapsedGroups by vm.collapsedGroups.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val messageResults by vm.messageResults.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -128,10 +129,13 @@ fun SessionsScreen(
                             it.workspace.contains(q, ignoreCase = true)
                     }
                     val pinned = matches.filter { it.id in pinnedIds }
-                    // Group the rest by workspace; "No workspace" sorts last.
-                    val groups = matches.filterNot { it.id in pinnedIds }
-                        .groupBy { it.workspace }
-                        .toSortedMap(compareBy({ it == "No workspace" }, { it }))
+                    // Two-tier tree: Profile → Workspace → rows, with collapsed groups already
+                    // pruned. The active profile sorts first.
+                    val tree = groupSessions(
+                        matches.filterNot { it.id in pinnedIds },
+                        collapsedGroups,
+                        activeProfile,
+                    )
 
                     LazyColumn {
                         // Gateway message-content search results (populated on the Search action).
@@ -175,18 +179,47 @@ fun SessionsScreen(
                                 )
                             }
                         }
-                        groups.forEach { (workspace, list) ->
-                            item(key = "h-$workspace") { SectionHeader(workspace, list.size) }
-                            items(list, key = { it.id }) { s ->
-                                SessionRow(
-                                    session = s,
-                                    isPinned = false,
-                                    onOpen = { onOpen(s.id) },
-                                    onTogglePin = { vm.togglePin(s.id) },
-                                    onRename = { vm.rename(s.id, it) },
-                                    onArchive = { vm.archive(s.id) },
-                                    onDelete = { vm.delete(s.id) },
+                        tree.forEach { pg ->
+                            item(key = "ph-${pg.profile}") {
+                                CollapsibleHeader(
+                                    label = pg.profile,
+                                    count = pg.count,
+                                    collapsed = pg.collapsed,
+                                    indent = false,
+                                    onToggle = {
+                                        vm.toggleGroup(
+                                            com.hermes.client.data.repository.GroupExpansionStore
+                                                .profileKey(pg.profile),
+                                        )
+                                    },
                                 )
+                            }
+                            pg.workspaces.forEach { wg ->
+                                item(key = "wh-${pg.profile}-${wg.workspace}") {
+                                    CollapsibleHeader(
+                                        label = wg.workspace,
+                                        count = wg.count,
+                                        collapsed = wg.collapsed,
+                                        indent = true,
+                                        onToggle = {
+                                            vm.toggleGroup(
+                                                com.hermes.client.data.repository.GroupExpansionStore
+                                                    .workspaceKey(pg.profile, wg.workspace),
+                                            )
+                                        },
+                                    )
+                                }
+                                items(wg.sessions, key = { it.id }) { s ->
+                                    SessionRow(
+                                        session = s,
+                                        isPinned = false,
+                                        onOpen = { onOpen(s.id) },
+                                        onTogglePin = { vm.togglePin(s.id) },
+                                        onRename = { vm.rename(s.id, it) },
+                                        onArchive = { vm.archive(s.id) },
+                                        onDelete = { vm.delete(s.id) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -194,6 +227,53 @@ fun SessionsScreen(
             }
             }
         }
+    }
+}
+
+/**
+ * A tap-to-collapse group header (profile = top tier, workspace = indented sub-tier). A leading
+ * chevron shows the state; the whole row toggles. Profile labels read in caps; workspace labels
+ * are indented and lighter so the two tiers are visually distinct.
+ */
+@Composable
+private fun CollapsibleHeader(
+    label: String,
+    count: Int,
+    collapsed: Boolean,
+    indent: Boolean,
+    onToggle: () -> Unit,
+) {
+    androidx.compose.foundation.layout.Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(
+                start = if (indent) 28.dp else 16.dp,
+                end = 16.dp,
+                top = if (indent) 6.dp else 16.dp,
+                bottom = 4.dp,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            if (collapsed) "▸" else "▾",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (indent) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(end = 8.dp),
+        )
+        Text(
+            if (indent) label else label.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (indent) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            count.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

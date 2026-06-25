@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.hermes.client.data.network.HermesApiException
 import com.hermes.client.data.network.SearchResultDto
 import com.hermes.client.data.repository.ChatRepository
+import com.hermes.client.data.repository.GroupExpansionStore
 import com.hermes.client.data.repository.PinStore
 import com.hermes.client.data.repository.ProfileManager
 import com.hermes.client.data.repository.SessionRepository
@@ -33,6 +34,7 @@ class SessionsViewModel @Inject constructor(
     private val chat: ChatRepository,
     private val profileManager: ProfileManager,
     private val pinStore: PinStore,
+    private val groupExpansion: GroupExpansionStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SessionsUiState())
     val state: StateFlow<SessionsUiState> = _state.asStateFlow()
@@ -46,6 +48,13 @@ class SessionsViewModel @Inject constructor(
             val prefix = "${profile ?: "default"}/"
             tokens.filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }.toSet()
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** Keys of currently-collapsed Profile/Workspace groups (device-local; default expanded). */
+    val collapsedGroups: StateFlow<Set<String>> =
+        groupExpansion.collapsed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** Collapse or expand a group (profile or workspace) by its [GroupExpansionStore] key. */
+    fun toggleGroup(groupKey: String) = viewModelScope.launch { groupExpansion.toggle(groupKey) }
 
     init {
         chat.connect()
