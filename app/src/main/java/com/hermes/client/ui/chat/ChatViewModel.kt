@@ -207,7 +207,11 @@ class ChatViewModel @Inject constructor(
                 // output, and a worker failure ("slash worker closed pipe") throws. Previously
                 // both were discarded, so a failed switch looked like nothing happened.
                 .onSuccess { out -> appendSystem(out?.takeIf { it.isNotBlank() } ?: "Model set to $model.") }
-                .onFailure { e -> appendError("Couldn't switch model: ${e.message ?: "the gateway slash worker failed"}") }
+                .onFailure { e ->
+                    // Don't swallow cancellation — rethrow so structured concurrency still works.
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    appendError("Couldn't switch model: ${e.message ?: "the gateway slash worker failed"}")
+                }
         }
     }
 

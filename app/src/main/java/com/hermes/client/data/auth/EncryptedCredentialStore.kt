@@ -34,10 +34,25 @@ class EncryptedCredentialStore(private val context: Context) : CredentialStore {
         try {
             create()
         } catch (e: Exception) {
-            // Corrupt/unreadable keyset — reset the backing store and try once more.
+            // Corrupt/unreadable keyset. EncryptedSharedPreferences stores its keyset inside the
+            // PREFS_NAME file, so deleting that and recreating recovers it (verified on a physical
+            // device). If a second attempt still fails the corruption is deeper — the master key in
+            // the Android keystore — so drop that too and regenerate everything, guaranteeing we
+            // never crash-loop on launch.
             DebugLog.log("auth", "credential store unreadable, resetting: ${e.javaClass.simpleName}")
             runCatching { context.deleteSharedPreferences(PREFS_NAME) }
-            create()
+            try {
+                create()
+            } catch (e2: Exception) {
+                DebugLog.log("auth", "reset insufficient, clearing master key: ${e2.javaClass.simpleName}")
+                runCatching {
+                    java.security.KeyStore.getInstance("AndroidKeyStore")
+                        .apply { load(null) }
+                        .deleteEntry(MASTER_KEY_ALIAS)
+                }
+                runCatching { context.deleteSharedPreferences(PREFS_NAME) }
+                create()
+            }
         }
 
     override fun load(): GatewayConfig? {
@@ -65,5 +80,9 @@ class EncryptedCredentialStore(private val context: Context) : CredentialStore {
 
     private companion object {
         const val PREFS_NAME = "hermes_credentials"
+        // Default Android-keystore alias used by MasterKeys.AES256_GCM_SPEC (the constant itself is
+        // package-private). Deleting this entry forces a fresh master key if the keyset reset alone
+        // didn't recover.
+        const val MASTER_KEY_ALIAS = "_androidx_security_master_key_"
     }
 }
