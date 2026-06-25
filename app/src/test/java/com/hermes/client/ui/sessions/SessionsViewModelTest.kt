@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -26,19 +27,21 @@ class SessionsViewModelTest {
     private val chatRepo = mockk<ChatRepository>(relaxed = true)
     private val profileManager = mockk<ProfileManager>(relaxed = true)
     private val pinStore = mockk<PinStore>(relaxed = true)
+    private val groupExpansion = mockk<com.hermes.client.data.repository.GroupExpansionStore>(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
         every { profileManager.active } returns MutableStateFlow<String?>("personal")
         every { pinStore.pinned } returns MutableStateFlow<Set<String>>(emptySet())
+        every { groupExpansion.collapsed } returns MutableStateFlow<Set<String>>(emptySet())
     }
 
-    private fun session(id: String, title: String) = Session(
+    private fun session(id: String, title: String, profile: String = "personal") = Session(
         id = id, title = title, model = null, provider = null,
-        messageCount = 1, profile = "personal", workspace = "No workspace", source = "hermes-dispatch",
+        messageCount = 1, profile = profile, workspace = "No workspace", source = "hermes-dispatch",
     )
 
-    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore)
+    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore, groupExpansion)
 
     // Regression: a session created or updated while the user was in a chat must appear once
     // the list is re-fetched. The Sessions screen calls refresh() on ON_RESUME (the "sessions"
@@ -49,7 +52,7 @@ class SessionsViewModelTest {
     // the gateway. searchMessages must populate messageResults from the repo, and clearing the
     // query must clear results.
     @Test fun searchMessages_populates_results_and_clear_resets() = runTest {
-        coEvery { sessionRepo.list(any()) } returns emptyList()
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
         coEvery { sessionRepo.search(any(), any()) } returns listOf(
             com.hermes.client.data.network.SearchResultDto(sessionId = "s9", snippet = "found it"),
         )
@@ -67,18 +70,93 @@ class SessionsViewModelTest {
     }
 
     @Test fun refresh_resurfaces_newly_added_session() = runTest {
-        coEvery { sessionRepo.list(any()) } returns listOf(session("s1", "old"))
+        coEvery { sessionRepo.listAllProfiles() } returns listOf(session("s1", "old"))
         val vm = buildVm()
         advanceUntilIdle()
         assertEquals(listOf("s1"), vm.state.value.sessions.map { it.id })
 
         // A new session now exists on the gateway, as if a prompt created one while in a chat.
-        coEvery { sessionRepo.list(any()) } returns listOf(session("s2", "new"), session("s1", "old"))
+        coEvery { sessionRepo.listAllProfiles() } returns listOf(session("s2", "new"), session("s1", "old"))
         vm.refresh()
         advanceUntilIdle()
 
         val ids = vm.state.value.sessions.map { it.id }
         assertTrue("refresh must surface the newly-added session", ids.contains("s2"))
         assertEquals(2, ids.size)
+    }
+
+    // T1: the list spans every profile (desktop mirror), and each session keeps its OWN profile
+    // — not the active one. This is the fix for "wrong profile shown": the app no longer guesses
+    // the profile from the active selection.
+    @Test fun list_spans_all_profiles_each_with_its_own_profile() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns listOf(
+            session("s1", "mine", profile = "personal"),
+            session("s2", "client", profile = "odos"),
+        )
+        val vm = buildVm() // active profile is "personal"
+        advanceUntilIdle()
+
+        val byId = vm.state.value.sessions.associateBy { it.id }
+        assertEquals(setOf("s1", "s2"), byId.keys)
+        assertEquals("personal", byId["s1"]?.profile)
+        assertEquals("odos", byId["s2"]?.profile) // not coerced to the active "personal"
+    }
+
+    // T5: in the cross-profile list, a session is pinned by its OWN profile token — so a pin made
+    // in "odos" still reads as pinned even though the active profile is "personal". Keying by the
+    // active profile (the old behavior) would make cross-profile pins vanish.
+    @Test fun isPinned_keys_off_session_profile_not_active_profile() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm() // active profile is "personal"
+        advanceUntilIdle()
+
+        val odosSession = session("s2", "client", profile = "odos")
+        assertTrue("odos pin matches the odos session", vm.isPinned(odosSession, setOf("odos/s2")))
+        assertFalse("a personal-scoped token must not match", vm.isPinned(odosSession, setOf("personal/s2")))
+    }
+
+    // T5: pinning uses the session's own profile token.
+    @Test fun togglePin_uses_session_profile_token() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.togglePin(session("s2", "client", profile = "odos"))
+        advanceUntilIdle()
+        io.mockk.coVerify { pinStore.toggle("odos/s2") }
+    }
+
+    // T3: opening a session from another profile must switch the active profile first, so the
+    // chat resumes against the correct per-profile DB.
+    @Test fun prepareOpen_switches_to_session_profile_when_different() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm() // active is "personal"
+        advanceUntilIdle()
+
+        vm.prepareOpen(session("s2", "client", profile = "odos"))
+        advanceUntilIdle()
+        io.mockk.coVerify { profileManager.switchTo("odos") }
+    }
+
+    // T3: no switch when the session is already in the active profile.
+    @Test fun prepareOpen_is_noop_for_active_profile_session() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm() // active is "personal"
+        advanceUntilIdle()
+
+        vm.prepareOpen(session("s1", "mine", profile = "personal"))
+        advanceUntilIdle()
+        io.mockk.coVerify(exactly = 0) { profileManager.switchTo(any()) }
+    }
+
+    // T2: toggling a group delegates to the persisted store (collapse state survives navigation).
+    @Test fun toggleGroup_persists_via_store() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.toggleGroup("p:odos")
+        advanceUntilIdle()
+        io.mockk.coVerify { groupExpansion.toggle("p:odos") }
     }
 }

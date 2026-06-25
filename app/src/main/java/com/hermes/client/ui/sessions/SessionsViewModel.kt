@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.hermes.client.data.network.HermesApiException
 import com.hermes.client.data.network.SearchResultDto
 import com.hermes.client.data.repository.ChatRepository
+import com.hermes.client.data.repository.GroupExpansionStore
 import com.hermes.client.data.repository.PinStore
 import com.hermes.client.data.repository.ProfileManager
 import com.hermes.client.data.repository.SessionRepository
@@ -14,7 +15,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -33,6 +33,7 @@ class SessionsViewModel @Inject constructor(
     private val chat: ChatRepository,
     private val profileManager: ProfileManager,
     private val pinStore: PinStore,
+    private val groupExpansion: GroupExpansionStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SessionsUiState())
     val state: StateFlow<SessionsUiState> = _state.asStateFlow()
@@ -40,28 +41,40 @@ class SessionsViewModel @Inject constructor(
     /** The active profile, shown as a subtitle so the tenant context is always visible. */
     val activeProfile: StateFlow<String?> = profileManager.active
 
-    /** Session ids pinned in the current profile (device-local). */
-    val pinnedIds: StateFlow<Set<String>> =
-        combine(pinStore.pinned, profileManager.active) { tokens, profile ->
-            val prefix = "${profile ?: "default"}/"
-            tokens.filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }.toSet()
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+    /**
+     * Raw pinned tokens ("<profile>/<sessionId>", device-local). The list spans all profiles, so
+     * the UI must test each session against its OWN profile token — not the active profile — or a
+     * pin made in another profile would vanish. Pins do not sync to desktop (no gateway pin API).
+     */
+    val pinnedTokens: StateFlow<Set<String>> =
+        pinStore.pinned.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** True if [session] is pinned, keyed by the session's own profile. */
+    fun isPinned(session: Session, tokens: Set<String> = pinnedTokens.value): Boolean =
+        PinStore.token(session.profile, session.id) in tokens
+
+    /** Keys of currently-collapsed Profile/Workspace groups (device-local; default expanded). */
+    val collapsedGroups: StateFlow<Set<String>> =
+        groupExpansion.collapsed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** Collapse or expand a group (profile or workspace) by its [GroupExpansionStore] key. */
+    fun toggleGroup(groupKey: String) = viewModelScope.launch { groupExpansion.toggle(groupKey) }
 
     init {
         chat.connect()
         viewModelScope.launch { profileManager.refresh() }
-        // Reload this profile's sessions whenever the selected profile changes (including the
-        // first value once it's loaded). Sessions are scoped server-side via ?profile=, so the
-        // list always reflects the profile picked in the drawer.
-        viewModelScope.launch {
-            profileManager.active.collect { refresh() }
-        }
+        // The list now spans all profiles (desktop mirror), so it no longer reloads on a profile
+        // switch — the contents are identical regardless of which profile is active. Load once;
+        // the screen's ON_RESUME effect refreshes after creating/updating a session in a chat.
+        refresh()
     }
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
         try {
-            val list = sessions.list(profileManager.active.value)
+            // Cross-profile: every session carries its true profile, so the app no longer guesses
+            // the profile from the active selection (the root cause of "wrong profile shown").
+            val list = sessions.listAllProfiles()
             _state.value = SessionsUiState(sessions = list)
         } catch (e: HermesApiException) {
             if (e.code == 401) {
@@ -103,6 +116,17 @@ class SessionsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Make [session]'s profile the active one before the chat opens. The list spans all profiles,
+     * but resume/history/slash resolve against the gateway's active per-profile DB — so opening a
+     * session from another tenant must switch the active profile first (and await it), or the chat
+     * loads against the wrong profile. No-op when the session is already in the active profile.
+     */
+    suspend fun prepareOpen(session: Session) {
+        val target = session.profile ?: return
+        if (target != profileManager.active.value) profileManager.switchTo(target)
+    }
+
     /** Returns the new session id, or null if creation failed (so the UI doesn't crash). */
     suspend fun createSession(): String? = runCatching { chat.createSession() }.getOrNull()
 
@@ -119,7 +143,8 @@ class SessionsViewModel @Inject constructor(
         runCatching { sessions.delete(sessionId) }.onSuccess { refresh() }
     }
 
-    fun togglePin(sessionId: String) = viewModelScope.launch {
-        pinStore.toggle(PinStore.token(profileManager.active.value, sessionId))
+    /** Pin/unpin keyed by the session's OWN profile, so it works regardless of the active one. */
+    fun togglePin(session: Session) = viewModelScope.launch {
+        pinStore.toggle(PinStore.token(session.profile, session.id))
     }
 }

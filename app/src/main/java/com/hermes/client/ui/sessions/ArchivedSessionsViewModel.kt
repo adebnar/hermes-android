@@ -31,15 +31,15 @@ class ArchivedSessionsViewModel @Inject constructor(
     val activeProfile: StateFlow<String?> = profileManager.active
 
     init {
-        // Reload whenever the active profile changes (including the first value), so the list
-        // is always scoped to the tenant selected in the drawer.
-        viewModelScope.launch { profileManager.active.collect { refresh() } }
+        // The archived view now spans all profiles (desktop mirror), so it loads once rather than
+        // reloading per profile switch. The screen refreshes on ON_RESUME.
+        refresh()
     }
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
         try {
-            _state.value = ArchivedUiState(sessions = sessions.archived(profileManager.active.value))
+            _state.value = ArchivedUiState(sessions = sessions.archivedAllProfiles())
         } catch (e: HermesApiException) {
             if (e.code == 401) _state.value = ArchivedUiState(unauthorized = true)
             else _state.value = ArchivedUiState(error = e.message ?: "Failed to load")

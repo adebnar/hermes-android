@@ -20,10 +20,25 @@ import kotlinx.serialization.Serializable
     @SerialName("last_active") val lastActive: Double? = null,
     @SerialName("message_count") val messageCount: Int = 0,
     val profile: String? = null,
+    @SerialName("is_default_profile") val isDefaultProfile: Boolean = false,
+    val archived: Boolean = false,
     val cwd: String? = null,
     val source: String? = null,
 )
 @Serializable data class SessionListDto(val sessions: List<SessionDto> = emptyList())
+
+/**
+ * Cross-profile session list (`/api/profiles/sessions`). Unlike `/api/sessions?profile=`,
+ * every session here carries its true `profile`, so the list can show all tenants at once
+ * with each session under the profile it actually belongs to. [profileTotals] maps profile
+ * name → session count (used for group headers); [errors] lists any profiles that failed to load.
+ */
+@Serializable data class ProfileSessionsDto(
+    val sessions: List<SessionDto> = emptyList(),
+    val total: Int = 0,
+    @SerialName("profile_totals") val profileTotals: Map<String, Int> = emptyMap(),
+    val errors: List<String> = emptyList(),
+)
 
 @Serializable data class MessageDto(
     // The gateway returns a numeric message id, and content may be null (e.g. tool-only turns).
