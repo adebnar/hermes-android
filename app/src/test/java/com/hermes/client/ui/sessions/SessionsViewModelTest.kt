@@ -126,6 +126,29 @@ class SessionsViewModelTest {
         io.mockk.coVerify { pinStore.toggle("odos/s2") }
     }
 
+    // T3: opening a session from another profile must switch the active profile first, so the
+    // chat resumes against the correct per-profile DB.
+    @Test fun prepareOpen_switches_to_session_profile_when_different() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm() // active is "personal"
+        advanceUntilIdle()
+
+        vm.prepareOpen(session("s2", "client", profile = "odos"))
+        advanceUntilIdle()
+        io.mockk.coVerify { profileManager.switchTo("odos") }
+    }
+
+    // T3: no switch when the session is already in the active profile.
+    @Test fun prepareOpen_is_noop_for_active_profile_session() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm() // active is "personal"
+        advanceUntilIdle()
+
+        vm.prepareOpen(session("s1", "mine", profile = "personal"))
+        advanceUntilIdle()
+        io.mockk.coVerify(exactly = 0) { profileManager.switchTo(any()) }
+    }
+
     // T2: toggling a group delegates to the persisted store (collapse state survives navigation).
     @Test fun toggleGroup_persists_via_store() = runTest {
         coEvery { sessionRepo.listAllProfiles() } returns emptyList()

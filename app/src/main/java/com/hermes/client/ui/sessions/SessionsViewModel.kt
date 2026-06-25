@@ -116,6 +116,17 @@ class SessionsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Make [session]'s profile the active one before the chat opens. The list spans all profiles,
+     * but resume/history/slash resolve against the gateway's active per-profile DB — so opening a
+     * session from another tenant must switch the active profile first (and await it), or the chat
+     * loads against the wrong profile. No-op when the session is already in the active profile.
+     */
+    suspend fun prepareOpen(session: Session) {
+        val target = session.profile ?: return
+        if (target != profileManager.active.value) profileManager.switchTo(target)
+    }
+
     /** Returns the new session id, or null if creation failed (so the UI doesn't crash). */
     suspend fun createSession(): String? = runCatching { chat.createSession() }.getOrNull()
 

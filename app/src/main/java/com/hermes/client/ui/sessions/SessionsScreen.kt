@@ -178,7 +178,9 @@ fun SessionsScreen(
                                 SessionRow(
                                     session = s,
                                     isPinned = true,
-                                    onOpen = { onOpen(s.id) },
+                                    // Switch to the session's profile (awaited) before navigating,
+                                    // so the chat resumes against the right per-profile DB.
+                                    onOpen = { scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
                                     onTogglePin = { vm.togglePin(s) },
                                     onRename = { vm.rename(s.id, it) },
                                     onArchive = { vm.archive(s.id) },
@@ -220,7 +222,7 @@ fun SessionsScreen(
                                     SessionRow(
                                         session = s,
                                         isPinned = false,
-                                        onOpen = { onOpen(s.id) },
+                                        onOpen = { scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
                                         onTogglePin = { vm.togglePin(s) },
                                         onRename = { vm.rename(s.id, it) },
                                         onArchive = { vm.archive(s.id) },
