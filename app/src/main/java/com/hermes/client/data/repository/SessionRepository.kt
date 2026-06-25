@@ -46,8 +46,11 @@ class SessionRepository(private val rest: HermesRestApi) {
             m.copy(id = "h-$i-${m.id}")
         }
 
-    suspend fun rename(sessionId: String, title: String) = rest.patchSession(sessionId, title = title)
-    suspend fun archive(sessionId: String, archived: Boolean) =
-        rest.patchSession(sessionId, archived = archived)
-    suspend fun delete(sessionId: String) = rest.deleteSession(sessionId)
+    // All mutations carry the session's profile so the gateway hits the right per-profile DB
+    // (otherwise the call 404s and the change silently no-ops).
+    suspend fun rename(sessionId: String, title: String, profile: String?) =
+        rest.patchSession(sessionId, title = title, profile = profile)
+    suspend fun archive(sessionId: String, archived: Boolean, profile: String?) =
+        rest.patchSession(sessionId, archived = archived, profile = profile)
+    suspend fun delete(sessionId: String, profile: String?) = rest.deleteSession(sessionId, profile)
 }

@@ -73,8 +73,8 @@ fun ArchivedSessionsScreen(
                         ArchivedRow(
                             session = s,
                             onOpen = { onOpen(s.id) },
-                            onUnarchive = { vm.unarchive(s.id) },
-                            onDelete = { vm.delete(s.id) },
+                            onUnarchive = { vm.unarchive(s) },
+                            onDelete = { vm.delete(s) },
                         )
                     }
                 }

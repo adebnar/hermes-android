@@ -123,15 +123,22 @@ class HermesRestApi(
         }
     }
 
-    /** Rename and/or archive a session via PATCH /api/sessions/{id}. */
+    /**
+     * Rename and/or archive a session via PATCH /api/sessions/{id}. [profile] MUST identify the
+     * session's profile (sent in the body): the gateway resolves the session against a per-profile
+     * DB, and without it a session in a non-default profile returns 404 — so the archive/rename
+     * silently no-ops and the session never leaves the list.
+     */
     suspend fun patchSession(
         sessionId: String,
         title: String? = null,
         archived: Boolean? = null,
+        profile: String? = null,
     ) = withContext(Dispatchers.IO) {
         val obj: JsonObject = buildJsonObject {
             if (title != null) put("title", title)
             if (archived != null) put("archived", archived)
+            if (!profile.isNullOrBlank()) put("profile", profile)
         }
         val payload = json.encodeToString(JsonObject.serializer(), obj)
             .toRequestBody("application/json".toMediaType())
@@ -140,8 +147,10 @@ class HermesRestApi(
         }
     }
 
-    suspend fun deleteSession(sessionId: String) = withContext(Dispatchers.IO) {
-        okHttp.newCall(builder("/api/sessions/$sessionId").delete().build()).execute().use { resp ->
+    /** Delete a session. [profile] (query param) scopes it to the right per-profile DB. */
+    suspend fun deleteSession(sessionId: String, profile: String? = null) = withContext(Dispatchers.IO) {
+        val path = "/api/sessions/$sessionId${profileParam(profile, first = true)}"
+        okHttp.newCall(builder(path).delete().build()).execute().use { resp ->
             if (!resp.isSuccessful) throw HermesApiException(resp.code, "delete session failed")
         }
     }

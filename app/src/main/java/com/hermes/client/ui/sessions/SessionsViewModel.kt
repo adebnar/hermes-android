@@ -132,17 +132,18 @@ class SessionsViewModel @Inject constructor(
     /** Returns the new session id, or null if creation failed (so the UI doesn't crash). */
     suspend fun createSession(): String? = runCatching { chat.createSession() }.getOrNull()
 
-    fun rename(sessionId: String, title: String) = viewModelScope.launch {
-        runCatching { sessions.rename(sessionId, title) }.onSuccess { refresh() }
+    fun rename(session: Session, title: String) = viewModelScope.launch {
+        runCatching { sessions.rename(session.id, title, session.profile) }.onSuccess { refresh() }
     }
 
-    fun archive(sessionId: String) = viewModelScope.launch {
-        // Archiving removes it from the default (archived=exclude) list.
-        runCatching { sessions.archive(sessionId, archived = true) }.onSuccess { refresh() }
+    fun archive(session: Session) = viewModelScope.launch {
+        // Archiving removes it from the active list — must carry the session's profile or the
+        // gateway 404s (wrong per-profile DB) and the session never disappears.
+        runCatching { sessions.archive(session.id, archived = true, session.profile) }.onSuccess { refresh() }
     }
 
-    fun delete(sessionId: String) = viewModelScope.launch {
-        runCatching { sessions.delete(sessionId) }.onSuccess { refresh() }
+    fun delete(session: Session) = viewModelScope.launch {
+        runCatching { sessions.delete(session.id, session.profile) }.onSuccess { refresh() }
     }
 
     /** Pin/unpin keyed by the session's OWN profile, so it works regardless of the active one. */

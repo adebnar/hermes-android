@@ -182,9 +182,9 @@ fun SessionsScreen(
                                     // so the chat resumes against the right per-profile DB.
                                     onOpen = { scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
                                     onTogglePin = { vm.togglePin(s) },
-                                    onRename = { vm.rename(s.id, it) },
-                                    onArchive = { vm.archive(s.id) },
-                                    onDelete = { vm.delete(s.id) },
+                                    onRename = { vm.rename(s, it) },
+                                    onArchive = { vm.archive(s) },
+                                    onDelete = { vm.delete(s) },
                                 )
                             }
                         }
@@ -224,9 +224,9 @@ fun SessionsScreen(
                                         isPinned = false,
                                         onOpen = { scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
                                         onTogglePin = { vm.togglePin(s) },
-                                        onRename = { vm.rename(s.id, it) },
-                                        onArchive = { vm.archive(s.id) },
-                                        onDelete = { vm.delete(s.id) },
+                                        onRename = { vm.rename(s, it) },
+                                        onArchive = { vm.archive(s) },
+                                        onDelete = { vm.delete(s) },
                                     )
                                 }
                             }
