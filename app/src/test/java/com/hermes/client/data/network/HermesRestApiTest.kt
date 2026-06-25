@@ -35,6 +35,40 @@ class HermesRestApiTest {
         assertEquals("secret", recorded.headers["X-Hermes-Session-Token"])
     }
 
+    // T1: the cross-profile list tags each session with its true profile and carries
+    // profile_totals for group headers. A default-profile session reports is_default_profile.
+    @Test fun profileSessions_parses_per_session_profile_and_totals() = runTest {
+        serverRule.server.enqueue(MockResponse.Builder().code(200).body(
+            """{"sessions":[
+                {"id":"s1","title":"Mine","profile":"personal","cwd":"/home/me/app","archived":false},
+                {"id":"s2","title":"Default","is_default_profile":true,"archived":false}
+            ],"total":2,"profile_totals":{"personal":1,"default":1},"errors":[]}"""
+        ).build())
+
+        val res = api(serverRule.server).profileSessions()
+        assertEquals(2, res.sessions.size)
+        assertEquals("personal", res.sessions[0].profile)
+        // is_default_profile with no explicit profile name still surfaces (normalized downstream).
+        assertTrue(res.sessions[1].isDefaultProfile)
+        assertEquals(1, res.profileTotals["personal"])
+
+        val recorded = serverRule.server.takeRequest()
+        assertTrue(recorded.target.startsWith("/api/profiles/sessions"))
+    }
+
+    // T4: the archived cross-profile view requests archived=only on the same endpoint.
+    @Test fun profileSessions_archivedOnly_appends_param() = runTest {
+        serverRule.server.enqueue(MockResponse.Builder().code(200).body(
+            """{"sessions":[],"total":0,"profile_totals":{},"errors":[]}"""
+        ).build())
+
+        api(serverRule.server).profileSessions(archivedOnly = true)
+
+        val recorded = serverRule.server.takeRequest()
+        assertTrue(recorded.target.startsWith("/api/profiles/sessions"))
+        assertTrue("must request only archived sessions", recorded.target.contains("archived=only"))
+    }
+
     @Test fun status_returns_true_on_200() = runTest {
         serverRule.server.enqueue(MockResponse.Builder().code(200).body("""{"ok":true}""").build())
         assertTrue(api(serverRule.server).status())

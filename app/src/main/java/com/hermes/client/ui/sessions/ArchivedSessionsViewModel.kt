@@ -31,15 +31,17 @@ class ArchivedSessionsViewModel @Inject constructor(
     val activeProfile: StateFlow<String?> = profileManager.active
 
     init {
-        // Reload whenever the active profile changes (including the first value), so the list
-        // is always scoped to the tenant selected in the drawer.
+        // Scoped to the active profile, matching the main list — reload when the profile changes.
         viewModelScope.launch { profileManager.active.collect { refresh() } }
     }
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
         try {
-            _state.value = ArchivedUiState(sessions = sessions.archived(profileManager.active.value))
+            val active = profileManager.active.value
+            val all = sessions.archivedAllProfiles()
+            val list = if (active.isNullOrBlank()) all else all.filter { it.profile == active }
+            _state.value = ArchivedUiState(sessions = list)
         } catch (e: HermesApiException) {
             if (e.code == 401) _state.value = ArchivedUiState(unauthorized = true)
             else _state.value = ArchivedUiState(error = e.message ?: "Failed to load")
@@ -49,11 +51,11 @@ class ArchivedSessionsViewModel @Inject constructor(
     }
 
     /** Restore an archived session to the active list, then refresh so it leaves this view. */
-    fun unarchive(sessionId: String) = viewModelScope.launch {
-        runCatching { sessions.archive(sessionId, archived = false) }.onSuccess { refresh() }
+    fun unarchive(session: Session) = viewModelScope.launch {
+        runCatching { sessions.archive(session.id, archived = false, session.profile) }.onSuccess { refresh() }
     }
 
-    fun delete(sessionId: String) = viewModelScope.launch {
-        runCatching { sessions.delete(sessionId) }.onSuccess { refresh() }
+    fun delete(session: Session) = viewModelScope.launch {
+        runCatching { sessions.delete(session.id, session.profile) }.onSuccess { refresh() }
     }
 }

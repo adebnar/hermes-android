@@ -9,8 +9,11 @@ fun SessionDto.toDomain() = Session(
     model = model,
     provider = provider,
     messageCount = messageCount,
-    profile = profile,
+    // Normalize the default profile to a stable "default" label: the gateway may report it as
+    // null or blank with is_default_profile=true, but grouping/pin-tokens/switching need one key.
+    profile = profile?.ifBlank { null } ?: if (isDefaultProfile) "default" else null,
     workspace = cwd?.trimEnd('/')?.substringAfterLast('/')?.ifBlank { null } ?: "No workspace",
+    archived = archived,
     source = source,
 )
 

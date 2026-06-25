@@ -134,6 +134,13 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideGroupExpansionStore(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.data.repository.GroupExpansionStore =
+        com.hermes.client.data.repository.GroupExpansionStore(context)
+
+    @Provides
+    @Singleton
     fun provideAnalyticsRepository(rest: HermesRestApi): com.hermes.client.data.repository.AnalyticsRepository =
         com.hermes.client.data.repository.AnalyticsRepository(rest)
 
