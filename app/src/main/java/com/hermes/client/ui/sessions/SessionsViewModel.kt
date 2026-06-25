@@ -63,18 +63,20 @@ class SessionsViewModel @Inject constructor(
     init {
         chat.connect()
         viewModelScope.launch { profileManager.refresh() }
-        // The list now spans all profiles (desktop mirror), so it no longer reloads on a profile
-        // switch — the contents are identical regardless of which profile is active. Load once;
-        // the screen's ON_RESUME effect refreshes after creating/updating a session in a chat.
-        refresh()
+        // The list is scoped to the active profile (like the desktop, one tenant at a time), so it
+        // reloads whenever the selected profile changes — including the first value once it loads.
+        viewModelScope.launch { profileManager.active.collect { refresh() } }
     }
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
         try {
-            // Cross-profile: every session carries its true profile, so the app no longer guesses
-            // the profile from the active selection (the root cause of "wrong profile shown").
-            val list = sessions.listAllProfiles()
+            // Fetch the cross-profile list (true per-session profile + cron/empty already filtered),
+            // then scope to the active profile so only that tenant's sessions show. Until the active
+            // profile is known, fall back to showing everything rather than a blank list.
+            val active = profileManager.active.value
+            val all = sessions.listAllProfiles()
+            val list = if (active.isNullOrBlank()) all else all.filter { it.profile == active }
             _state.value = SessionsUiState(sessions = list)
         } catch (e: HermesApiException) {
             if (e.code == 401) {
