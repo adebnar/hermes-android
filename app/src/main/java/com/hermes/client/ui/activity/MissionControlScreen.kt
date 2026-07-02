@@ -51,7 +51,7 @@ import com.hermes.client.ui.components.HermesTopBar
 import com.hermes.client.ui.components.LoadingState
 import com.hermes.client.ui.nav.ShellViewModel
 import com.hermes.client.ui.theme.LocalProfileAccent
-import com.hermes.client.ui.theme.profileAccentColors
+import com.hermes.client.ui.theme.rememberProfileAccent
 import com.hermes.client.ui.util.relativeTime
 import kotlinx.coroutines.launch
 
@@ -104,7 +104,7 @@ fun MissionControlScreen(
 
     val currentProfile = names.getOrNull(pagerState.currentPage)
     // Top bar + tabs paint in the *current page's* accent, so the chrome shifts colour as you swipe.
-    CompositionLocalProvider(LocalProfileAccent provides profileAccentColors(currentProfile, dark)) {
+    CompositionLocalProvider(LocalProfileAccent provides rememberProfileAccent(currentProfile, dark)) {
         Scaffold(
             topBar = {
                 Column {
@@ -149,7 +149,7 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
     val onOpen: (String) -> Unit = { route -> scope.launch { vm.switchTo(profile); onNavigate(route) } }
 
     // Each page paints in its own tenant accent so peeking pages during a swipe read correctly.
-    CompositionLocalProvider(LocalProfileAccent provides profileAccentColors(profile, dark)) {
+    CompositionLocalProvider(LocalProfileAccent provides rememberProfileAccent(profile, dark)) {
         MissionControlContent(state = state, nowMs = now, onRetry = { vm.refresh() }, onOpen = onOpen)
     }
 }

@@ -114,9 +114,11 @@ data class ProfileAccentColors(
     val onContainer: Color,
 )
 
-fun profileAccentColors(profile: String?, dark: Boolean): ProfileAccentColors {
-    val a = accentArgb(profile, dark)
-    val c = containerArgb(profile, dark)
+fun profileAccentColors(profile: String?, dark: Boolean, overrideArgb: Int? = null): ProfileAccentColors {
+    // A user-chosen colour (if any) is used verbatim as the accent; otherwise fall back to the
+    // deterministic hashed hue. The soft container is derived from whichever colour we end up with.
+    val a = overrideArgb ?: accentArgb(profile, dark)
+    val c = if (overrideArgb != null) softContainerFrom(overrideArgb, dark) else containerArgb(profile, dark)
     return ProfileAccentColors(
         accent = Color(a),
         onAccent = Color(onColorFor(a)),
@@ -125,5 +127,49 @@ fun profileAccentColors(profile: String?, dark: Boolean): ProfileAccentColors {
     )
 }
 
+/** Soft accent-tinted container derived from a chosen accent colour (for the top-bar tint). */
+internal fun softContainerFrom(argb: Int, dark: Boolean): Int {
+    val (h, s, _) = argbToHsl(argb)
+    return hslToArgb(h, s * 0.55f, if (dark) 0.24f else 0.90f)
+}
+
+/** ARGB → HSL (hue in [0,360), saturation/lightness in [0,1]); alpha ignored. */
+internal fun argbToHsl(argb: Int): Triple<Float, Float, Float> {
+    val r = ((argb shr 16) and 0xFF) / 255f
+    val g = ((argb shr 8) and 0xFF) / 255f
+    val b = (argb and 0xFF) / 255f
+    val max = maxOf(r, g, b)
+    val min = minOf(r, g, b)
+    val l = (max + min) / 2f
+    if (max == min) return Triple(0f, 0f, l)
+    val d = max - min
+    val s = if (l > 0.5f) d / (2f - max - min) else d / (max + min)
+    val h = when (max) {
+        r -> (g - b) / d + (if (g < b) 6f else 0f)
+        g -> (b - r) / d + 2f
+        else -> (r - g) / d + 4f
+    } * 60f
+    return Triple(h, s, l)
+}
+
+/**
+ * Curated, contrast-safe accent swatches for the per-profile colour picker: evenly-spaced hues at
+ * a saturation/lightness whose on-colour stays legible (verified in tests). Lets users set a
+ * colour without a free wheel that could produce an illegible tint.
+ */
+// Contrast is guaranteed by construction: onColorFor() adaptively picks black or white, and the
+// worst-case max(black,white) contrast for any opaque colour is ~4.58 — always above the AA-large
+// 3.0 bar. So any chosen colour stays legible as long as chrome text uses the paired on-colour;
+// no colour needs to be rejected. (This is why the picker can even be a free wheel later.)
+val ACCENT_SWATCHES: List<Int> = (0 until 12).map { hslToArgb(it * 30f, 0.62f, 0.44f) }
+
 /** Available anywhere in the tree; defaults to the brand (no-profile) accent in light mode. */
 val LocalProfileAccent = staticCompositionLocalOf { profileAccentColors(null, dark = false) }
+
+/** Per-profile colour overrides (profile name → ARGB), provided at the app root from persistence. */
+val LocalProfileAccentOverrides = staticCompositionLocalOf<Map<String, Int>> { emptyMap() }
+
+/** Accent for [profile], consulting the user's override map from [LocalProfileAccentOverrides]. */
+@androidx.compose.runtime.Composable
+fun rememberProfileAccent(profile: String?, dark: Boolean): ProfileAccentColors =
+    profileAccentColors(profile, dark, LocalProfileAccentOverrides.current[profile])

@@ -30,7 +30,8 @@ fun HermesTheme(
         darkTheme -> HermesDarkColors
         else -> HermesLightColors
     }
-    val accent = profileAccentColors(profile, darkTheme)
+    // Honour a user-chosen colour for the active profile (falls back to the hashed hue).
+    val accent = profileAccentColors(profile, darkTheme, LocalProfileAccentOverrides.current[profile])
 
     CompositionLocalProvider(LocalProfileAccent provides accent) {
         MaterialTheme(

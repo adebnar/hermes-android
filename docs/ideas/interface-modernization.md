@@ -118,15 +118,15 @@ now that it's public-facing).
   fixed brand color — decide when building the component.
 
 ## Deferred features (post-Phase-1)
-- **User-settable per-profile accent** — let users override the auto-hashed hue with a
-  chosen color per profile (persisted; falls back to the hash when unset). This also
-  sidesteps the birthday-problem collision risk for large profile sets.
-- **Hard contrast guarantee** — any user-chosen or auto color MUST keep chrome text/icons
-  legible. The accent already ships a WCAG-contrast-checked on-color; the rule is that
-  *every* element on a tinted surface uses that on-color (regression seen 0.1.19: the
-  Sessions "Archived" action rendered in theme-primary over the accent and was hard to
-  read — fixed by routing it through `AccentChrome.onBar`). A color picker must run the
-  same contrast check and reject/adjust failing choices.
+- ✅ **User-settable per-profile accent** *(shipped post-0.1.19)* — a curated-swatch picker
+  in the **You** tab writes a per-profile colour to `ProfileAccentStore` (DataStore);
+  `LocalProfileAccentOverrides` threads it through `HermesTheme` and every accent call site,
+  with "Auto" to revert to the hashed hue.
+- ✅ **Contrast guarantee** *(resolved by design)* — turns out no colour needs rejecting: the
+  adaptive `onColorFor()` picks black/white by max contrast, and the worst case for any opaque
+  colour is ~4.58 (above AA-large 3.0). So the guarantee is simply "every element on a tinted
+  surface uses the paired on-colour" (the 0.1.19 "Archived" regression, fixed via
+  `AccentChrome.onBar`). No picker guard required — even a free wheel would be safe.
 
 ## Status
 Idea refined 2026-07-02. Direction: **A now / B later**, hybrid chat, chrome-only
