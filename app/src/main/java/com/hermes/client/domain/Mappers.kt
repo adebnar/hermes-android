@@ -15,6 +15,7 @@ fun SessionDto.toDomain() = Session(
     workspace = cwd?.trimEnd('/')?.substringAfterLast('/')?.ifBlank { null } ?: "No workspace",
     archived = archived,
     source = source,
+    lastActive = com.hermes.client.ui.util.secondsToEpochMs(lastActive),
 )
 
 fun MessageDto.toDomain() = ChatMessage(

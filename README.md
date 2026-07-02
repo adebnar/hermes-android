@@ -11,6 +11,11 @@ the Hermes Desktop app. It connects to a remote Hermes gateway over Tailscale, a
 private VPN, or your local network, and gives you full chat plus the management surface: sessions, models,
 profiles, scheduled jobs, usage analytics, messaging integrations, and settings.
 
+A three-tab bottom bar (**Chats · Agent Activity · You**) sits on a ground-up Material 3
+design system where each tenant profile has its own accent colour, so you always see which
+client you're acting as. The **Agent Activity** tab is a live Mission Control feed you can
+swipe between tenants.
+
 Built with Kotlin and Jetpack Compose (Material 3).
 
 ---
@@ -47,14 +52,27 @@ on your phone:
 
 ## Features
 
-- **Chat** — streaming responses, model picker, slash commands (`/…`) with an inline
-  command palette, `@` file mentions/path completion, image attachments, tool-call
-  approval and clarification prompts.
-- **Sessions** — grouped by workspace, with **search** (instant title filter + gateway
-  message-content search), pinning, **archive / unarchive / delete** (an Archived view from
-  the Sessions top bar), and a session-admin view. Opening a session lands on the newest reply.
-- **Models & profiles** — switch the active model or tenant profile on the fly; the active
-  profile is shown in the chat top bar.
+- **Navigation & design** — a three-tab bottom bar (**Chats · Agent Activity · You**) on a
+  ground-up Material 3 design system: every tenant profile gets its own accent colour that
+  tints the app chrome (a glanceable "which client am I in" signal), Rounded iconography,
+  motion, and consistent shared components.
+- **Chat** — a hybrid transcript (compact bubbles for you, full-width document-style agent
+  turns) with streaming responses and an animated typing indicator, model picker, slash
+  commands (`/…`) with an inline command palette, `@` file mentions/path completion, image
+  attachments, and tool-call approval/clarification prompts. Opening a thread lands on the
+  newest message (and re-lands after rotation).
+- **Mission Control** (the **Agent Activity** tab) — a live, time-grouped activity feed
+  (**Live now · Upcoming · Recent**) merging conversations and cron for the active profile,
+  with quick links to Cron/Messaging/Usage/Agents; completed runs open their output.
+  **Profile-spatial**: swipe left/right to move between tenants' activity, each painted in
+  its own accent.
+- **Sessions** — grouped by workspace with collapsible headers, **search** (instant title
+  filter + gateway message-content search), pinning, and **archive / unarchive / delete**
+  (swipe a row to archive; an Archived view from the top bar), plus a session-admin view.
+  Opening a session lands on the newest reply.
+- **Profiles** — switch the active tenant from a shared chip switcher on both the Chats and
+  Agent Activity tabs, or manage them from the **You** tab; the active profile tints the chrome.
+- **Models** — switch the active model on the fly from the chat top bar.
 - **Cron** — list, create, edit, pause/resume, run-now, and delete scheduled jobs, with
   next-run times and run history.
 - **Usage** — daily token chart and per-model breakdown.

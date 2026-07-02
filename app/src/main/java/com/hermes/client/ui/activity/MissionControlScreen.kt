@@ -1,0 +1,238 @@
+package com.hermes.client.ui.activity
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Chat
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.Forum
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.hermes.client.ui.components.EmptyState
+import com.hermes.client.ui.components.ErrorState
+import com.hermes.client.ui.components.HermesTopBar
+import com.hermes.client.ui.components.LoadingState
+import com.hermes.client.ui.nav.ShellViewModel
+import com.hermes.client.ui.theme.LocalProfileAccent
+import com.hermes.client.ui.theme.profileAccentColors
+import com.hermes.client.ui.util.relativeTime
+import kotlinx.coroutines.launch
+
+private data class QuickLink(val label: String, val icon: ImageVector, val route: String)
+
+private val QUICK_LINKS = listOf(
+    QuickLink("Cron", Icons.Rounded.Schedule, "cron"),
+    QuickLink("Messaging", Icons.Rounded.Forum, "messaging"),
+    QuickLink("Usage", Icons.Rounded.BarChart, "usage"),
+    QuickLink("Agents", Icons.Rounded.Extension, "agents_tools"),
+)
+
+/**
+ * Mission Control — the "Agent Activity" tab. Profile-spatial: a horizontal pager with one page
+ * per tenant, each painted in that tenant's accent, so swiping left/right moves between tenants'
+ * activity. The top bar + tenant tabs follow the current page; opening an item switches the
+ * app-wide active profile to that page's tenant first. [onNavigate] opens feed items + quick links.
+ */
+@Composable
+fun MissionControlScreen(
+    onNavigate: (String) -> Unit,
+    shell: ShellViewModel = hiltViewModel(),
+) {
+    val profiles by shell.profiles.collectAsStateWithLifecycle()
+    val active by shell.active.collectAsStateWithLifecycle()
+    val dark = isSystemInDarkTheme()
+
+    // One page per profile; at least one page even before the list loads.
+    val names: List<String?> = remember(profiles, active) {
+        profiles.map { it.name as String? }.ifEmpty { listOf(active) }
+    }
+
+    val pagerState = rememberPagerState(
+        initialPage = names.indexOf(active).coerceAtLeast(0),
+        pageCount = { names.size },
+    )
+    val scope = rememberCoroutineScope()
+
+    // Jump to the active profile's page once the profile list has loaded (it arrives async).
+    var jumped by remember { mutableStateOf(false) }
+    LaunchedEffect(names, active) {
+        if (!jumped && active != null) {
+            val idx = names.indexOf(active)
+            if (idx >= 0) {
+                pagerState.scrollToPage(idx)
+                jumped = true
+            }
+        }
+    }
+
+    val currentProfile = names.getOrNull(pagerState.currentPage)
+    // Top bar + tabs paint in the *current page's* accent, so the chrome shifts colour as you swipe.
+    CompositionLocalProvider(LocalProfileAccent provides profileAccentColors(currentProfile, dark)) {
+        Scaffold(
+            topBar = {
+                Column {
+                    HermesTopBar(title = "Agent Activity", subtitle = currentProfile?.let { "Profile: $it" })
+                    if (names.size > 1) {
+                        com.hermes.client.ui.components.ProfileChips(
+                            names = names.filterNotNull(),
+                            active = currentProfile,
+                            onSelect = { name ->
+                                val idx = names.indexOf(name)
+                                if (idx >= 0) scope.launch { pagerState.animateScrollToPage(idx) }
+                            },
+                        )
+                    }
+                }
+            },
+        ) { padding ->
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.padding(padding).fillMaxSize(),
+                key = { names[it] ?: "_$it" },
+            ) { page ->
+                MissionControlPage(profile = names[page], dark = dark, onNavigate = onNavigate)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (String) -> Unit) {
+    // One VM instance per tenant page, keyed by profile name.
+    val vm: MissionControlViewModel = hiltViewModel(key = "mc-${profile ?: "_"}")
+    val state by vm.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val now = remember(state.sections) { System.currentTimeMillis() }
+
+    LaunchedEffect(profile) { vm.load(profile) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refresh() }
+
+    // Opening an item makes this page's tenant the active profile (awaited) before navigating, so
+    // the chat/cron screen acts against the right per-profile DB.
+    val onOpen: (String) -> Unit = { route -> scope.launch { vm.switchTo(profile); onNavigate(route) } }
+
+    // Each page paints in its own tenant accent so peeking pages during a swipe read correctly.
+    CompositionLocalProvider(LocalProfileAccent provides profileAccentColors(profile, dark)) {
+        MissionControlContent(state = state, nowMs = now, onRetry = { vm.refresh() }, onOpen = onOpen)
+    }
+}
+
+@Composable
+private fun MissionControlContent(
+    state: MissionControlState,
+    nowMs: Long,
+    onRetry: () -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    LazyColumn(Modifier.fillMaxSize()) {
+        item(key = "quicklinks") {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                QUICK_LINKS.forEach { link ->
+                    AssistChip(
+                        onClick = { onOpen(link.route) },
+                        label = { Text(link.label) },
+                        leadingIcon = { Icon(link.icon, contentDescription = null, Modifier.width(18.dp)) },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+            }
+        }
+        when {
+            state.loading && state.sections.isEmpty() -> item { LoadingState() }
+            state.error != null -> item { ErrorState(message = state.error!!, onRetry = onRetry) }
+            state.sections.isEmpty() -> item {
+                EmptyState(
+                    title = "Nothing happening yet",
+                    subtitle = "Conversations and scheduled runs for this profile will show up here.",
+                )
+            }
+            else -> state.sections.forEach { section ->
+                item(key = "h-${section.title}") { SectionHeader(section.title, section.items.size) }
+                items(section.items, key = { it.id }) { activity ->
+                    ActivityRow(activity, nowMs, onClick = { onOpen(activity.route) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(label: String, count: Int) {
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) {
+        Text(
+            label.uppercase(),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            count.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ActivityRow(item: ActivityItem, nowMs: Long, onClick: () -> Unit) {
+    val icon: ImageVector = when {
+        item.kind == ActivityKind.CONVERSATION -> Icons.AutoMirrored.Rounded.Chat
+        item.upcoming -> Icons.Rounded.Schedule
+        item.status.equals("success", ignoreCase = true) -> Icons.Rounded.CheckCircle
+        item.status.equals("error", ignoreCase = true) ||
+            item.status.equals("failed", ignoreCase = true) -> Icons.Rounded.ErrorOutline
+        else -> Icons.Rounded.History
+    }
+    val tint = when {
+        item.status.equals("error", ignoreCase = true) ||
+            item.status.equals("failed", ignoreCase = true) -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
+    val time = relativeTime(item.timestampMs, nowMs)
+    ListItem(
+        leadingContent = { Icon(icon, contentDescription = null, tint = tint) },
+        headlineContent = { Text(item.title) },
+        supportingContent = { Text(listOfNotNull(item.subtitle, time).joinToString(" · ")) },
+        modifier = Modifier.clickable(onClick = onClick),
+    )
+}

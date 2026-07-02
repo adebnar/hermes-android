@@ -67,6 +67,7 @@ fun SessionsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
+    val profiles by vm.profiles.collectAsStateWithLifecycle()
     val pinnedTokens by vm.pinnedTokens.collectAsStateWithLifecycle()
     val collapsedGroups by vm.collapsedGroups.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
@@ -88,18 +89,28 @@ fun SessionsScreen(
 
     Scaffold(
         topBar = {
-            com.hermes.client.ui.components.HermesTopBar(
-                title = "Sessions",
-                subtitle = activeProfile?.let { "Profile: $it" },
-                actions = {
-                    TextButton(
-                        onClick = onOpenArchived,
-                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                            contentColor = com.hermes.client.ui.components.AccentChrome.onBar,
-                        ),
-                    ) { Text("Archived") }
-                },
-            )
+            Column {
+                com.hermes.client.ui.components.HermesTopBar(
+                    title = "Sessions",
+                    actions = {
+                        TextButton(
+                            onClick = onOpenArchived,
+                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                contentColor = com.hermes.client.ui.components.AccentChrome.onBar,
+                            ),
+                        ) { Text("Archived") }
+                    },
+                )
+                // Same tenant switcher as Agent Activity: a chip row, active one selected. Tapping
+                // switches the active profile and the list re-fetches.
+                if (profiles.size > 1) {
+                    com.hermes.client.ui.components.ProfileChips(
+                        names = profiles.map { it.name },
+                        active = activeProfile,
+                        onSelect = vm::switchProfile,
+                    )
+                }
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
