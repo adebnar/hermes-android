@@ -42,10 +42,10 @@ on your phone:
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/01-connect.png" width="24%" alt="Connect to your Hermes gateway" />
-  <img src="docs/screenshots/02-features.png" width="24%" alt="Full management surface — sessions, models, cron, usage, settings" />
-  <img src="docs/screenshots/03-settings.png" width="24%" alt="Settings" />
-  <img src="docs/screenshots/04-dark-theme.png" width="24%" alt="Light & dark themes" />
+  <img src="docs/screenshots/01-chats.png" width="24%" alt="Chats — per-profile accent, tenant chips, grouped sessions, bottom navigation" />
+  <img src="docs/screenshots/02-mission-control.png" width="24%" alt="Agent Activity — live Mission Control feed merging conversations and cron" />
+  <img src="docs/screenshots/03-chat.png" width="24%" alt="Chat — hybrid bubbles, markdown, and copyable code blocks" />
+  <img src="docs/screenshots/04-profiles.png" width="24%" alt="You — per-profile accent colours and the accent picker" />
 </p>
 
 ---
