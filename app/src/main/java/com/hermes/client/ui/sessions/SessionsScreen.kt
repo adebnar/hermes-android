@@ -8,18 +8,26 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -78,7 +86,9 @@ fun SessionsScreen(
             com.hermes.client.ui.components.HermesTopBar(
                 title = "Sessions",
                 subtitle = activeProfile?.let { "Profile: $it" },
-                navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+                navigationIcon = {
+                    IconButton(onClick = onMenu) { Icon(Icons.Rounded.Menu, contentDescription = "Open menu") }
+                },
                 actions = {
                     TextButton(
                         onClick = onOpenArchived,
@@ -93,7 +103,7 @@ fun SessionsScreen(
             ExtendedFloatingActionButton(
                 onClick = { scope.launch { vm.createSession()?.let { onOpen(it) } } },
                 text = { Text("New") },
-                icon = {},
+                icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
                 containerColor = com.hermes.client.ui.components.AccentChrome.fabContainer,
                 contentColor = com.hermes.client.ui.components.AccentChrome.onFab,
             )
@@ -109,7 +119,9 @@ fun SessionsScreen(
                 singleLine = true,
                 trailingIcon = {
                     if (query.isNotBlank()) {
-                        IconButton(onClick = { vm.onQueryChange("") }) { Text("✕") }
+                        IconButton(onClick = { vm.onQueryChange("") }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                        }
                     }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -118,8 +130,18 @@ fun SessionsScreen(
             )
             Box(Modifier.fillMaxSize()) {
             when {
-                state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
+                state.loading -> com.hermes.client.ui.components.LoadingState()
+                state.error != null -> com.hermes.client.ui.components.ErrorState(
+                    message = state.error!!,
+                    onRetry = { vm.refresh() },
+                )
+                state.sessions.isEmpty() && query.isBlank() && messageResults.isEmpty() ->
+                    com.hermes.client.ui.components.EmptyState(
+                        title = "No sessions yet",
+                        subtitle = "Start a conversation with the New button.",
+                        actionLabel = "New session",
+                        onAction = { scope.launch { vm.createSession()?.let { onOpen(it) } } },
+                    )
                 else -> {
                     val q = query.trim()
                     // Instant client-side title/workspace filter over the loaded sessions.
@@ -264,12 +286,12 @@ private fun CollapsibleHeader(
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            if (collapsed) "▸" else "▾",
-            style = MaterialTheme.typography.labelMedium,
-            color = if (indent) MaterialTheme.colorScheme.onSurfaceVariant
+        Icon(
+            if (collapsed) Icons.Rounded.ChevronRight else Icons.Rounded.ExpandMore,
+            contentDescription = if (collapsed) "Expand" else "Collapse",
+            tint = if (indent) MaterialTheme.colorScheme.onSurfaceVariant
             else MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(end = 8.dp),
+            modifier = Modifier.padding(end = 8.dp).size(18.dp),
         )
         Text(
             if (indent) label else label.uppercase(),
@@ -330,7 +352,17 @@ private fun SessionRow(
 
     Box {
         ListItem(
-            headlineContent = { Text(if (isPinned) "📌  ${session.title}" else session.title) },
+            headlineContent = { Text(session.title) },
+            leadingContent = if (isPinned) {
+                {
+                    Icon(
+                        Icons.Rounded.PushPin,
+                        contentDescription = "Pinned",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            } else null,
             // Show the session's true profile (from the cross-profile list) next to its model so
             // the tenant is unambiguous before the profile grouping lands.
             supportingContent = {
