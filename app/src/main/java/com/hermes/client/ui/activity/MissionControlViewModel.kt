@@ -44,7 +44,8 @@ class MissionControlViewModel @Inject constructor(
         _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
         try {
             val active = profileManager.active.value
-            val all = sessions.listAllProfiles()
+            // activityFeed keeps cron-produced sessions so a scheduled run's output is openable.
+            val all = sessions.activityFeed()
             val scoped = if (active.isNullOrBlank()) all else all.filter { it.profile == active }
             // A cron failure (e.g. profile without cron) must not blank the whole feed.
             val crons = runCatching { tools.cronJobs(active) }.getOrDefault(emptyList())

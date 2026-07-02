@@ -61,23 +61,37 @@ class ActivityModelsTest {
         assertTrue(items.single().subtitle!!.contains("3 msg"))
     }
 
-    @Test fun active_cron_yields_upcoming_and_recent() {
+    // A cron-produced session (source="cron") is the run's OUTPUT: it reads as CRON but opens the
+    // actual chat, not the job config — the whole point of the fix.
+    @Test fun cron_session_is_cron_kind_but_opens_the_chat() {
+        val s = Session(
+            id = "run9", title = "Nightly digest", model = "opus", provider = null,
+            messageCount = 5, profile = "personal", source = "cron", lastActive = now,
+        )
+        val item = sessionsToActivity(listOf(s)).single()
+        assertEquals(ActivityKind.CRON, item.kind)
+        assertEquals("chat/run9", item.route)
+        assertTrue(item.subtitle!!.contains("Cron run"))
+    }
+
+    @Test fun active_cron_yields_only_upcoming() {
         val job = CronJobDto(
             id = "c1", name = "Nightly", enabled = true,
             nextRunAt = "2026-06-20T09:00:00Z", lastRunAt = "2026-06-19T09:00:00Z", lastStatus = "success",
         )
         val items = cronsToActivity(listOf(job))
-        assertEquals(setOf("cron-next-c1", "cron-last-c1"), items.map { it.id }.toSet())
-        assertTrue(items.any { it.upcoming })
-        assertTrue(items.all { it.route == "cron_detail/c1" })
+        assertEquals(listOf("cron-next-c1"), items.map { it.id })
+        assertTrue(items.single().upcoming)
+        assertEquals("cron_detail/c1", items.single().route)
     }
 
-    @Test fun paused_cron_has_no_upcoming_item() {
+    // Paused / disabled jobs contribute nothing (no upcoming run); their past runs still show as
+    // cron sessions via the session feed.
+    @Test fun paused_cron_yields_nothing() {
         val job = CronJobDto(
             id = "c2", name = "Paused", enabled = true, pausedAt = "2026-01-01T00:00:00Z",
             nextRunAt = "2026-06-20T09:00:00Z", lastRunAt = "2026-06-19T09:00:00Z", lastStatus = "error",
         )
-        val items = cronsToActivity(listOf(job))
-        assertEquals(listOf("cron-last-c2"), items.map { it.id })
+        assertEquals(emptyList<ActivityItem>(), cronsToActivity(listOf(job)))
     }
 }

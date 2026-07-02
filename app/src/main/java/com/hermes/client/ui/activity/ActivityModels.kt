@@ -31,11 +31,15 @@ const val LIVE_WINDOW_MS = 15 * 60_000L
 private const val RECENT_CAP = 40
 
 fun sessionsToActivity(sessions: List<Session>): List<ActivityItem> = sessions.map { s ->
+    // A cron-produced session IS the run's output — tapping it opens the actual messages, not the
+    // job config. Mark it CRON so it reads as automated, but route it to the chat like any session.
+    val isCron = s.source == "cron"
     ActivityItem(
         id = "sess-${s.id}",
-        kind = ActivityKind.CONVERSATION,
+        kind = if (isCron) ActivityKind.CRON else ActivityKind.CONVERSATION,
         title = s.title,
-        subtitle = listOfNotNull(s.model, "${s.messageCount} msg").joinToString(" · "),
+        subtitle = if (isCron) "Cron run · ${s.messageCount} msg"
+        else listOfNotNull(s.model, "${s.messageCount} msg").joinToString(" · "),
         timestampMs = s.lastActive,
         upcoming = false,
         status = null,
@@ -43,42 +47,24 @@ fun sessionsToActivity(sessions: List<Session>): List<ActivityItem> = sessions.m
     )
 }
 
-fun cronsToActivity(crons: List<CronJobDto>): List<ActivityItem> = crons.flatMap { job ->
-    val name = job.name?.ifBlank { null } ?: job.id
-    buildList {
-        // Upcoming next run — only for jobs that are actually going to run.
-        if (job.enabled && !job.isPaused) {
-            isoToEpochMs(job.nextRunAt)?.let { next ->
-                add(
-                    ActivityItem(
-                        id = "cron-next-${job.id}",
-                        kind = ActivityKind.CRON,
-                        title = name,
-                        subtitle = "Scheduled · ${job.scheduleText}",
-                        timestampMs = next,
-                        upcoming = true,
-                        status = null,
-                        route = "cron_detail/${job.id}",
-                    ),
-                )
-            }
-        }
-        // Most recent run (with pass/fail).
-        isoToEpochMs(job.lastRunAt)?.let { last ->
-            add(
-                ActivityItem(
-                    id = "cron-last-${job.id}",
-                    kind = ActivityKind.CRON,
-                    title = name,
-                    subtitle = "Ran",
-                    timestampMs = last,
-                    upcoming = false,
-                    status = job.lastStatus,
-                    route = "cron_detail/${job.id}",
-                ),
-            )
-        }
-    }
+/**
+ * Cron jobs contribute only **upcoming** next-runs (there is no session yet, so these route to the
+ * job detail). Past runs surface as real cron sessions via [sessionsToActivity] instead, so tapping
+ * a completed run opens its output rather than the job's config.
+ */
+fun cronsToActivity(crons: List<CronJobDto>): List<ActivityItem> = crons.mapNotNull { job ->
+    if (!job.enabled || job.isPaused) return@mapNotNull null
+    val next = isoToEpochMs(job.nextRunAt) ?: return@mapNotNull null
+    ActivityItem(
+        id = "cron-next-${job.id}",
+        kind = ActivityKind.CRON,
+        title = job.name?.ifBlank { null } ?: job.id,
+        subtitle = "Scheduled · ${job.scheduleText}",
+        timestampMs = next,
+        upcoming = true,
+        status = null,
+        route = "cron_detail/${job.id}",
+    )
 }
 
 /**
