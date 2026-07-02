@@ -1,9 +1,12 @@
 package com.hermes.client.ui.sessions
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -33,6 +37,9 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -204,6 +211,7 @@ fun SessionsScreen(
                                     onRename = { vm.rename(s, it) },
                                     onArchive = { vm.archive(s) },
                                     onDelete = { vm.delete(s) },
+                                    modifier = Modifier.animateItem(),
                                 )
                             }
                         }
@@ -246,6 +254,7 @@ fun SessionsScreen(
                                         onRename = { vm.rename(s, it) },
                                         onArchive = { vm.archive(s) },
                                         onDelete = { vm.delete(s) },
+                                        modifier = Modifier.animateItem(),
                                     )
                                 }
                             }
@@ -332,7 +341,7 @@ private fun SectionHeader(label: String, count: Int, note: String? = null) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun SessionRow(
     session: Session,
@@ -342,13 +351,48 @@ private fun SessionRow(
     onRename: (String) -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var confirmingDelete by remember { mutableStateOf(false) }
 
-    Box {
-        ListItem(
+    // Swipe a row left to archive (frequent, reversible). Delete stays behind the long-press
+    // menu + a confirm, since swipe-to-delete is easy to trigger by accident.
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onArchive(); true
+            } else {
+                false
+            }
+        },
+        positionalThreshold = { distance -> distance * 0.4f },
+    )
+
+    Box(modifier) {
+        SwipeToDismissBox(
+            state = dismissState,
+            enableDismissFromStartToEnd = false,
+            enableDismissFromEndToStart = true,
+            backgroundContent = {
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Rounded.Archive,
+                        contentDescription = "Archive",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            },
+        ) {
+            ListItem(
             headlineContent = { Text(session.title) },
             leadingContent = if (isPinned) {
                 {
@@ -370,7 +414,8 @@ private fun SessionRow(
                 onClick = onOpen,
                 onLongClick = { menuOpen = true },
             ),
-        )
+            )
+        }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             DropdownMenuItem(
                 text = { Text(if (isPinned) "Unpin" else "Pin") },
