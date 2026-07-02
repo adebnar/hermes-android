@@ -64,6 +64,7 @@ import com.mikepenz.markdown.m3.markdownTypography
 @Composable
 fun ChatMessageList(
     state: ChatUiState,
+    sessionId: String,
     modifier: Modifier = Modifier,
     listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
 ) {
@@ -74,8 +75,9 @@ fun ChatMessageList(
     // On first load of a non-empty thread (opening an existing session), jump straight to the
     // newest message so the latest reply is visible immediately — otherwise the list stays at
     // the top and the most recent response looks missing until you scroll down by hand.
-    var landed by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(state.messages.isNotEmpty()) {
+    // Keyed by sessionId so opening a different thread always re-lands at its bottom.
+    var landed by rememberSaveable(sessionId) { mutableStateOf(false) }
+    LaunchedEffect(sessionId, state.messages.isNotEmpty()) {
         if (state.messages.isEmpty() || landed) return@LaunchedEffect
         // History loads after the list is already composed, so wait until the LazyColumn has
         // actually measured the loaded items before scrolling — jumping before first layout
@@ -83,14 +85,19 @@ fun ChatMessageList(
         snapshotFlow { listState.layoutInfo.totalItemsCount }
             .filter { it >= state.messages.size }
             .first()
-        // Converge to the ABSOLUTE bottom — the end of the newest message, not just the last
-        // item's top. Scroll purely by the list's own "can I still scroll down?" signal rather
-        // than a captured message index (which could go stale if the thread changes mid-loop):
-        // keep scrolling until nothing remains below, letting a frame measure the next items
-        // between steps.
+        // Converge to the ABSOLUTE bottom. Full-width assistant markdown measures lazily and can
+        // keep growing over several frames, so a single scroll pass under-shoots. Keep scrolling
+        // to the end each frame and only declare "landed" after a few consecutive frames with
+        // nothing left below — that catches late-measuring content without a fixed guess.
+        var stableFrames = 0
         var guard = 0
-        while (guard++ < 60 && listState.canScrollForward) {
-            listState.scrollBy(100_000f)
+        while (guard++ < 90 && stableFrames < 3) {
+            if (listState.canScrollForward) {
+                listState.scrollBy(100_000f)
+                stableFrames = 0
+            } else {
+                stableFrames++
+            }
             withFrameNanos {} // let a layout pass measure the next items, then continue
         }
         landed = true

@@ -218,7 +218,7 @@ fun ChatScreen(
                     }
                 }
             } else {
-                ChatMessageList(state = state, modifier = Modifier.weight(1f))
+                ChatMessageList(state = state, sessionId = sessionId, modifier = Modifier.weight(1f))
             }
         }
     }
