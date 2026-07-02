@@ -41,6 +41,12 @@ class SessionsViewModel @Inject constructor(
     /** The active profile, shown as a subtitle so the tenant context is always visible. */
     val activeProfile: StateFlow<String?> = profileManager.active
 
+    /** All profiles, for the in-place profile switcher on the Chats top bar. */
+    val profiles: StateFlow<List<com.hermes.client.data.network.ProfileDto>> = profileManager.list
+
+    /** Switch the active profile; the list re-fetches automatically (init collects active). */
+    fun switchProfile(name: String) = viewModelScope.launch { profileManager.switchTo(name) }
+
     /**
      * Raw pinned tokens ("<profile>/<sessionId>", device-local). The list spans all profiles, so
      * the UI must test each session against its OWN profile token — not the active profile — or a
