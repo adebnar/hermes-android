@@ -42,8 +42,8 @@ fun ModelsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Models") },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Models",
                 navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },

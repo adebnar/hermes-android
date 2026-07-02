@@ -1,4 +1,5 @@
 package com.hermes.client.ui.profiles
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.clickable
@@ -30,8 +31,8 @@ fun ProfilesScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Profiles") },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Profiles",
                 navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },
@@ -49,7 +50,13 @@ fun ProfilesScreen(
                             },
                         )
                     },
-                    trailingContent = if (p.name == active) ({ Text("✓") }) else null,
+                    trailingContent = if (p.name == active) ({
+                        androidx.compose.material3.Icon(
+                            androidx.compose.material.icons.Icons.Rounded.CheckCircle,
+                            contentDescription = "Active",
+                            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        )
+                    }) else null,
                     modifier = Modifier.clickable { vm.switchProfile(p.name) },
                 )
             }

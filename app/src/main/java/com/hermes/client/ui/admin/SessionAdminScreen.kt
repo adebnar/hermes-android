@@ -40,8 +40,8 @@ fun SessionAdminScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Session admin") },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Session admin",
                 navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },

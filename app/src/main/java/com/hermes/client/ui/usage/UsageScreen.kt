@@ -102,8 +102,8 @@ fun UsageScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Usage") },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Usage",
                 navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },

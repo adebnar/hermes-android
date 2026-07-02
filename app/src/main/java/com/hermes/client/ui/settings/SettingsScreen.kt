@@ -26,8 +26,8 @@ fun SettingsScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Settings",
                 navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },

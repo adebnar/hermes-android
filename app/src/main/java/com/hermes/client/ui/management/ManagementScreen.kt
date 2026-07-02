@@ -23,8 +23,8 @@ fun ManagementScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Management") },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Management",
                 navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },

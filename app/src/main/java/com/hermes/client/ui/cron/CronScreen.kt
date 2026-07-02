@@ -38,15 +38,9 @@ fun CronScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    androidx.compose.foundation.layout.Column {
-                        Text("Cron jobs")
-                        state.profile?.let {
-                            Text("Profile: $it", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Cron jobs",
+                subtitle = state.profile?.let { "Profile: $it" },
                 navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },

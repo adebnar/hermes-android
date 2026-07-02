@@ -33,8 +33,8 @@ fun AgentsToolsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Agents & tools") },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Agents & tools",
                 navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },

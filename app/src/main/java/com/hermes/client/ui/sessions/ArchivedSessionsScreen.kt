@@ -1,4 +1,5 @@
 package com.hermes.client.ui.sessions
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -51,22 +52,30 @@ fun ArchivedSessionsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Archived") },
-                navigationIcon = { IconButton(onClick = onBack) { Text("←") } },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Archived",
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        androidx.compose.material3.Icon(
+                            androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
+                },
             )
         },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
                 state.loading && state.sessions.isEmpty() ->
-                    CircularProgressIndicator(Modifier.align(Alignment.Center))
-                state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
-                state.sessions.isEmpty() -> Text(
-                    "No archived sessions.",
-                    Modifier.align(Alignment.Center).padding(24.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    com.hermes.client.ui.components.LoadingState()
+                state.error != null -> com.hermes.client.ui.components.ErrorState(
+                    message = state.error!!,
+                    onRetry = { vm.refresh() },
+                )
+                state.sessions.isEmpty() -> com.hermes.client.ui.components.EmptyState(
+                    title = "No archived sessions",
+                    subtitle = "Archived conversations will appear here.",
                 )
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     items(state.sessions, key = { it.id }) { s ->
