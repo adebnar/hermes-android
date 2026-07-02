@@ -25,7 +25,6 @@ import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -111,10 +110,13 @@ fun MissionControlScreen(
                 Column {
                     HermesTopBar(title = "Agent Activity", subtitle = currentProfile?.let { "Profile: $it" })
                     if (names.size > 1) {
-                        ProfileTabs(
-                            names = names,
-                            current = pagerState.currentPage,
-                            onSelect = { scope.launch { pagerState.animateScrollToPage(it) } },
+                        com.hermes.client.ui.components.ProfileChips(
+                            names = names.filterNotNull(),
+                            active = currentProfile,
+                            onSelect = { name ->
+                                val idx = names.indexOf(name)
+                                if (idx >= 0) scope.launch { pagerState.animateScrollToPage(idx) }
+                            },
                         )
                     }
                 }
@@ -190,23 +192,6 @@ private fun MissionControlContent(
                     ActivityRow(activity, nowMs, onClick = { onOpen(activity.route) })
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun ProfileTabs(names: List<String?>, current: Int, onSelect: (Int) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-    ) {
-        names.forEachIndexed { index, name ->
-            FilterChip(
-                selected = index == current,
-                onClick = { onSelect(index) },
-                label = { Text(name ?: "Default") },
-            )
-            Spacer(Modifier.width(8.dp))
         }
     }
 }

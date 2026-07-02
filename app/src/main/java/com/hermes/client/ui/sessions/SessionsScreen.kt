@@ -20,8 +20,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Archive
-import androidx.compose.material.icons.rounded.ArrowDropDown
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -91,20 +89,28 @@ fun SessionsScreen(
 
     Scaffold(
         topBar = {
-            com.hermes.client.ui.components.HermesTopBar(
-                title = "Sessions",
-                actions = {
-                    // In-place tenant switcher: the active profile is tappable to change tenants
-                    // without leaving the Chats page; the list re-fetches on switch.
-                    ProfileSwitcher(profiles = profiles, active = activeProfile, onSwitch = vm::switchProfile)
-                    TextButton(
-                        onClick = onOpenArchived,
-                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                            contentColor = com.hermes.client.ui.components.AccentChrome.onBar,
-                        ),
-                    ) { Text("Archived") }
-                },
-            )
+            Column {
+                com.hermes.client.ui.components.HermesTopBar(
+                    title = "Sessions",
+                    actions = {
+                        TextButton(
+                            onClick = onOpenArchived,
+                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                contentColor = com.hermes.client.ui.components.AccentChrome.onBar,
+                            ),
+                        ) { Text("Archived") }
+                    },
+                )
+                // Same tenant switcher as Agent Activity: a chip row, active one selected. Tapping
+                // switches the active profile and the list re-fetches.
+                if (profiles.size > 1) {
+                    com.hermes.client.ui.components.ProfileChips(
+                        names = profiles.map { it.name },
+                        active = activeProfile,
+                        onSelect = vm::switchProfile,
+                    )
+                }
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -265,38 +271,6 @@ fun SessionsScreen(
                     }
                 }
             }
-            }
-        }
-    }
-}
-
-/** Active-profile chip in the top bar; tap to switch tenants without leaving the Chats page. */
-@Composable
-private fun ProfileSwitcher(
-    profiles: List<com.hermes.client.data.network.ProfileDto>,
-    active: String?,
-    onSwitch: (String) -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        TextButton(
-            onClick = { open = true },
-            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                contentColor = com.hermes.client.ui.components.AccentChrome.onBar,
-            ),
-        ) {
-            Text(active ?: "Profile", maxLines = 1)
-            Icon(Icons.Rounded.ArrowDropDown, contentDescription = "Switch profile")
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            profiles.forEach { p ->
-                DropdownMenuItem(
-                    text = { Text(p.name) },
-                    onClick = { open = false; onSwitch(p.name) },
-                    trailingIcon = if (p.name == active) {
-                        { Icon(Icons.Rounded.Check, contentDescription = "Active") }
-                    } else null,
-                )
             }
         }
     }
