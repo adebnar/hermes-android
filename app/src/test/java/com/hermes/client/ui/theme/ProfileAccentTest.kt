@@ -94,6 +94,19 @@ class ProfileAccentTest {
         assertEquals(0f, sg, 0.02f); assertEquals(0.5f, lg, 0.02f) // grey → ~0 saturation
     }
 
+    // Any colour the free HSL picker can produce keeps its adaptive on-colour legible — the basis
+    // for allowing a free picker with no rejection.
+    @Test fun custom_hsl_colours_stay_legible() {
+        var h = 0
+        while (h < 360) {
+            for (l in listOf(0.15f, 0.44f, 0.7f, 0.9f)) {
+                val argb = hslToColorArgb(h.toFloat(), 0.6f, l)
+                assertTrue("hsl($h,0.6,$l)", contrastRatio(argb, onColorFor(argb)) >= 3.0)
+            }
+            h += 30
+        }
+    }
+
     // The soft container derived from any chosen swatch must also stay legible in both modes.
     @Test fun soft_container_stays_legible() {
         for (argb in ACCENT_SWATCHES) for (dark in listOf(false, true)) {
