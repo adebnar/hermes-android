@@ -79,7 +79,14 @@ fun SessionsScreen(
                 title = "Sessions",
                 subtitle = activeProfile?.let { "Profile: $it" },
                 navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
-                actions = { TextButton(onClick = onOpenArchived) { Text("Archived") } },
+                actions = {
+                    TextButton(
+                        onClick = onOpenArchived,
+                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                            contentColor = com.hermes.client.ui.components.AccentChrome.onBar,
+                        ),
+                    ) { Text("Archived") }
+                },
             )
         },
         floatingActionButton = {

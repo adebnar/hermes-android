@@ -27,23 +27,26 @@ fun HermesTopBar(
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
 ) {
     val accent = LocalProfileAccent.current
+    // Soft tint: a pale accent-tinted bar with a contrast-checked dark/light on-color. Keeps
+    // the tenant signal without a heavy fully-saturated header, and — critically — every bit
+    // of chrome text/icon must use `onContainer` so nothing (e.g. action labels) goes illegible.
     val colors: TopAppBarColors = TopAppBarDefaults.topAppBarColors(
-        containerColor = accent.accent,
-        titleContentColor = accent.onAccent,
-        navigationIconContentColor = accent.onAccent,
-        actionIconContentColor = accent.onAccent,
+        containerColor = accent.container,
+        titleContentColor = accent.onContainer,
+        navigationIconContentColor = accent.onContainer,
+        actionIconContentColor = accent.onContainer,
     )
     TopAppBar(
         modifier = modifier,
         colors = colors,
         title = {
             Column {
-                Text(title, style = MaterialTheme.typography.titleLarge, color = accent.onAccent)
+                Text(title, style = MaterialTheme.typography.titleLarge, color = accent.onContainer)
                 if (subtitle != null) {
                     Text(
                         subtitle,
                         style = MaterialTheme.typography.labelMedium,
-                        color = accent.onAccent.copy(alpha = 0.85f),
+                        color = accent.onContainer.copy(alpha = 0.75f),
                     )
                 }
             }
@@ -53,8 +56,11 @@ fun HermesTopBar(
     )
 }
 
-/** Convenience accessors so screens can tint other chrome (FAB, etc.) to the same accent. */
+/** Convenience accessors so screens can tint other chrome (FAB, action labels) to the accent. */
 object AccentChrome {
     val fabContainer: Color @Composable get() = LocalProfileAccent.current.accent
     val onFab: Color @Composable get() = LocalProfileAccent.current.onAccent
+
+    /** Legible content color for anything sitting on the soft-tinted top bar (e.g. action text). */
+    val onBar: Color @Composable get() = LocalProfileAccent.current.onContainer
 }
