@@ -173,3 +173,15 @@ val LocalProfileAccentOverrides = staticCompositionLocalOf<Map<String, Int>> { e
 @androidx.compose.runtime.Composable
 fun rememberProfileAccent(profile: String?, dark: Boolean): ProfileAccentColors =
     profileAccentColors(profile, dark, LocalProfileAccentOverrides.current[profile])
+
+// --- Custom colour picker helpers (free HSL selection; contrast is inherent) ---
+
+/** ARGB for an HSL triple — the value the custom picker persists. */
+fun hslToColorArgb(hue: Float, sat: Float, light: Float): Int = hslToArgb(hue, sat, light)
+
+/** Accent bundle previewing an HSL choice (accent verbatim + adaptive on-colour + soft container). */
+fun accentFromHsl(hue: Float, sat: Float, light: Float, dark: Boolean): ProfileAccentColors =
+    profileAccentColors(null, dark, overrideArgb = hslToArgb(hue, sat, light))
+
+/** Decompose an ARGB colour into (hue, saturation, lightness) to seed the picker sliders. */
+fun colorArgbToHsl(argb: Int): Triple<Float, Float, Float> = argbToHsl(argb)
