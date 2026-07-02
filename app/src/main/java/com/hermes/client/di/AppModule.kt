@@ -141,6 +141,13 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideProfileAccentStore(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.data.repository.ProfileAccentStore =
+        com.hermes.client.data.repository.ProfileAccentStore(context)
+
+    @Provides
+    @Singleton
     fun provideAnalyticsRepository(rest: HermesRestApi): com.hermes.client.data.repository.AnalyticsRepository =
         com.hermes.client.data.repository.AnalyticsRepository(rest)
 
