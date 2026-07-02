@@ -126,7 +126,7 @@ fun HermesNav(hasConfig: Boolean) {
                     onUnauthorized = onUnauthorized,
                 )
             }
-            composable("activity") { ActivityHubScreen(onNavigate = push) }
+            composable("activity") { com.hermes.client.ui.activity.MissionControlScreen(onNavigate = push) }
             composable("you") { YouHubScreen(onNavigate = push) }
 
             // ---- Pushed screens (back arrow) ----
