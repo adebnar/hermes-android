@@ -30,14 +30,14 @@ class ProfileAccentStore(private val context: Context) {
     suspend fun setColor(profile: String, argb: Int) {
         context.profileAccentDataStore.edit { prefs ->
             val cur = prefs[key] ?: emptySet()
-            prefs[key] = cur.filterNot { it.startsWith("$profile=") }.toSet() + "$profile=$argb"
+            prefs[key] = cur.filterNot { it.substringBeforeLast('=') == profile }.toSet() + "$profile=$argb"
         }
     }
 
     suspend fun clear(profile: String) {
         context.profileAccentDataStore.edit { prefs ->
             val cur = prefs[key] ?: emptySet()
-            prefs[key] = cur.filterNot { it.startsWith("$profile=") }.toSet()
+            prefs[key] = cur.filterNot { it.substringBeforeLast('=') == profile }.toSet()
         }
     }
 }

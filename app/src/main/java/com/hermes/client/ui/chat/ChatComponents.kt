@@ -278,9 +278,10 @@ private fun CodeWithCopy(code: String, @Suppress("UNUSED_PARAMETER") language: S
             text = code,
             style = style,
             modifier = Modifier
+                // Reserve the copy-button area OUTSIDE the scroll so long code never slides under it.
+                .padding(end = 44.dp)
                 .horizontalScroll(rememberScrollState())
-                .padding(12.dp)
-                .padding(end = 32.dp), // leave room for the copy button
+                .padding(12.dp),
         )
         IconButton(
             onClick = {
