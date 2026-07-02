@@ -133,6 +133,7 @@ fun MissionControlScreen(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (String) -> Unit) {
     // One VM instance per tenant page, keyed by profile name.
@@ -148,9 +149,19 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
     // the chat/cron screen acts against the right per-profile DB.
     val onOpen: (String) -> Unit = { route -> scope.launch { vm.switchTo(profile); onNavigate(route) } }
 
+    // Pull-to-refresh: the indicator shows only for an explicit pull (not the ON_RESUME reload),
+    // and clears when the load finishes.
+    var refreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(state.loading) { if (!state.loading) refreshing = false }
+
     // Each page paints in its own tenant accent so peeking pages during a swipe read correctly.
     CompositionLocalProvider(LocalProfileAccent provides rememberProfileAccent(profile, dark)) {
-        MissionControlContent(state = state, nowMs = now, onRetry = { vm.refresh() }, onOpen = onOpen)
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = { refreshing = true; vm.refresh() },
+        ) {
+            MissionControlContent(state = state, nowMs = now, onRetry = { vm.refresh() }, onOpen = onOpen)
+        }
     }
 }
 
