@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun LoadingState(modifier: Modifier = Modifier, label: String? = null) {
     Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
+        modifier = modifier.padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -46,11 +46,11 @@ fun LoadingState(modifier: Modifier = Modifier, label: String? = null) {
 @Composable
 fun ErrorState(
     message: String,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.fillMaxSize(),
     onRetry: (() -> Unit)? = null,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
+        modifier = modifier.padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -77,14 +77,14 @@ fun ErrorState(
 @Composable
 fun EmptyState(
     title: String,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.fillMaxSize(),
     subtitle: String? = null,
     icon: ImageVector = Icons.Rounded.Inbox,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
+        modifier = modifier.padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

@@ -73,7 +73,7 @@ fun CronDetailScreen(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         when {
-            state.loading -> com.hermes.client.ui.components.LoadingState(Modifier.padding(padding))
+            state.loading -> com.hermes.client.ui.components.LoadingState()
             state.job == null -> Text(state.error ?: "Not found", Modifier.padding(padding).padding(24.dp))
             else -> {
                 val job = state.job!!

@@ -130,7 +130,7 @@ fun MemorySettingsScreen(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         if (state.loading) {
-            com.hermes.client.ui.components.LoadingState(Modifier.padding(padding))
+            com.hermes.client.ui.components.LoadingState()
             return@Scaffold
         }
         if (state.error != null) {

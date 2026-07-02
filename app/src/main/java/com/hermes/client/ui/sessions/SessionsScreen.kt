@@ -370,11 +370,10 @@ private fun SessionRow(
     // menu + a confirm, since swipe-to-delete is easy to trigger by accident.
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
-                onArchive(); true
-            } else {
-                false
-            }
+            if (value == SwipeToDismissBoxValue.EndToStart) onArchive()
+            // Never keep the box dismissed: on a successful archive the list refresh removes the
+            // row; on failure it stays visible instead of getting stuck off-screen with no way back.
+            false
         },
         positionalThreshold = { distance -> distance * 0.4f },
     )

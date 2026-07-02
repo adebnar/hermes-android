@@ -110,7 +110,7 @@ fun MessagingSetupScreen(
     ) { padding ->
         val p = state.platform
         when {
-            state.loading -> com.hermes.client.ui.components.LoadingState(Modifier.padding(padding))
+            state.loading -> com.hermes.client.ui.components.LoadingState()
             p == null -> Text("Platform not found", Modifier.padding(padding).padding(24.dp))
             else -> Column(
                 Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),

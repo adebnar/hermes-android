@@ -129,7 +129,7 @@ fun McpSettingsScreen(
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         if (state.loading) {
-            com.hermes.client.ui.components.LoadingState(Modifier.padding(padding)); return@Scaffold
+            com.hermes.client.ui.components.LoadingState(); return@Scaffold
         }
         if (state.error != null) {
             Text(state.error!!, Modifier.padding(padding).padding(24.dp)); return@Scaffold

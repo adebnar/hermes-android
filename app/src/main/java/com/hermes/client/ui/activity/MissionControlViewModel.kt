@@ -35,10 +35,19 @@ class MissionControlViewModel @Inject constructor(
     val state: StateFlow<MissionControlState> = _state.asStateFlow()
 
     private var profile: String? = null
+    private var loadJob: kotlinx.coroutines.Job? = null
 
-    /** Load (or reload) the feed for [profile]. */
-    fun load(profile: String?) = viewModelScope.launch {
-        this@MissionControlViewModel.profile = profile
+    /** Load (or reload) the feed for [profile]. Cancels any in-flight load so rapid calls
+     *  (LaunchedEffect + ON_RESUME) can't race to a stale last-writer-wins result. */
+    fun load(profile: String?) {
+        this.profile = profile
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            loadInner(profile)
+        }
+    }
+
+    private suspend fun loadInner(profile: String?) {
         _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
         try {
             // activityFeed keeps cron-produced sessions so a scheduled run's output is openable.

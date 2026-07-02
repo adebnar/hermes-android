@@ -88,10 +88,15 @@ fun ChatMessageList(
         snapshotFlow { listState.layoutInfo.totalItemsCount }
             .filter { it >= state.messages.size }
             .first()
+        // Mark landed before the convergence loop: if the user scrolls during the loop, scrollBy
+        // loses the MutatePriority race and throws CancellationException, cancelling this effect.
+        // Setting the flag first means an interrupted landing still ends in a consistent state and
+        // we never re-fight the user (the follow effect only re-scrolls when already at the bottom).
+        landed = true
         // Converge to the ABSOLUTE bottom. Full-width assistant markdown measures lazily and can
         // keep growing over several frames, so a single scroll pass under-shoots. Keep scrolling
-        // to the end each frame and only declare "landed" after a few consecutive frames with
-        // nothing left below — that catches late-measuring content without a fixed guess.
+        // to the end each frame and only stop after a few consecutive frames with nothing left
+        // below — that catches late-measuring content without a fixed guess.
         var stableFrames = 0
         var guard = 0
         while (guard++ < 90 && stableFrames < 3) {
@@ -103,7 +108,6 @@ fun ChatMessageList(
             }
             withFrameNanos {} // let a layout pass measure the next items, then continue
         }
-        landed = true
     }
 
     // After the initial jump, follow new content. Always follow right after the user sends
