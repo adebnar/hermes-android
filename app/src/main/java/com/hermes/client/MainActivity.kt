@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.hermes.client.data.auth.CredentialStore
 import com.hermes.client.data.diagnostics.CrashReporter
+import com.hermes.client.data.repository.ProfileManager
 import com.hermes.client.data.repository.SettingsStore
 import com.hermes.client.data.repository.ThemeMode
 import com.hermes.client.ui.diagnostics.CrashReportScreen
@@ -27,6 +28,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject lateinit var credentialStore: CredentialStore
     @Inject lateinit var settingsStore: SettingsStore
+    @Inject lateinit var profileManager: ProfileManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,12 +37,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mode by settingsStore.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
             val technical by settingsStore.toolCallTechnical.collectAsState(initial = true)
+            val activeProfile by profileManager.active.collectAsState()
             val dark = when (mode) {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
             }
-            HermesTheme(darkTheme = dark) {
+            HermesTheme(darkTheme = dark, profile = activeProfile) {
                 CompositionLocalProvider(LocalToolCallTechnical provides technical) {
                     Surface {
                         // If the previous run crashed, show the saved trace first so it can be
