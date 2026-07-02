@@ -1,4 +1,5 @@
 package com.hermes.client.ui.chat
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -110,7 +111,7 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+                navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
                 title = {
                     Column {
                         Text("Chat")

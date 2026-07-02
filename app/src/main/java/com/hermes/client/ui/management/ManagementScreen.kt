@@ -1,4 +1,5 @@
 package com.hermes.client.ui.management
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -24,7 +25,7 @@ fun ManagementScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Management") },
-                navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+                navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },
     ) { padding ->

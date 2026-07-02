@@ -1,4 +1,5 @@
 package com.hermes.client.ui.models
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -43,7 +44,7 @@ fun ModelsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Models") },
-                navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+                navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

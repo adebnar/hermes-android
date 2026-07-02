@@ -86,9 +86,6 @@ fun SessionsScreen(
             com.hermes.client.ui.components.HermesTopBar(
                 title = "Sessions",
                 subtitle = activeProfile?.let { "Profile: $it" },
-                navigationIcon = {
-                    IconButton(onClick = onMenu) { Icon(Icons.Rounded.Menu, contentDescription = "Open menu") }
-                },
                 actions = {
                     TextButton(
                         onClick = onOpenArchived,

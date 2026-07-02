@@ -1,4 +1,5 @@
 package com.hermes.client.ui.tools
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,7 +35,7 @@ fun AgentsToolsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Agents & tools") },
-                navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+                navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },
     ) { padding ->
