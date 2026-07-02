@@ -21,9 +21,9 @@ data class MissionControlState(
 )
 
 /**
- * Mission Control feed for the active profile: merges recent/live conversations with cron
- * (upcoming next-runs + recent runs) into time-grouped sections. Cron is fetched defensively so a
- * cron-side failure still leaves the conversation feed intact.
+ * Mission Control feed for one specific profile (each page of the profile-spatial pager owns its
+ * own instance, keyed by profile name). Merges that profile's conversations and cron into
+ * time-grouped sections; cron is fetched defensively so a cron failure still leaves conversations.
  */
 @HiltViewModel
 class MissionControlViewModel @Inject constructor(
@@ -34,21 +34,18 @@ class MissionControlViewModel @Inject constructor(
     private val _state = MutableStateFlow(MissionControlState())
     val state: StateFlow<MissionControlState> = _state.asStateFlow()
 
-    val activeProfile: StateFlow<String?> = profileManager.active
+    private var profile: String? = null
 
-    init {
-        viewModelScope.launch { profileManager.active.collect { refresh() } }
-    }
-
-    fun refresh() = viewModelScope.launch {
+    /** Load (or reload) the feed for [profile]. */
+    fun load(profile: String?) = viewModelScope.launch {
+        this@MissionControlViewModel.profile = profile
         _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
         try {
-            val active = profileManager.active.value
             // activityFeed keeps cron-produced sessions so a scheduled run's output is openable.
             val all = sessions.activityFeed()
-            val scoped = if (active.isNullOrBlank()) all else all.filter { it.profile == active }
+            val scoped = if (profile.isNullOrBlank()) all else all.filter { it.profile == profile }
             // A cron failure (e.g. profile without cron) must not blank the whole feed.
-            val crons = runCatching { tools.cronJobs(active) }.getOrDefault(emptyList())
+            val crons = runCatching { tools.cronJobs(profile) }.getOrDefault(emptyList())
             val items = sessionsToActivity(scoped) + cronsToActivity(crons)
             _state.value = MissionControlState(sections = groupActivity(items, System.currentTimeMillis()))
         } catch (e: HermesApiException) {
@@ -56,6 +53,16 @@ class MissionControlViewModel @Inject constructor(
             else _state.value = MissionControlState(error = e.message ?: "Failed to load")
         } catch (e: Exception) {
             _state.value = MissionControlState(error = e.message ?: "Failed to load")
+        }
+    }
+
+    fun refresh() = load(profile)
+
+    /** Make [profile] the app-wide active profile (awaited) before opening one of its items, so the
+     *  chat/cron screens act against the correct per-profile DB. No-op if already active. */
+    suspend fun switchTo(profile: String?) {
+        if (!profile.isNullOrBlank() && profile != profileManager.active.value) {
+            profileManager.switchTo(profile)
         }
     }
 }
