@@ -1,4 +1,5 @@
 package com.hermes.client.ui.settings
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +20,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -45,9 +45,9 @@ fun DiagnosticsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Diagnostics") },
-                navigationIcon = { IconButton(onClick = onBack) { Text("←") } },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Diagnostics",
+                navigationIcon = { IconButton(onClick = onBack) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },
     ) { padding ->

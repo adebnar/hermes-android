@@ -1,4 +1,5 @@
 package com.hermes.client.ui.cron
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +16,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -110,9 +110,16 @@ fun CronEditScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(if (state.isNew) "New cron job" else "Edit cron job") },
-                navigationIcon = { IconButton(onClick = onDone) { Text("‹") } },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = if (state.isNew) "New cron job" else "Edit cron job",
+                navigationIcon = {
+                    IconButton(onClick = onDone) {
+                        androidx.compose.material3.Icon(
+                            androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

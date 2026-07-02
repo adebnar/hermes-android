@@ -1,4 +1,5 @@
 package com.hermes.client.ui.settings
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -18,7 +18,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -123,15 +122,15 @@ fun MemorySettingsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Models & memory") },
-                navigationIcon = { IconButton(onClick = onBack) { Text("‹") } },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Models & memory",
+                navigationIcon = { IconButton(onClick = onBack) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         if (state.loading) {
-            CircularProgressIndicator(Modifier.padding(padding).padding(24.dp))
+            com.hermes.client.ui.components.LoadingState(Modifier.padding(padding))
             return@Scaffold
         }
         if (state.error != null) {
