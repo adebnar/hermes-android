@@ -15,9 +15,21 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -122,56 +134,110 @@ fun ChatMessageList(
     }
 }
 
+// Hybrid layout: the user's own turns stay as compact right-aligned bubbles, while the agent's
+// turns render full-width and document-style (like the desktop / modern AI apps) so long answers,
+// code, and tool traces have room to breathe and read as a transcript rather than an SMS thread.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubble(msg: ChatMessage) {
-    val isUser = msg.role == Role.USER
-    val bubbleColor = when {
-        msg.isError -> MaterialTheme.colorScheme.errorContainer
-        isUser -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
+    when (msg.role) {
+        Role.USER -> UserBubble(msg)
+        else -> AssistantTurn(msg)
     }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun UserBubble(msg: ChatMessage) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-    ) {
+    val bg = if (msg.isError) MaterialTheme.colorScheme.errorContainer
+    else MaterialTheme.colorScheme.primaryContainer
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Column(
             Modifier
                 .widthIn(max = 320.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(bubbleColor)
-                // Long-press any bubble to copy its text to the clipboard.
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = {
-                        if (msg.text.isNotBlank()) {
-                            clipboard.setText(AnnotatedString(msg.text))
-                            Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                )
-                .padding(12.dp),
+                // Asymmetric corners (a small "tail" corner) mark this as the sender's bubble.
+                .clip(RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp))
+                .background(bg)
+                .combinedClickable(onClick = {}, onLongClick = { copyToClipboard(msg.text, clipboard, context) })
+                .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            if (msg.thinking.isNotBlank()) ThinkingCard(msg.thinking)
-            msg.tools.forEach { ToolCard(it) }
-            if (isUser) {
-                // Plain text for user messages
-                if (msg.text.isNotBlank()) Text(msg.text, style = MaterialTheme.typography.bodyMedium)
-            } else {
-                // Markdown for assistant messages
-                if (msg.text.isNotBlank()) {
-                    Markdown(
-                        content = msg.text,
-                        colors = markdownColor(),
-                        typography = markdownTypography(),
+            if (msg.text.isNotBlank()) Text(msg.text, style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AssistantTurn(msg: ChatMessage) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = {}, onLongClick = { copyToClipboard(msg.text, clipboard, context) })
+            .padding(vertical = 2.dp),
+    ) {
+        if (msg.thinking.isNotBlank()) ThinkingCard(msg.thinking)
+        msg.tools.forEach { ToolCard(it) }
+        if (msg.text.isNotBlank()) {
+            if (msg.isError) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        msg.text,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp),
                     )
                 }
+            } else {
+                Markdown(content = msg.text, colors = markdownColor(), typography = markdownTypography())
             }
-            if (msg.isStreaming && msg.text.isBlank() && msg.tools.isEmpty()) {
-                Text("…", style = MaterialTheme.typography.bodyMedium)
-            }
+        }
+        if (msg.isStreaming && msg.text.isBlank() && msg.tools.isEmpty()) {
+            TypingIndicator()
+        }
+    }
+}
+
+private fun copyToClipboard(
+    text: String,
+    clipboard: androidx.compose.ui.platform.ClipboardManager,
+    context: android.content.Context,
+) {
+    if (text.isNotBlank()) {
+        clipboard.setText(AnnotatedString(text))
+        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Three pulsing dots while the agent composes its first token — replaces the literal "…". */
+@Composable
+private fun TypingIndicator() {
+    val transition = rememberInfiniteTransition(label = "typing")
+    Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(3) { i ->
+            val alpha by transition.animateFloat(
+                initialValue = 0.25f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 600, delayMillis = i * 160, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "dot$i",
+            )
+            Box(
+                Modifier
+                    .padding(end = 5.dp)
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)),
+            )
         }
     }
 }
@@ -192,16 +258,30 @@ private fun ToolCard(tool: ToolCall) {
     val technical = com.hermes.client.ui.theme.LocalToolCallTechnical.current
     Surface(
         tonalElevation = 2.dp,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(10.dp),
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
     ) {
-        Column(Modifier.padding(8.dp)) {
-            Text(
-                text = if (tool.status == ToolStatus.RUNNING) "▶ ${tool.name}…" else "✓ ${tool.name}",
-                style = MaterialTheme.typography.labelMedium,
-            )
+        Column(Modifier.padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (tool.status == ToolStatus.RUNNING) Icons.Rounded.PlayArrow else Icons.Rounded.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = if (tool.status == ToolStatus.RUNNING) "${tool.name}…" else tool.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+            }
             if (technical && tool.output.isNotBlank()) {
-                Text(tool.output, style = MaterialTheme.typography.bodySmall, maxLines = 6)
+                Text(
+                    tool.output,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 6,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
         }
     }
