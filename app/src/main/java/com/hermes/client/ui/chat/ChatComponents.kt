@@ -39,7 +39,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -75,8 +74,12 @@ fun ChatMessageList(
     // On first load of a non-empty thread (opening an existing session), jump straight to the
     // newest message so the latest reply is visible immediately — otherwise the list stays at
     // the top and the most recent response looks missing until you scroll down by hand.
-    // Keyed by sessionId so opening a different thread always re-lands at its bottom.
-    var landed by rememberSaveable(sessionId) { mutableStateOf(false) }
+    // Deliberately `remember` (not `rememberSaveable`) and keyed by sessionId: a config change
+    // like rotation recreates the composition, resets this to false, and re-lands at the bottom.
+    // With rememberSaveable it would survive rotation as `true` and skip the re-scroll, leaving
+    // the view mid-thread because the restored offset no longer maps to the bottom after the
+    // width reflow. Switching threads also re-lands (the key changes).
+    var landed by remember(sessionId) { mutableStateOf(false) }
     LaunchedEffect(sessionId, state.messages.isNotEmpty()) {
         if (state.messages.isEmpty() || landed) return@LaunchedEffect
         // History loads after the list is already composed, so wait until the LazyColumn has
