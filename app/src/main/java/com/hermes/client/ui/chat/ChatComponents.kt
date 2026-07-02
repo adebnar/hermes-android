@@ -15,9 +15,21 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,7 +39,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -52,6 +63,7 @@ import com.mikepenz.markdown.m3.markdownTypography
 @Composable
 fun ChatMessageList(
     state: ChatUiState,
+    sessionId: String,
     modifier: Modifier = Modifier,
     listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
 ) {
@@ -62,8 +74,13 @@ fun ChatMessageList(
     // On first load of a non-empty thread (opening an existing session), jump straight to the
     // newest message so the latest reply is visible immediately — otherwise the list stays at
     // the top and the most recent response looks missing until you scroll down by hand.
-    var landed by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(state.messages.isNotEmpty()) {
+    // Deliberately `remember` (not `rememberSaveable`) and keyed by sessionId: a config change
+    // like rotation recreates the composition, resets this to false, and re-lands at the bottom.
+    // With rememberSaveable it would survive rotation as `true` and skip the re-scroll, leaving
+    // the view mid-thread because the restored offset no longer maps to the bottom after the
+    // width reflow. Switching threads also re-lands (the key changes).
+    var landed by remember(sessionId) { mutableStateOf(false) }
+    LaunchedEffect(sessionId, state.messages.isNotEmpty()) {
         if (state.messages.isEmpty() || landed) return@LaunchedEffect
         // History loads after the list is already composed, so wait until the LazyColumn has
         // actually measured the loaded items before scrolling — jumping before first layout
@@ -71,17 +88,26 @@ fun ChatMessageList(
         snapshotFlow { listState.layoutInfo.totalItemsCount }
             .filter { it >= state.messages.size }
             .first()
-        // Converge to the ABSOLUTE bottom — the end of the newest message, not just the last
-        // item's top. Scroll purely by the list's own "can I still scroll down?" signal rather
-        // than a captured message index (which could go stale if the thread changes mid-loop):
-        // keep scrolling until nothing remains below, letting a frame measure the next items
-        // between steps.
+        // Mark landed before the convergence loop: if the user scrolls during the loop, scrollBy
+        // loses the MutatePriority race and throws CancellationException, cancelling this effect.
+        // Setting the flag first means an interrupted landing still ends in a consistent state and
+        // we never re-fight the user (the follow effect only re-scrolls when already at the bottom).
+        landed = true
+        // Converge to the ABSOLUTE bottom. Full-width assistant markdown measures lazily and can
+        // keep growing over several frames, so a single scroll pass under-shoots. Keep scrolling
+        // to the end each frame and only stop after a few consecutive frames with nothing left
+        // below — that catches late-measuring content without a fixed guess.
+        var stableFrames = 0
         var guard = 0
-        while (guard++ < 60 && listState.canScrollForward) {
-            listState.scrollBy(100_000f)
+        while (guard++ < 90 && stableFrames < 3) {
+            if (listState.canScrollForward) {
+                listState.scrollBy(100_000f)
+                stableFrames = 0
+            } else {
+                stableFrames++
+            }
             withFrameNanos {} // let a layout pass measure the next items, then continue
         }
-        landed = true
     }
 
     // After the initial jump, follow new content. Always follow right after the user sends
@@ -122,56 +148,110 @@ fun ChatMessageList(
     }
 }
 
+// Hybrid layout: the user's own turns stay as compact right-aligned bubbles, while the agent's
+// turns render full-width and document-style (like the desktop / modern AI apps) so long answers,
+// code, and tool traces have room to breathe and read as a transcript rather than an SMS thread.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubble(msg: ChatMessage) {
-    val isUser = msg.role == Role.USER
-    val bubbleColor = when {
-        msg.isError -> MaterialTheme.colorScheme.errorContainer
-        isUser -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
+    when (msg.role) {
+        Role.USER -> UserBubble(msg)
+        else -> AssistantTurn(msg)
     }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun UserBubble(msg: ChatMessage) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-    ) {
+    val bg = if (msg.isError) MaterialTheme.colorScheme.errorContainer
+    else MaterialTheme.colorScheme.primaryContainer
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Column(
             Modifier
                 .widthIn(max = 320.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(bubbleColor)
-                // Long-press any bubble to copy its text to the clipboard.
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = {
-                        if (msg.text.isNotBlank()) {
-                            clipboard.setText(AnnotatedString(msg.text))
-                            Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                )
-                .padding(12.dp),
+                // Asymmetric corners (a small "tail" corner) mark this as the sender's bubble.
+                .clip(RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp))
+                .background(bg)
+                .combinedClickable(onClick = {}, onLongClick = { copyToClipboard(msg.text, clipboard, context) })
+                .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            if (msg.thinking.isNotBlank()) ThinkingCard(msg.thinking)
-            msg.tools.forEach { ToolCard(it) }
-            if (isUser) {
-                // Plain text for user messages
-                if (msg.text.isNotBlank()) Text(msg.text, style = MaterialTheme.typography.bodyMedium)
-            } else {
-                // Markdown for assistant messages
-                if (msg.text.isNotBlank()) {
-                    Markdown(
-                        content = msg.text,
-                        colors = markdownColor(),
-                        typography = markdownTypography(),
+            if (msg.text.isNotBlank()) Text(msg.text, style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AssistantTurn(msg: ChatMessage) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = {}, onLongClick = { copyToClipboard(msg.text, clipboard, context) })
+            .padding(vertical = 2.dp),
+    ) {
+        if (msg.thinking.isNotBlank()) ThinkingCard(msg.thinking)
+        msg.tools.forEach { ToolCard(it) }
+        if (msg.text.isNotBlank()) {
+            if (msg.isError) {
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        msg.text,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp),
                     )
                 }
+            } else {
+                Markdown(content = msg.text, colors = markdownColor(), typography = markdownTypography())
             }
-            if (msg.isStreaming && msg.text.isBlank() && msg.tools.isEmpty()) {
-                Text("…", style = MaterialTheme.typography.bodyMedium)
-            }
+        }
+        if (msg.isStreaming && msg.text.isBlank() && msg.tools.isEmpty()) {
+            TypingIndicator()
+        }
+    }
+}
+
+private fun copyToClipboard(
+    text: String,
+    clipboard: androidx.compose.ui.platform.ClipboardManager,
+    context: android.content.Context,
+) {
+    if (text.isNotBlank()) {
+        clipboard.setText(AnnotatedString(text))
+        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/** Three pulsing dots while the agent composes its first token — replaces the literal "…". */
+@Composable
+private fun TypingIndicator() {
+    val transition = rememberInfiniteTransition(label = "typing")
+    Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(3) { i ->
+            val alpha by transition.animateFloat(
+                initialValue = 0.25f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 600, delayMillis = i * 160, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "dot$i",
+            )
+            Box(
+                Modifier
+                    .padding(end = 5.dp)
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)),
+            )
         }
     }
 }
@@ -192,16 +272,30 @@ private fun ToolCard(tool: ToolCall) {
     val technical = com.hermes.client.ui.theme.LocalToolCallTechnical.current
     Surface(
         tonalElevation = 2.dp,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(10.dp),
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
     ) {
-        Column(Modifier.padding(8.dp)) {
-            Text(
-                text = if (tool.status == ToolStatus.RUNNING) "▶ ${tool.name}…" else "✓ ${tool.name}",
-                style = MaterialTheme.typography.labelMedium,
-            )
+        Column(Modifier.padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (tool.status == ToolStatus.RUNNING) Icons.Rounded.PlayArrow else Icons.Rounded.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = if (tool.status == ToolStatus.RUNNING) "${tool.name}…" else tool.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+            }
             if (technical && tool.output.isNotBlank()) {
-                Text(tool.output, style = MaterialTheme.typography.bodySmall, maxLines = 6)
+                Text(
+                    tool.output,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 6,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
         }
     }

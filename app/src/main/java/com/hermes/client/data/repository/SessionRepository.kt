@@ -28,6 +28,15 @@ class SessionRepository(private val rest: HermesRestApi) {
         rest.profileSessions().sessions.map { it.toDomain() }
             .filter { !it.archived && it.isInteractive() }
 
+    /**
+     * Mission Control feed source: like [listAllProfiles] but KEEPS cron-produced sessions, so a
+     * scheduled run's actual output (which the gateway stores as a real `source="cron"` session)
+     * is openable straight from the activity feed. Still drops archived + empty sessions.
+     */
+    suspend fun activityFeed(): List<Session> =
+        rest.profileSessions().sessions.map { it.toDomain() }
+            .filter { !it.archived && it.messageCount > 0 }
+
     /** All archived sessions across every profile (the cross-profile archived view). */
     suspend fun archivedAllProfiles(): List<Session> =
         rest.profileSessions(archivedOnly = true).sessions.map { it.toDomain() }

@@ -1,11 +1,11 @@
 package com.hermes.client.ui.tools
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -13,7 +13,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -32,15 +31,15 @@ fun AgentsToolsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Agents & tools") },
-                navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Agents & tools",
+                navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
-                state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                state.loading -> com.hermes.client.ui.components.LoadingState()
                 state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     item { SectionHeader("Skills (${state.skills.size})") }

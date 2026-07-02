@@ -1,4 +1,5 @@
 package com.hermes.client.ui.admin
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -39,9 +39,9 @@ fun SessionAdminScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Session admin") },
-                navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Session admin",
+                navigationIcon = { IconButton(onClick = onMenu) { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back") } },
             )
         },
     ) { padding ->

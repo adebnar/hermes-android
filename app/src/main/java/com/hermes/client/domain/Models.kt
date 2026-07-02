@@ -17,6 +17,9 @@ data class Session(
     val workspace: String = "No workspace",
     val archived: Boolean = false,
     val source: String? = null,
+    // Epoch millis of last activity (from the gateway's last_active seconds), for recency sorting
+    // and the Mission Control feed. Null when the gateway omits it.
+    val lastActive: Long? = null,
 )
 
 data class ToolCall(

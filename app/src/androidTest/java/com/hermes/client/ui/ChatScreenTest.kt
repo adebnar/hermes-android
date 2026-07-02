@@ -21,7 +21,7 @@ class ChatScreenTest {
                 ChatMessage(id = "a1", role = Role.ASSISTANT, text = "Hi there"),
             ),
         )
-        rule.setContent { HermesTheme { ChatMessageList(state = state) } }
+        rule.setContent { HermesTheme { ChatMessageList(state = state, sessionId = "s1") } }
         rule.onNodeWithText("Hello").assertIsDisplayed()
         rule.onNodeWithText("Hi there").assertIsDisplayed()
     }
@@ -45,7 +45,7 @@ class ChatScreenTest {
         // effect runs before layout (empty visibleItems) and scrolls anyway.
         val listState = androidx.compose.foundation.lazy.LazyListState()
         val state = androidx.compose.runtime.mutableStateOf(ChatUiState(messages = emptyList()))
-        rule.setContent { HermesTheme { ChatMessageList(state = state.value, listState = listState) } }
+        rule.setContent { HermesTheme { ChatMessageList(state = state.value, sessionId = "s1", listState = listState) } }
         rule.waitForIdle()
         state.value = ChatUiState(messages = msgs)
         // The scroll-to-bottom converges across layout passes (item heights are measured
@@ -67,7 +67,7 @@ class ChatScreenTest {
                 ChatMessage(id = "gemma", role = Role.ASSISTANT, text = "second reply"),
             ),
         )
-        rule.setContent { HermesTheme { ChatMessageList(state = state) } }
+        rule.setContent { HermesTheme { ChatMessageList(state = state, sessionId = "s1") } }
         rule.onNodeWithText("first reply").assertIsDisplayed()
         rule.onNodeWithText("second reply").assertIsDisplayed()
     }

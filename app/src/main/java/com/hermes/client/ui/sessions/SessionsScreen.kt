@@ -1,33 +1,46 @@
 package com.hermes.client.ui.sessions
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Archive
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,6 +67,7 @@ fun SessionsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
+    val profiles by vm.profiles.collectAsStateWithLifecycle()
     val pinnedTokens by vm.pinnedTokens.collectAsStateWithLifecycle()
     val collapsedGroups by vm.collapsedGroups.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
@@ -75,27 +89,36 @@ fun SessionsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Sessions")
-                        activeProfile?.let {
-                            Text(
-                                "Profile: $it",
-                                style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                            )
-                        }
-                    }
-                },
-                navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
-                actions = { TextButton(onClick = onOpenArchived) { Text("Archived") } },
-            )
+            Column {
+                com.hermes.client.ui.components.HermesTopBar(
+                    title = "Sessions",
+                    actions = {
+                        TextButton(
+                            onClick = onOpenArchived,
+                            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                contentColor = com.hermes.client.ui.components.AccentChrome.onBar,
+                            ),
+                        ) { Text("Archived") }
+                    },
+                )
+                // Same tenant switcher as Agent Activity: a chip row, active one selected. Tapping
+                // switches the active profile and the list re-fetches.
+                if (profiles.size > 1) {
+                    com.hermes.client.ui.components.ProfileChips(
+                        names = profiles.map { it.name },
+                        active = activeProfile,
+                        onSelect = vm::switchProfile,
+                    )
+                }
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { scope.launch { vm.createSession()?.let { onOpen(it) } } },
                 text = { Text("New") },
-                icon = {},
+                icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                containerColor = com.hermes.client.ui.components.AccentChrome.fabContainer,
+                contentColor = com.hermes.client.ui.components.AccentChrome.onFab,
             )
         },
     ) { padding ->
@@ -109,7 +132,9 @@ fun SessionsScreen(
                 singleLine = true,
                 trailingIcon = {
                     if (query.isNotBlank()) {
-                        IconButton(onClick = { vm.onQueryChange("") }) { Text("✕") }
+                        IconButton(onClick = { vm.onQueryChange("") }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                        }
                     }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -118,8 +143,18 @@ fun SessionsScreen(
             )
             Box(Modifier.fillMaxSize()) {
             when {
-                state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
+                state.loading -> com.hermes.client.ui.components.LoadingState()
+                state.error != null -> com.hermes.client.ui.components.ErrorState(
+                    message = state.error!!,
+                    onRetry = { vm.refresh() },
+                )
+                state.sessions.isEmpty() && query.isBlank() && messageResults.isEmpty() ->
+                    com.hermes.client.ui.components.EmptyState(
+                        title = "No sessions yet",
+                        subtitle = "Start a conversation with the New button.",
+                        actionLabel = "New session",
+                        onAction = { scope.launch { vm.createSession()?.let { onOpen(it) } } },
+                    )
                 else -> {
                     val q = query.trim()
                     // Instant client-side title/workspace filter over the loaded sessions.
@@ -185,6 +220,7 @@ fun SessionsScreen(
                                     onRename = { vm.rename(s, it) },
                                     onArchive = { vm.archive(s) },
                                     onDelete = { vm.delete(s) },
+                                    modifier = Modifier.animateItem(),
                                 )
                             }
                         }
@@ -227,6 +263,7 @@ fun SessionsScreen(
                                         onRename = { vm.rename(s, it) },
                                         onArchive = { vm.archive(s) },
                                         onDelete = { vm.delete(s) },
+                                        modifier = Modifier.animateItem(),
                                     )
                                 }
                             }
@@ -264,12 +301,12 @@ private fun CollapsibleHeader(
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            if (collapsed) "▸" else "▾",
-            style = MaterialTheme.typography.labelMedium,
-            color = if (indent) MaterialTheme.colorScheme.onSurfaceVariant
+        Icon(
+            if (collapsed) Icons.Rounded.ChevronRight else Icons.Rounded.ExpandMore,
+            contentDescription = if (collapsed) "Expand" else "Collapse",
+            tint = if (indent) MaterialTheme.colorScheme.onSurfaceVariant
             else MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(end = 8.dp),
+            modifier = Modifier.padding(end = 8.dp).size(18.dp),
         )
         Text(
             if (indent) label else label.uppercase(),
@@ -313,7 +350,7 @@ private fun SectionHeader(label: String, count: Int, note: String? = null) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun SessionRow(
     session: Session,
@@ -323,14 +360,58 @@ private fun SessionRow(
     onRename: (String) -> Unit,
     onArchive: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var confirmingDelete by remember { mutableStateOf(false) }
 
-    Box {
-        ListItem(
-            headlineContent = { Text(if (isPinned) "📌  ${session.title}" else session.title) },
+    // Swipe a row left to archive (frequent, reversible). Delete stays behind the long-press
+    // menu + a confirm, since swipe-to-delete is easy to trigger by accident.
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) onArchive()
+            // Never keep the box dismissed: on a successful archive the list refresh removes the
+            // row; on failure it stays visible instead of getting stuck off-screen with no way back.
+            false
+        },
+        positionalThreshold = { distance -> distance * 0.4f },
+    )
+
+    Box(modifier) {
+        SwipeToDismissBox(
+            state = dismissState,
+            enableDismissFromStartToEnd = false,
+            enableDismissFromEndToStart = true,
+            backgroundContent = {
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Rounded.Archive,
+                        contentDescription = "Archive",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            },
+        ) {
+            ListItem(
+            headlineContent = { Text(session.title) },
+            leadingContent = if (isPinned) {
+                {
+                    Icon(
+                        Icons.Rounded.PushPin,
+                        contentDescription = "Pinned",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            } else null,
             // Show the session's true profile (from the cross-profile list) next to its model so
             // the tenant is unambiguous before the profile grouping lands.
             supportingContent = {
@@ -341,7 +422,8 @@ private fun SessionRow(
                 onClick = onOpen,
                 onLongClick = { menuOpen = true },
             ),
-        )
+            )
+        }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             DropdownMenuItem(
                 text = { Text(if (isPinned) "Unpin" else "Pin") },

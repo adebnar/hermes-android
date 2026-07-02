@@ -1,4 +1,5 @@
 package com.hermes.client.ui.cron
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
@@ -23,7 +23,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,15 +58,22 @@ fun CronDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(state.job?.name ?: "Cron job", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { IconButton(onClick = onBack) { Text("‹") } },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = state.job?.name ?: "Cron job",
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        androidx.compose.material3.Icon(
+                            androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         when {
-            state.loading -> CircularProgressIndicator(Modifier.padding(padding).padding(24.dp))
+            state.loading -> com.hermes.client.ui.components.LoadingState()
             state.job == null -> Text(state.error ?: "Not found", Modifier.padding(padding).padding(24.dp))
             else -> {
                 val job = state.job!!
