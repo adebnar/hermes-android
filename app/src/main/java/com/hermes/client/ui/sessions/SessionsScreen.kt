@@ -75,18 +75,9 @@ fun SessionsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Sessions")
-                        activeProfile?.let {
-                            Text(
-                                "Profile: $it",
-                                style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                            )
-                        }
-                    }
-                },
+            com.hermes.client.ui.components.HermesTopBar(
+                title = "Sessions",
+                subtitle = activeProfile?.let { "Profile: $it" },
                 navigationIcon = { IconButton(onClick = onMenu) { Text("☰") } },
                 actions = { TextButton(onClick = onOpenArchived) { Text("Archived") } },
             )
@@ -96,6 +87,8 @@ fun SessionsScreen(
                 onClick = { scope.launch { vm.createSession()?.let { onOpen(it) } } },
                 text = { Text("New") },
                 icon = {},
+                containerColor = com.hermes.client.ui.components.AccentChrome.fabContainer,
+                contentColor = com.hermes.client.ui.components.AccentChrome.onFab,
             )
         },
     ) { padding ->
