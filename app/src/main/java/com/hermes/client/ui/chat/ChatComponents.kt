@@ -3,6 +3,8 @@ package com.hermes.client.ui.chat
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +58,13 @@ import com.hermes.client.domain.ChatMessage
 import com.hermes.client.domain.Role
 import com.hermes.client.domain.ToolCall
 import com.hermes.client.domain.ToolStatus
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.text.TextStyle
+import com.mikepenz.markdown.compose.components.MarkdownComponents
+import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.MarkdownCodeBlock
+import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
@@ -210,7 +219,13 @@ private fun AssistantTurn(msg: ChatMessage) {
                     )
                 }
             } else {
-                Markdown(content = msg.text, colors = markdownColor(), typography = markdownTypography())
+                val mdComponents = remember { chatMarkdownComponents() }
+                Markdown(
+                    content = msg.text,
+                    colors = markdownColor(),
+                    typography = markdownTypography(),
+                    components = mdComponents,
+                )
             }
         }
         if (msg.isStreaming && msg.text.isBlank() && msg.tools.isEmpty()) {
@@ -227,6 +242,61 @@ private fun copyToClipboard(
     if (text.isNotBlank()) {
         clipboard.setText(AnnotatedString(text))
         Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/**
+ * Markdown component set that renders code blocks/fences with a copy button. The library's fence
+ * renderer already extracts the clean code text and hands it to this block, so we just overlay a
+ * copy affordance on the default code rendering.
+ */
+private fun chatMarkdownComponents(): MarkdownComponents =
+    markdownComponents(
+        codeFence = { m ->
+            MarkdownCodeFence(m.content, m.node, style = m.typography.code) { code, language, style ->
+                CodeWithCopy(code, language, style)
+            }
+        },
+        codeBlock = { m ->
+            MarkdownCodeBlock(m.content, m.node, style = m.typography.code) { code, language, style ->
+                CodeWithCopy(code, language, style)
+            }
+        },
+    )
+
+@Composable
+private fun CodeWithCopy(code: String, @Suppress("UNUSED_PARAMETER") language: String?, style: TextStyle) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Text(
+            text = code,
+            style = style,
+            modifier = Modifier
+                // Reserve the copy-button area OUTSIDE the scroll so long code never slides under it.
+                .padding(end = 44.dp)
+                .horizontalScroll(rememberScrollState())
+                .padding(12.dp),
+        )
+        IconButton(
+            onClick = {
+                clipboard.setText(AnnotatedString(code))
+                Toast.makeText(context, "Code copied", Toast.LENGTH_SHORT).show()
+            },
+            modifier = Modifier.align(Alignment.TopEnd),
+        ) {
+            Icon(
+                Icons.Rounded.ContentCopy,
+                contentDescription = "Copy code",
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

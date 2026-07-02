@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var credentialStore: CredentialStore
     @Inject lateinit var settingsStore: SettingsStore
     @Inject lateinit var profileManager: ProfileManager
+    @Inject lateinit var profileAccentStore: com.hermes.client.data.repository.ProfileAccentStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,26 +39,33 @@ class MainActivity : ComponentActivity() {
             val mode by settingsStore.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
             val technical by settingsStore.toolCallTechnical.collectAsState(initial = true)
             val activeProfile by profileManager.active.collectAsState()
+            val accentOverrides by profileAccentStore.overrides.collectAsState(initial = emptyMap())
             val dark = when (mode) {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
             }
-            HermesTheme(darkTheme = dark, profile = activeProfile) {
-                CompositionLocalProvider(LocalToolCallTechnical provides technical) {
-                    Surface {
-                        // If the previous run crashed, show the saved trace first so it can be
-                        // shared, then continue into the app once dismissed.
-                        var report by remember { mutableStateOf(crashReport) }
-                        val current = report
-                        if (current != null) {
-                            CrashReportScreen(
-                                report = current,
-                                onShare = { shareCrash(current) },
-                                onDismiss = { CrashReporter.clear(this@MainActivity); report = null },
-                            )
-                        } else {
-                            HermesNav(hasConfig = hasConfig)
+            // Provide the user's per-profile colour overrides above the theme so HermesTheme and
+            // every accent call site (Mission Control pages, You-tab avatars) can honour them.
+            CompositionLocalProvider(
+                com.hermes.client.ui.theme.LocalProfileAccentOverrides provides accentOverrides,
+            ) {
+                HermesTheme(darkTheme = dark, profile = activeProfile) {
+                    CompositionLocalProvider(LocalToolCallTechnical provides technical) {
+                        Surface {
+                            // If the previous run crashed, show the saved trace first so it can be
+                            // shared, then continue into the app once dismissed.
+                            var report by remember { mutableStateOf(crashReport) }
+                            val current = report
+                            if (current != null) {
+                                CrashReportScreen(
+                                    report = current,
+                                    onShare = { shareCrash(current) },
+                                    onDismiss = { CrashReporter.clear(this@MainActivity); report = null },
+                                )
+                            } else {
+                                HermesNav(hasConfig = hasConfig)
+                            }
                         }
                     }
                 }

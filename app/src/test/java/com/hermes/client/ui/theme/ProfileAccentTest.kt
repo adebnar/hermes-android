@@ -67,4 +67,52 @@ class ProfileAccentTest {
         assertEquals(0xFFFFFFFF.toInt(), hslToArgb(0f, 0f, 1f))     // white
         assertEquals(0xFF000000.toInt(), hslToArgb(0f, 0f, 0f))     // black
     }
+
+    // Every picker swatch must keep its on-colour legible — the contrast guarantee for the
+    // user-settable accent feature (its adaptive on-colour clears AA-large).
+    @Test fun all_swatches_are_contrast_safe() {
+        assertEquals(12, ACCENT_SWATCHES.size)
+        ACCENT_SWATCHES.forEach {
+            assertTrue(
+                "swatch ${Integer.toHexString(it)}",
+                contrastRatio(it, onColorFor(it)) >= 3.0,
+            )
+        }
+    }
+
+    // The adaptive on-colour keeps *any* opaque colour legible — even a mid-grey, where black wins.
+    @Test fun adaptive_on_colour_keeps_any_colour_legible() {
+        for (argb in listOf(0xFF808080.toInt(), 0xFF3366CC.toInt(), 0xFFEEDD00.toInt())) {
+            assertTrue(contrastRatio(argb, onColorFor(argb)) >= 3.0)
+        }
+    }
+
+    @Test fun argb_to_hsl_known_values() {
+        val (hr, sr, lr) = argbToHsl(0xFFFF0000.toInt())
+        assertEquals(0f, hr, 1f); assertEquals(1f, sr, 0.02f); assertEquals(0.5f, lr, 0.02f)
+        val (_, sg, lg) = argbToHsl(0xFF808080.toInt())
+        assertEquals(0f, sg, 0.02f); assertEquals(0.5f, lg, 0.02f) // grey → ~0 saturation
+    }
+
+    // Any colour the free HSL picker can produce keeps its adaptive on-colour legible — the basis
+    // for allowing a free picker with no rejection.
+    @Test fun custom_hsl_colours_stay_legible() {
+        var h = 0
+        while (h < 360) {
+            for (l in listOf(0.15f, 0.44f, 0.7f, 0.9f)) {
+                val argb = hslToColorArgb(h.toFloat(), 0.6f, l)
+                assertTrue("hsl($h,0.6,$l)", contrastRatio(argb, onColorFor(argb)) >= 3.0)
+            }
+            h += 30
+        }
+    }
+
+    // The soft container derived from any chosen swatch must also stay legible in both modes.
+    @Test fun soft_container_stays_legible() {
+        for (argb in ACCENT_SWATCHES) for (dark in listOf(false, true)) {
+            val c = softContainerFrom(argb, dark)
+            assertTrue("container for ${Integer.toHexString(argb)} dark=$dark",
+                contrastRatio(c, onColorFor(c)) >= 3.0)
+        }
+    }
 }

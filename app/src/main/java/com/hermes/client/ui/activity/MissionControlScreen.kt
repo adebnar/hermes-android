@@ -51,7 +51,7 @@ import com.hermes.client.ui.components.HermesTopBar
 import com.hermes.client.ui.components.LoadingState
 import com.hermes.client.ui.nav.ShellViewModel
 import com.hermes.client.ui.theme.LocalProfileAccent
-import com.hermes.client.ui.theme.profileAccentColors
+import com.hermes.client.ui.theme.rememberProfileAccent
 import com.hermes.client.ui.util.relativeTime
 import kotlinx.coroutines.launch
 
@@ -104,7 +104,7 @@ fun MissionControlScreen(
 
     val currentProfile = names.getOrNull(pagerState.currentPage)
     // Top bar + tabs paint in the *current page's* accent, so the chrome shifts colour as you swipe.
-    CompositionLocalProvider(LocalProfileAccent provides profileAccentColors(currentProfile, dark)) {
+    CompositionLocalProvider(LocalProfileAccent provides rememberProfileAccent(currentProfile, dark)) {
         Scaffold(
             topBar = {
                 Column {
@@ -133,6 +133,7 @@ fun MissionControlScreen(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (String) -> Unit) {
     // One VM instance per tenant page, keyed by profile name.
@@ -148,9 +149,19 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
     // the chat/cron screen acts against the right per-profile DB.
     val onOpen: (String) -> Unit = { route -> scope.launch { vm.switchTo(profile); onNavigate(route) } }
 
+    // Pull-to-refresh: the indicator shows only for an explicit pull (not the ON_RESUME reload),
+    // and clears when the load finishes.
+    var refreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(state.loading) { if (!state.loading) refreshing = false }
+
     // Each page paints in its own tenant accent so peeking pages during a swipe read correctly.
-    CompositionLocalProvider(LocalProfileAccent provides profileAccentColors(profile, dark)) {
-        MissionControlContent(state = state, nowMs = now, onRetry = { vm.refresh() }, onOpen = onOpen)
+    CompositionLocalProvider(LocalProfileAccent provides rememberProfileAccent(profile, dark)) {
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = { refreshing = true; vm.refresh() },
+        ) {
+            MissionControlContent(state = state, nowMs = now, onRetry = { vm.refresh() }, onOpen = onOpen)
+        }
     }
 }
 
