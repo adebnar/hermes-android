@@ -52,6 +52,15 @@ fun ModelsScreen(
                 state.loading -> com.hermes.client.ui.components.LoadingState()
                 state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
                 else -> LazyColumn(Modifier.fillMaxSize()) {
+                    item(key = "hint") {
+                        Text(
+                            "Sets the default model for new sessions. A chat that's already running keeps " +
+                                "its own model — open that chat and use its Model picker to switch it.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                    }
                     state.providers.forEach { provider ->
                         item(key = "h-${provider.slug}") {
                             Text(
