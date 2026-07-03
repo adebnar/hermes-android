@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingRoute.value = intent?.getStringExtra("extra_route")
+        intent?.removeExtra("extra_route")
         val hasConfig = credentialStore.load() != null
         val crashReport = CrashReporter.read(this)
         // Resume the notification service if the user previously enabled it.
@@ -96,7 +97,11 @@ class MainActivity : ComponentActivity() {
                                 )
                             } else {
                                 val deepLinkRoute by pendingRoute
-                                HermesNav(hasConfig = hasConfig, deepLinkRoute = deepLinkRoute)
+                                HermesNav(
+                                    hasConfig = hasConfig,
+                                    deepLinkRoute = deepLinkRoute,
+                                    onDeepLinkConsumed = { pendingRoute.value = null },
+                                )
                             }
                         }
                     }
@@ -109,6 +114,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingRoute.value = intent.getStringExtra("extra_route")
+        intent.removeExtra("extra_route")
     }
 
     /** Share the saved crash trace via the system share sheet. */

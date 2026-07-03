@@ -46,6 +46,18 @@ class GatewayConnectionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
     override fun onBind(intent: Intent?): IBinder? = null
 
+    // Android 15+ (API 35) caps a dataSync foreground service at ~6h and calls this instead of
+    // just killing the process; Android 16 (API 36) added a fgsType-aware overload. Implement
+    // both so whichever the OS invokes stops the service cleanly rather than crashing/ANR-ing.
+    // Deliberately no auto-restart here (deferred) — just let the OS stop us.
+    override fun onTimeout(startId: Int) {
+        stopSelf()
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        stopSelf()
+    }
+
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()

@@ -9,6 +9,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 /** Handles the Approve/Deny actions on an approval notification by sending the approval RPC. */
@@ -24,7 +25,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                runCatching { chat.respondApproval(sid, approve) }
+                runCatching { withTimeout(8_000) { chat.respondApproval(sid, approve) } }
                     .onSuccess {
                         // Only clear the notification once the RPC actually succeeded — on
                         // failure, leave it so the action isn't silently lost.

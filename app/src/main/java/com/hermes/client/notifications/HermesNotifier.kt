@@ -18,10 +18,14 @@ class HermesNotifier(private val context: Context) {
     fun ensureChannels() {
         val sys = context.getSystemService(NotificationManager::class.java)
         sys.createNotificationChannel(
-            NotificationChannel(Notif.CHANNEL_APPROVALS, "Approvals", NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(Notif.CHANNEL_APPROVALS, "Approvals", NotificationManager.IMPORTANCE_HIGH).apply {
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE
+            },
         )
         sys.createNotificationChannel(
-            NotificationChannel(Notif.CHANNEL_ACTIVITY, "Agent activity", NotificationManager.IMPORTANCE_DEFAULT),
+            NotificationChannel(Notif.CHANNEL_ACTIVITY, "Agent activity", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE
+            },
         )
         sys.createNotificationChannel(
             NotificationChannel(Notif.CHANNEL_SERVICE, "Connection", NotificationManager.IMPORTANCE_MIN),

@@ -11,7 +11,10 @@ import com.hermes.client.data.network.str
 fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs): NotificationSpec? {
     if (!prefs.enabled) return null
     val sid = event.sessionId ?: return null
-    val id = (event.type + sid).hashCode()
+    var id = (event.type + sid).hashCode()
+    // Never collide with HermesNotifier.SERVICE_NOTIFICATION_ID (1001) — that id belongs to the
+    // ongoing foreground-service notification, and notify()-ing over it would clobber it.
+    if (id == 1001) id = 1002
     return when (event.type) {
         Notif.EVENT_APPROVAL -> if (!prefs.approvals) null else NotificationSpec(
             id = id,

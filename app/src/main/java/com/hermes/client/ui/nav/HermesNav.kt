@@ -61,13 +61,16 @@ private val TABS = listOf(
  *
  * [deepLinkRoute], when non-null, is navigated to once (keyed by value) — used to jump straight
  * to a session when the activity is launched or resumed from a tapped notification.
+ * [onDeepLinkConsumed] is invoked right after that navigation so the caller can clear its
+ * pending-route state; otherwise a config change (rotation, dark-mode/font-scale) would recreate
+ * the activity, re-read the same intent extra, and re-navigate to the same chat.
  */
 @Composable
-fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null) {
+fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsumed: () -> Unit = {}) {
     val nav = rememberNavController()
     val start = if (hasConfig) "sessions" else "setup"
 
-    LaunchedEffect(deepLinkRoute) { deepLinkRoute?.let { nav.navigate(it) } }
+    LaunchedEffect(deepLinkRoute) { deepLinkRoute?.let { nav.navigate(it); onDeepLinkConsumed() } }
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
