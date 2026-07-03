@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -30,6 +31,7 @@ class ChatViewModel @Inject constructor(
     private val modelRepo: ModelRepository,
     private val profileRepo: ProfileRepository,
     private val profileManager: ProfileManager,
+    private val favoritesStore: com.hermes.client.data.repository.ModelFavoritesStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChatUiState.empty())
@@ -49,6 +51,26 @@ class ChatViewModel @Inject constructor(
     // user changes it, then the chosen model as confirmation the switch took.
     private val _currentModel = MutableStateFlow<String?>(null)
     val currentModel: StateFlow<String?> = _currentModel.asStateFlow()
+
+    // Provider list for the model sheet (grouped by real slug); loaded alongside options.
+    private val _providers = MutableStateFlow<List<com.hermes.client.data.network.ModelProviderDto>>(emptyList())
+    val providers: kotlinx.coroutines.flow.StateFlow<List<com.hermes.client.data.network.ModelProviderDto>> = _providers.asStateFlow()
+
+    // Provider of the confirmed session model (set together with _currentModel on a successful switch).
+    private val _currentProvider = MutableStateFlow<String?>(null)
+    val currentProvider: kotlinx.coroutines.flow.StateFlow<String?> = _currentProvider.asStateFlow()
+
+    val favorites: kotlinx.coroutines.flow.StateFlow<Set<String>> =
+        favoritesStore.favorites.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    data class ModelSheetUi(
+        val query: String = "",
+        val scope: com.hermes.client.ui.models.ModelScope = com.hermes.client.ui.models.ModelScope.SESSION,
+        val pending: Boolean = false,
+        val error: String? = null,
+    )
+    private val _modelSheet = MutableStateFlow(ModelSheetUi())
+    val modelSheet: kotlinx.coroutines.flow.StateFlow<ModelSheetUi> = _modelSheet.asStateFlow()
 
     private val _profiles = MutableStateFlow<List<ProfileDto>>(emptyList())
     val profiles: StateFlow<List<ProfileDto>> = _profiles.asStateFlow()
@@ -95,6 +117,7 @@ class ChatViewModel @Inject constructor(
             com.hermes.client.data.diagnostics.DebugLog.log("session", "resume($id) → handle=${handle ?: "none"}")
             // Load model options, profiles, and the slash-command catalog; failures are non-fatal
             launch { runCatching { _models.value = modelRepo.options() } }
+            launch { runCatching { _providers.value = modelRepo.providers() } }
             launch { runCatching { _profiles.value = profileRepo.list() } }
             launch { runCatching { _commands.value = chat.commandsCatalog() } }
         }
@@ -214,6 +237,7 @@ class ChatViewModel @Inject constructor(
                 // both were discarded, so a failed switch looked like nothing happened.
                 .onSuccess { out ->
                     _currentModel.value = model
+                    _currentProvider.value = provider
                     appendSystem(out?.takeIf { it.isNotBlank() } ?: "Model set to $model.")
                 }
                 .onFailure { e ->
@@ -221,6 +245,54 @@ class ChatViewModel @Inject constructor(
                     if (e is kotlinx.coroutines.CancellationException) throw e
                     appendError("Couldn't switch model: ${e.message ?: "the gateway slash worker failed"}")
                 }
+        }
+    }
+
+    fun onSheetQuery(q: String) { _modelSheet.value = _modelSheet.value.copy(query = q) }
+    fun onSheetScope(s: com.hermes.client.ui.models.ModelScope) {
+        _modelSheet.value = _modelSheet.value.copy(scope = s, error = null)
+    }
+    fun toggleFavorite(provider: String, model: String) =
+        viewModelScope.launch { favoritesStore.toggle(provider, model) }
+
+    /**
+     * Apply a model chosen in the sheet. SESSION → the /model --session slash (overrides just this
+     * chat); DEFAULT → the global default via REST. On failure the gateway message is surfaced in
+     * the sheet (kept open); on success the sheet is dismissed by the caller via [onDone].
+     */
+    fun onSelectFromSheet(provider: String, model: String, onDone: () -> Unit) {
+        _modelSheet.value = _modelSheet.value.copy(pending = true, error = null)
+        viewModelScope.launch {
+            when (_modelSheet.value.scope) {
+                com.hermes.client.ui.models.ModelScope.SESSION ->
+                    runCatching { chat.slashExec(sessionId, "/model $model --provider $provider --session") }
+                        .onSuccess {
+                            _currentModel.value = model
+                            _currentProvider.value = provider
+                            _modelSheet.value = ModelSheetUi()  // reset + clear pending/error
+                            onDone()
+                        }
+                        .onFailure { e ->
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            _modelSheet.value = _modelSheet.value.copy(
+                                pending = false,
+                                error = e.message ?: "Couldn't switch model.",
+                            )
+                        }
+                com.hermes.client.ui.models.ModelScope.DEFAULT ->
+                    runCatching { modelRepo.set(provider, model) }
+                        .onSuccess {
+                            _modelSheet.value = _modelSheet.value.copy(pending = false, error = null)
+                            onDone()
+                        }
+                        .onFailure { e ->
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            _modelSheet.value = _modelSheet.value.copy(
+                                pending = false,
+                                error = e.message ?: "Couldn't set default model.",
+                            )
+                        }
+            }
         }
     }
 

@@ -6,6 +6,7 @@ import com.hermes.client.data.network.ModelOptionDto
 import com.hermes.client.data.network.ProfileDto
 import com.hermes.client.data.network.ServerEvent
 import com.hermes.client.data.repository.ChatRepository
+import com.hermes.client.data.repository.ModelFavoritesStore
 import com.hermes.client.data.repository.ModelRepository
 import com.hermes.client.data.repository.ProfileRepository
 import com.hermes.client.data.repository.SessionRepository
@@ -38,6 +39,7 @@ class ChatViewModelTest {
     private val modelRepo = mockk<ModelRepository>(relaxed = true)
     private val profileRepo = mockk<ProfileRepository>(relaxed = true)
     private val profileManager = mockk<com.hermes.client.data.repository.ProfileManager>(relaxed = true)
+    private val favoritesStore = mockk<ModelFavoritesStore>(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
@@ -49,10 +51,12 @@ class ChatViewModelTest {
         every { profileManager.active } returns MutableStateFlow<String?>(null)
         coEvery { sessionRepo.history(any(), any()) } returns emptyList()
         coEvery { modelRepo.options() } returns emptyList()
+        coEvery { modelRepo.providers() } returns emptyList()
         coEvery { profileRepo.list() } returns emptyList()
+        every { favoritesStore.favorites } returns MutableStateFlow(emptySet())
     }
 
-    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager)
+    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager, favoritesStore)
 
     @Test fun streamed_delta_appears_in_state() = runTest {
         val vm = buildVm()
