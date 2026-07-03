@@ -67,6 +67,7 @@ fun ChatScreen(
     val connState by vm.connectionState.collectAsStateWithLifecycle()
     val unauthorized by vm.unauthorized.collectAsStateWithLifecycle()
     val models by vm.models.collectAsStateWithLifecycle()
+    val currentModel by vm.currentModel.collectAsStateWithLifecycle()
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
     val commands by vm.commands.collectAsStateWithLifecycle()
     val pathItems by vm.pathItems.collectAsStateWithLifecycle()
@@ -130,6 +131,7 @@ fun ChatScreen(
                     if (models.isNotEmpty()) {
                         ModelPickerButton(
                             models = models,
+                            currentModel = currentModel,
                             onSelect = { vm.selectModel(it.provider, it.model) },
                         )
                     }
@@ -274,11 +276,12 @@ private fun ConnectionBanner(state: ConnectionState, onRetry: () -> Unit) {
 @Composable
 private fun ModelPickerButton(
     models: List<ModelOptionDto>,
+    currentModel: String?,
     onSelect: (ModelOptionDto) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     TextButton(onClick = { expanded = true }) {
-        Text("Model")
+        Text(currentModel ?: "Model", maxLines = 1)
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             models.forEach { option ->
                 DropdownMenuItem(

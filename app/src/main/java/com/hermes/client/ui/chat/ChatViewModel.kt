@@ -44,6 +44,12 @@ class ChatViewModel @Inject constructor(
     private val _models = MutableStateFlow<List<ModelOptionDto>>(emptyList())
     val models: StateFlow<List<ModelOptionDto>> = _models.asStateFlow()
 
+    // The model this session is confirmed to be using. Null until a switch succeeds (the gateway
+    // doesn't report the session's current model up-front), so the picker shows "Model" until the
+    // user changes it, then the chosen model as confirmation the switch took.
+    private val _currentModel = MutableStateFlow<String?>(null)
+    val currentModel: StateFlow<String?> = _currentModel.asStateFlow()
+
     private val _profiles = MutableStateFlow<List<ProfileDto>>(emptyList())
     val profiles: StateFlow<List<ProfileDto>> = _profiles.asStateFlow()
 
@@ -206,7 +212,10 @@ class ChatViewModel @Inject constructor(
                 // result (or an error like "Could not resolve credentials for …") in the slash
                 // output, and a worker failure ("slash worker closed pipe") throws. Previously
                 // both were discarded, so a failed switch looked like nothing happened.
-                .onSuccess { out -> appendSystem(out?.takeIf { it.isNotBlank() } ?: "Model set to $model.") }
+                .onSuccess { out ->
+                    _currentModel.value = model
+                    appendSystem(out?.takeIf { it.isNotBlank() } ?: "Model set to $model.")
+                }
                 .onFailure { e ->
                     // Don't swallow cancellation — rethrow so structured concurrency still works.
                     if (e is kotlinx.coroutines.CancellationException) throw e
