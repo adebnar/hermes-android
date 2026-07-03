@@ -26,6 +26,7 @@ import com.hermes.client.ui.theme.HermesTheme
 import com.hermes.client.ui.theme.LocalToolCallTechnical
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -37,6 +38,8 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var profileManager: ProfileManager
     @Inject lateinit var profileAccentStore: com.hermes.client.data.repository.ProfileAccentStore
     @Inject lateinit var notificationSettings: com.hermes.client.data.repository.NotificationSettings
+    @Inject lateinit var chat: com.hermes.client.data.repository.ChatRepository
+    @Inject lateinit var pendingShare: com.hermes.client.share.PendingShareStore
 
     /**
      * Route requested by a tapped notification (see `HermesNotifier.openIntent`'s
@@ -49,6 +52,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         pendingRoute.value = intent?.getStringExtra("extra_route")
         intent?.removeExtra("extra_route")
+        handleShare(intent)
         val hasConfig = credentialStore.load() != null
         val crashReport = CrashReporter.read(this)
         // Resume the notification service if the user previously enabled it.
@@ -115,6 +119,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         pendingRoute.value = intent.getStringExtra("extra_route")
         intent.removeExtra("extra_route")
+        handleShare(intent)
     }
 
     /** Share the saved crash trace via the system share sheet. */
@@ -125,5 +130,35 @@ class MainActivity : ComponentActivity() {
             putExtra(Intent.EXTRA_TEXT, report)
         }
         startActivity(Intent.createChooser(intent, "Share crash report"))
+    }
+
+    /**
+     * Handle an incoming ACTION_SEND text share: open a new chat with the shared text pre-filled.
+     * Reuses the notification deep-link rail (pendingRoute -> HermesNav.deepLinkRoute).
+     */
+    private fun handleShare(intent: Intent?) {
+        val text = com.hermes.client.share.sharedText(
+            intent?.action,
+            intent?.type,
+            intent?.getStringExtra(Intent.EXTRA_SUBJECT),
+            intent?.getStringExtra(Intent.EXTRA_TEXT),
+        ) ?: return
+        // Not configured yet -> the app opens to setup; drop the share in v1.
+        if (credentialStore.load() == null) return
+        lifecycleScope.launch {
+            chat.connect()  // idempotent; a cold-start share has no open socket yet, and
+                            // createSession() would otherwise block on the ready-gate forever.
+            runCatching { chat.createSession() }
+                .onSuccess { id ->
+                    pendingShare.put(id, text)
+                    pendingRoute.value = "chat/$id"
+                }
+                .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    android.widget.Toast.makeText(
+                        this@MainActivity, "Couldn't start a chat", android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+        }
     }
 }
