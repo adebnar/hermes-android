@@ -12,6 +12,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -57,11 +58,16 @@ private val TABS = listOf(
  * [hasConfig] is false the start destination is "setup" and the bar is hidden there.
  *
  * onUnauthorized clears the back stack and routes to "setup" so an expired token forces re-entry.
+ *
+ * [deepLinkRoute], when non-null, is navigated to once (keyed by value) — used to jump straight
+ * to a session when the activity is launched or resumed from a tapped notification.
  */
 @Composable
-fun HermesNav(hasConfig: Boolean) {
+fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null) {
     val nav = rememberNavController()
     val start = if (hasConfig) "sessions" else "setup"
+
+    LaunchedEffect(deepLinkRoute) { deepLinkRoute?.let { nav.navigate(it) } }
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route

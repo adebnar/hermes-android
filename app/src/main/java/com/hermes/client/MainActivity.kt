@@ -38,8 +38,16 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var profileAccentStore: com.hermes.client.data.repository.ProfileAccentStore
     @Inject lateinit var notificationSettings: com.hermes.client.data.repository.NotificationSettings
 
+    /**
+     * Route requested by a tapped notification (see `HermesNotifier.openIntent`'s
+     * `extra_route`). Read on create and on every `onNewIntent` so a tap while the app is
+     * already running still navigates; consumed by `HermesNav`'s `deepLinkRoute` param.
+     */
+    private var pendingRoute = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingRoute.value = intent?.getStringExtra("extra_route")
         val hasConfig = credentialStore.load() != null
         val crashReport = CrashReporter.read(this)
         // Resume the notification service if the user previously enabled it.
@@ -87,13 +95,20 @@ class MainActivity : ComponentActivity() {
                                     onDismiss = { CrashReporter.clear(this@MainActivity); report = null },
                                 )
                             } else {
-                                HermesNav(hasConfig = hasConfig)
+                                val deepLinkRoute by pendingRoute
+                                HermesNav(hasConfig = hasConfig, deepLinkRoute = deepLinkRoute)
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingRoute.value = intent.getStringExtra("extra_route")
     }
 
     /** Share the saved crash trace via the system share sheet. */
