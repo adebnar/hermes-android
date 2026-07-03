@@ -143,11 +143,17 @@ class MainActivity : ComponentActivity() {
             intent?.getStringExtra(Intent.EXTRA_SUBJECT),
             intent?.getStringExtra(Intent.EXTRA_TEXT),
         ) ?: return
+        // Consume the share so a config-change recreation doesn't re-fire it (mirrors the
+        // extra_route handling) — creating a duplicate session and hijacking navigation.
+        intent?.removeExtra(Intent.EXTRA_TEXT)
+        intent?.removeExtra(Intent.EXTRA_SUBJECT)
         // Not configured yet -> the app opens to setup; drop the share in v1.
         if (credentialStore.load() == null) return
         lifecycleScope.launch {
-            chat.connect()  // idempotent; a cold-start share has no open socket yet, and
-                            // createSession() would otherwise block on the ready-gate forever.
+            // connect() first — a cold-start share has no open socket yet, and createSession()
+            // would otherwise fail after the ready-gate timeout. connect() is idempotent, so
+            // this is safe even when already connected.
+            chat.connect()
             runCatching { chat.createSession() }
                 .onSuccess { id ->
                     pendingShare.put(id, text)
