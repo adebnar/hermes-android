@@ -148,6 +148,13 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideModelFavoritesStore(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.data.repository.ModelFavoritesStore =
+        com.hermes.client.data.repository.ModelFavoritesStore(context)
+
+    @Provides
+    @Singleton
     fun provideNotificationSettings(
         @ApplicationContext context: Context,
     ): com.hermes.client.data.repository.NotificationSettings =
