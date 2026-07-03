@@ -25,8 +25,8 @@ android {
         applicationId = "com.hermes.client"
         minSdk = 26
         targetSdk = 36
-        versionCode = 24
-        versionName = "0.1.23"
+        versionCode = 25
+        versionName = "0.1.24"
         testInstrumentationRunner = "com.hermes.client.HiltTestRunner"
         // App name; the beta build type overrides this so both can be installed at once.
         manifestPlaceholders["appLabel"] = "Hermes"
