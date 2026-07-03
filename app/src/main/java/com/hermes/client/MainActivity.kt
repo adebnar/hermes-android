@@ -23,6 +23,8 @@ import com.hermes.client.ui.theme.HermesTheme
 import com.hermes.client.ui.theme.LocalToolCallTechnical
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -30,11 +32,18 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var settingsStore: SettingsStore
     @Inject lateinit var profileManager: ProfileManager
     @Inject lateinit var profileAccentStore: com.hermes.client.data.repository.ProfileAccentStore
+    @Inject lateinit var notificationSettings: com.hermes.client.data.repository.NotificationSettings
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val hasConfig = credentialStore.load() != null
         val crashReport = CrashReporter.read(this)
+        // Resume the notification service if the user previously enabled it.
+        kotlinx.coroutines.MainScope().launch {
+            if (notificationSettings.prefs.first().enabled) {
+                com.hermes.client.notifications.GatewayConnectionService.start(this@MainActivity)
+            }
+        }
         setContent {
             val mode by settingsStore.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
             val technical by settingsStore.toolCallTechnical.collectAsState(initial = true)
