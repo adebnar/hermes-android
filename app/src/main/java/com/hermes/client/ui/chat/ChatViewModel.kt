@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hermes.client.data.network.ConnectionState
 import com.hermes.client.data.network.HermesApiException
-import com.hermes.client.data.network.ModelOptionDto
 import com.hermes.client.data.network.ProfileDto
 import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.ModelRepository
@@ -42,9 +41,6 @@ class ChatViewModel @Inject constructor(
     // I1: expose 401 unauthorized so the nav layer can route back to Setup
     private val _unauthorized = MutableStateFlow(false)
     val unauthorized: StateFlow<Boolean> = _unauthorized.asStateFlow()
-
-    private val _models = MutableStateFlow<List<ModelOptionDto>>(emptyList())
-    val models: StateFlow<List<ModelOptionDto>> = _models.asStateFlow()
 
     // The model this session is confirmed to be using. Null until a switch succeeds (the gateway
     // doesn't report the session's current model up-front), so the picker shows "Model" until the
@@ -116,7 +112,6 @@ class ChatViewModel @Inject constructor(
             handle?.let { sessionId = it }
             com.hermes.client.data.diagnostics.DebugLog.log("session", "resume($id) → handle=${handle ?: "none"}")
             // Load model options, profiles, and the slash-command catalog; failures are non-fatal
-            launch { runCatching { _models.value = modelRepo.options() } }
             launch { runCatching { _providers.value = modelRepo.providers() } }
             launch { runCatching { _profiles.value = profileRepo.list() } }
             launch { runCatching { _commands.value = chat.commandsCatalog() } }
@@ -222,32 +217,6 @@ class ChatViewModel @Inject constructor(
         )
     }
 
-    fun selectModel(provider: String, model: String) {
-        // Switch THIS conversation's model, not the global default. The gateway pins a session
-        // to its own model (model_override); setting only the global model leaves a resumed
-        // session on its original — possibly unavailable — model ("model is not available in
-        // session"), and the error persists no matter how often the picker is used. The
-        // `/model … --session` slash overrides just this session, which is what the user means
-        // by changing the model inside a chat.
-        viewModelScope.launch {
-            runCatching { chat.slashExec(sessionId, "/model $model --provider $provider --session") }
-                // Surface the outcome instead of swallowing it: the gateway reports the switch
-                // result (or an error like "Could not resolve credentials for …") in the slash
-                // output, and a worker failure ("slash worker closed pipe") throws. Previously
-                // both were discarded, so a failed switch looked like nothing happened.
-                .onSuccess { out ->
-                    _currentModel.value = model
-                    _currentProvider.value = provider
-                    appendSystem(out?.takeIf { it.isNotBlank() } ?: "Model set to $model.")
-                }
-                .onFailure { e ->
-                    // Don't swallow cancellation — rethrow so structured concurrency still works.
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    appendError("Couldn't switch model: ${e.message ?: "the gateway slash worker failed"}")
-                }
-        }
-    }
-
     fun onSheetQuery(q: String) { _modelSheet.value = _modelSheet.value.copy(query = q) }
     fun onSheetScope(s: com.hermes.client.ui.models.ModelScope) {
         _modelSheet.value = _modelSheet.value.copy(scope = s, error = null)
@@ -283,6 +252,7 @@ class ChatViewModel @Inject constructor(
                     runCatching { modelRepo.set(provider, model) }
                         .onSuccess {
                             _modelSheet.value = _modelSheet.value.copy(pending = false, error = null)
+                            appendSystem("Default set to $model")
                             onDone()
                         }
                         .onFailure { e ->

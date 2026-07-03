@@ -60,4 +60,18 @@ class ModelSelectorTest {
         val codex = items.filterIsInstance<ModelListItem.Header>().first { it.title == "openai-codex" }
         assertTrue(codex.isCurrent)
     }
+
+    @Test fun non_current_provider_header_is_not_current() {
+        val items = modelSelectorRows(providers, emptySet(), "", null, null)
+        val openRouter = items.filterIsInstance<ModelListItem.Header>().first { it.title == "OpenRouter" }
+        assertTrue(!openRouter.isCurrent)
+    }
+
+    @Test fun favorite_filtered_out_by_query_produces_no_favorites_header() {
+        val favs = setOf(favKey("openai-codex", "gpt-5.5"))
+        // "step" matches only the OpenRouter model, not the favorited gpt-5.5 — so the favorite
+        // is filtered out and no "Favorites" header should appear.
+        val items = modelSelectorRows(providers, favs, "step", null, null)
+        assertTrue(headers(items).none { it == "Favorites" })
+    }
 }
