@@ -74,6 +74,10 @@ fun ChatScreen(
     val commands by vm.commands.collectAsStateWithLifecycle()
     val pathItems by vm.pathItems.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
+    val initialDraft by vm.initialDraft.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(initialDraft) {
+        initialDraft?.takeIf { it.isNotEmpty() }?.let { draft = it; vm.clearInitialDraft() }
+    }
     // Slash-command palette: when the draft is a "/query", show matching commands.
     val slashMatches = if (draft.startsWith("/") && !draft.contains(' ')) {
         val q = draft.drop(1).lowercase()

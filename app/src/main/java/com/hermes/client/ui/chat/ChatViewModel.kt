@@ -31,6 +31,7 @@ class ChatViewModel @Inject constructor(
     private val profileRepo: ProfileRepository,
     private val profileManager: ProfileManager,
     private val favoritesStore: com.hermes.client.data.repository.ModelFavoritesStore,
+    private val pendingShareStore: com.hermes.client.share.PendingShareStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChatUiState.empty())
@@ -55,6 +56,11 @@ class ChatViewModel @Inject constructor(
     // Provider of the confirmed session model (set together with _currentModel on a successful switch).
     private val _currentProvider = MutableStateFlow<String?>(null)
     val currentProvider: kotlinx.coroutines.flow.StateFlow<String?> = _currentProvider.asStateFlow()
+
+    // Text handed off from a share (Share-to-Hermes). ChatScreen pre-fills the composer with it once.
+    private val _initialDraft = MutableStateFlow<String?>(null)
+    val initialDraft: StateFlow<String?> = _initialDraft.asStateFlow()
+    fun clearInitialDraft() { _initialDraft.value = null }
 
     val favorites: kotlinx.coroutines.flow.StateFlow<Set<String>> =
         favoritesStore.favorites.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), emptySet())
@@ -89,6 +95,8 @@ class ChatViewModel @Inject constructor(
     fun open(id: String) {
         sessionId = id
         connJob?.cancel()
+        // A share created this session and stashed its text; surface it as the initial composer draft.
+        pendingShareStore.take(id)?.let { _initialDraft.value = it }
         com.hermes.client.data.diagnostics.DebugLog.log("session", "open($id)")
         viewModelScope.launch {
             try {
