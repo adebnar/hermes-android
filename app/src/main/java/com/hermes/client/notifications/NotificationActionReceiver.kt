@@ -3,6 +3,7 @@ package com.hermes.client.notifications
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.hermes.client.data.diagnostics.DebugLog
 import com.hermes.client.data.repository.ChatRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -24,7 +25,14 @@ class NotificationActionReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 runCatching { chat.respondApproval(sid, approve) }
-                if (notifId != -1) notifier.cancel(notifId)
+                    .onSuccess {
+                        // Only clear the notification once the RPC actually succeeded — on
+                        // failure, leave it so the action isn't silently lost.
+                        if (notifId != -1) notifier.cancel(notifId)
+                    }
+                    .onFailure { e ->
+                        DebugLog.log("notif", "approval response failed session=$sid approve=$approve: ${e.message}")
+                    }
             } finally {
                 pending.finish()
             }

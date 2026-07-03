@@ -1,6 +1,9 @@
 package com.hermes.client
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,6 +25,7 @@ import com.hermes.client.ui.nav.HermesNav
 import com.hermes.client.ui.theme.HermesTheme
 import com.hermes.client.ui.theme.LocalToolCallTechnical
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.core.content.ContextCompat
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -41,7 +45,17 @@ class MainActivity : ComponentActivity() {
         // Resume the notification service if the user previously enabled it.
         kotlinx.coroutines.MainScope().launch {
             if (notificationSettings.prefs.first().enabled) {
-                com.hermes.client.notifications.GatewayConnectionService.start(this@MainActivity)
+                // On API 33+ the service posts notifications and needs POST_NOTIFICATIONS at
+                // runtime; if it isn't granted (e.g. revoked since last enable), don't auto-start
+                // — the Settings screen re-requests the permission the next time it's enabled.
+                val canStart = Build.VERSION.SDK_INT < 33 ||
+                    ContextCompat.checkSelfPermission(
+                        this@MainActivity,
+                        Manifest.permission.POST_NOTIFICATIONS,
+                    ) == PackageManager.PERMISSION_GRANTED
+                if (canStart) {
+                    com.hermes.client.notifications.GatewayConnectionService.start(this@MainActivity)
+                }
             }
         }
         setContent {

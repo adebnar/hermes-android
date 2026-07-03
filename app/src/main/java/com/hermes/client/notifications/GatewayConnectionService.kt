@@ -8,7 +8,6 @@ import com.hermes.client.data.network.HermesGatewayClient
 import com.hermes.client.data.repository.NotificationSettings
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
@@ -34,8 +33,12 @@ class GatewayConnectionService : Service() {
         client.connect()
         scope.launch {
             client.events.collect { event ->
-                val prefs = settings.prefs.first()
-                toNotificationSpec(event, prefs)?.let { notifier.post(it) }
+                // One malformed/unexpected event must not crash the process — mirror the guard
+                // ChatViewModel's reduce() uses around event handling.
+                runCatching {
+                    val prefs = settings.prefs.first()
+                    toNotificationSpec(event, prefs)?.let { notifier.post(it) }
+                }
             }
         }
     }

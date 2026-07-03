@@ -49,7 +49,7 @@ class HermesNotifier(private val context: Context) {
         spec.actions.forEach { a ->
             b.addAction(0, a.label, actionIntent(a, spec.id))
         }
-        if (NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+        if (mgr.areNotificationsEnabled()) {
             mgr.notify(spec.id, b.build())
         }
     }
