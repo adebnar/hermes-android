@@ -1,6 +1,8 @@
 package com.hermes.client.data.network
 
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -18,6 +20,12 @@ data class ServerEvent(
             return ServerEvent(type, sessionId, payload)
         }
     }
+}
+
+internal fun ServerEvent.str(key: String): String? = when (val el = payload[key]) {
+    null, JsonNull -> null
+    is JsonPrimitive -> el.content
+    else -> el.toString()
 }
 
 internal fun JsonObject.objOrEmpty(key: String): JsonObject =
