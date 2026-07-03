@@ -1,6 +1,9 @@
 package com.hermes.client
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,7 +25,10 @@ import com.hermes.client.ui.nav.HermesNav
 import com.hermes.client.ui.theme.HermesTheme
 import com.hermes.client.ui.theme.LocalToolCallTechnical
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.core.content.ContextCompat
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -30,11 +36,37 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var settingsStore: SettingsStore
     @Inject lateinit var profileManager: ProfileManager
     @Inject lateinit var profileAccentStore: com.hermes.client.data.repository.ProfileAccentStore
+    @Inject lateinit var notificationSettings: com.hermes.client.data.repository.NotificationSettings
+
+    /**
+     * Route requested by a tapped notification (see `HermesNotifier.openIntent`'s
+     * `extra_route`). Read on create and on every `onNewIntent` so a tap while the app is
+     * already running still navigates; consumed by `HermesNav`'s `deepLinkRoute` param.
+     */
+    private var pendingRoute = mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingRoute.value = intent?.getStringExtra("extra_route")
+        intent?.removeExtra("extra_route")
         val hasConfig = credentialStore.load() != null
         val crashReport = CrashReporter.read(this)
+        // Resume the notification service if the user previously enabled it.
+        kotlinx.coroutines.MainScope().launch {
+            if (notificationSettings.prefs.first().enabled) {
+                // On API 33+ the service posts notifications and needs POST_NOTIFICATIONS at
+                // runtime; if it isn't granted (e.g. revoked since last enable), don't auto-start
+                // — the Settings screen re-requests the permission the next time it's enabled.
+                val canStart = Build.VERSION.SDK_INT < 33 ||
+                    ContextCompat.checkSelfPermission(
+                        this@MainActivity,
+                        Manifest.permission.POST_NOTIFICATIONS,
+                    ) == PackageManager.PERMISSION_GRANTED
+                if (canStart) {
+                    com.hermes.client.notifications.GatewayConnectionService.start(this@MainActivity)
+                }
+            }
+        }
         setContent {
             val mode by settingsStore.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
             val technical by settingsStore.toolCallTechnical.collectAsState(initial = true)
@@ -64,13 +96,25 @@ class MainActivity : ComponentActivity() {
                                     onDismiss = { CrashReporter.clear(this@MainActivity); report = null },
                                 )
                             } else {
-                                HermesNav(hasConfig = hasConfig)
+                                val deepLinkRoute by pendingRoute
+                                HermesNav(
+                                    hasConfig = hasConfig,
+                                    deepLinkRoute = deepLinkRoute,
+                                    onDeepLinkConsumed = { pendingRoute.value = null },
+                                )
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingRoute.value = intent.getStringExtra("extra_route")
+        intent.removeExtra("extra_route")
     }
 
     /** Share the saved crash trace via the system share sheet. */

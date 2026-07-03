@@ -36,6 +36,8 @@ fun SettingsScreen(
             HorizontalDivider()
             Entry("Appearance", "Theme, light/dark, tool-call display") { onNavigate("settings_appearance") }
             HorizontalDivider()
+            Entry("Notifications", "Approvals, cron, and messaging alerts") { onNavigate("settings_notifications") }
+            HorizontalDivider()
             Entry("Models & memory", "Default model, memory toggles & budgets") { onNavigate("settings_memory") }
             HorizontalDivider()
             Entry("MCP servers", "View and edit connected MCP servers") { onNavigate("settings_mcp") }

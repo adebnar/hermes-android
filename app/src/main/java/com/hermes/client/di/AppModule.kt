@@ -148,6 +148,20 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideNotificationSettings(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.data.repository.NotificationSettings =
+        com.hermes.client.data.repository.NotificationSettings(context)
+
+    @Provides
+    @Singleton
+    fun provideHermesNotifier(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.notifications.HermesNotifier =
+        com.hermes.client.notifications.HermesNotifier(context)
+
+    @Provides
+    @Singleton
     fun provideAnalyticsRepository(rest: HermesRestApi): com.hermes.client.data.repository.AnalyticsRepository =
         com.hermes.client.data.repository.AnalyticsRepository(rest)
 

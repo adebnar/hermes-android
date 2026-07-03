@@ -73,6 +73,18 @@ open class HermesGatewayClient(
     }
 
     fun connect() {
+        // Idempotent: multiple owners (the foreground service, view models, etc.) may all call
+        // connect() on this shared singleton. If a socket is already open, or a connect/backoff
+        // reconnect is already in flight, this must be a no-op — otherwise a second openSocket()
+        // would leak a duplicate live WebSocket that the generation check only shadows, never
+        // closes. reconnectNow() intentionally bypasses this guard to force a fresh socket.
+        val cur = _state.value
+        if (cur is ConnectionState.Connecting || cur is ConnectionState.Connected ||
+            cur is ConnectionState.Reconnecting
+        ) {
+            DebugLog.log("ws", "connect() no-op — already $cur")
+            return
+        }
         manuallyClosed = false
         openSocket()
     }
