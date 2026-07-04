@@ -94,4 +94,13 @@ class ActivityModelsTest {
         )
         assertEquals(emptyList<ActivityItem>(), cronsToActivity(listOf(job)))
     }
+
+    @Test fun sessionsToActivity_sets_sessionId_to_raw_id() {
+        val s = com.hermes.client.domain.Session(
+            id = "sess-42", title = "Nightly report", model = null, provider = null,
+            messageCount = 3, profile = "default", source = "cron", lastActive = 1_000L,
+        )
+        val item = sessionsToActivity(listOf(s)).single()
+        assertEquals("sess-42", item.sessionId)
+    }
 }
