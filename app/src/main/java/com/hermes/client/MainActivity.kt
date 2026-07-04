@@ -156,7 +156,7 @@ class MainActivity : ComponentActivity() {
             chat.connect()
             runCatching { chat.createSession() }
                 .onSuccess { id ->
-                    pendingShare.put(id, text)
+                    pendingShare.put(id, com.hermes.client.share.PendingShare(text = text))
                     pendingRoute.value = "chat/$id"
                 }
                 .onFailure { e ->

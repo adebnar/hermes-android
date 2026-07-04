@@ -96,7 +96,8 @@ class ChatViewModel @Inject constructor(
         sessionId = id
         connJob?.cancel()
         // A share created this session and stashed its text; surface it as the initial composer draft.
-        pendingShareStore.take(id)?.let { _initialDraft.value = it }
+        val ps = pendingShareStore.take(id)
+        ps?.text?.let { _initialDraft.value = it }
         com.hermes.client.data.diagnostics.DebugLog.log("session", "open($id)")
         viewModelScope.launch {
             try {
