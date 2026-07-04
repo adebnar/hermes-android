@@ -8,28 +8,36 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -139,6 +147,14 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
     // One VM instance per tenant page, keyed by profile name.
     val vm: MissionControlViewModel = hiltViewModel(key = "mc-${profile ?: "_"}")
     val state by vm.state.collectAsStateWithLifecycle()
+    val responses by vm.responses.collectAsStateWithLifecycle()
+    val expanded = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
+    val onToggle: (ActivityItem) -> Unit = { item ->
+        val open = !(expanded[item.id] ?: false)
+        expanded[item.id] = open
+        if (open) item.sessionId?.let { vm.loadResponse(it) }
+    }
+    val onRetryResponse: (ActivityItem) -> Unit = { item -> item.sessionId?.let { vm.loadResponse(it) } }
     val scope = rememberCoroutineScope()
     val now = remember(state.sections) { System.currentTimeMillis() }
 
@@ -160,7 +176,11 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
             isRefreshing = refreshing,
             onRefresh = { refreshing = true; vm.refresh() },
         ) {
-            MissionControlContent(state = state, nowMs = now, onRetry = { vm.refresh() }, onOpen = onOpen)
+            MissionControlContent(
+                state = state, nowMs = now, onRetry = { vm.refresh() },
+                responses = responses, expanded = expanded,
+                onToggle = onToggle, onRetryResponse = onRetryResponse, onOpen = onOpen,
+            )
         }
     }
 }
@@ -170,6 +190,10 @@ private fun MissionControlContent(
     state: MissionControlState,
     nowMs: Long,
     onRetry: () -> Unit,
+    responses: Map<String, MissionControlViewModel.CronResponseUi>,
+    expanded: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Boolean>,
+    onToggle: (ActivityItem) -> Unit,
+    onRetryResponse: (ActivityItem) -> Unit,
     onOpen: (String) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
@@ -200,7 +224,18 @@ private fun MissionControlContent(
             else -> state.sections.forEach { section ->
                 item(key = "h-${section.title}") { SectionHeader(section.title, section.items.size) }
                 items(section.items, key = { it.id }) { activity ->
-                    ActivityRow(activity, nowMs, onClick = { onOpen(activity.route) })
+                    val expandable = activity.kind == ActivityKind.CRON &&
+                        activity.sessionId != null && !activity.upcoming
+                    ActivityRow(
+                        item = activity,
+                        nowMs = nowMs,
+                        expandable = expandable,
+                        isExpanded = expanded[activity.id] == true,
+                        response = activity.sessionId?.let { responses[it] },
+                        onClick = { if (expandable) onToggle(activity) else onOpen(activity.route) },
+                        onRetry = { onRetryResponse(activity) },
+                        onOpenFull = { onOpen(activity.route) },
+                    )
                 }
             }
         }
@@ -225,7 +260,16 @@ private fun SectionHeader(label: String, count: Int) {
 }
 
 @Composable
-private fun ActivityRow(item: ActivityItem, nowMs: Long, onClick: () -> Unit) {
+private fun ActivityRow(
+    item: ActivityItem,
+    nowMs: Long,
+    expandable: Boolean = false,
+    isExpanded: Boolean = false,
+    response: MissionControlViewModel.CronResponseUi? = null,
+    onClick: () -> Unit,
+    onRetry: () -> Unit = {},
+    onOpenFull: () -> Unit = {},
+) {
     val icon: ImageVector = when {
         item.kind == ActivityKind.CONVERSATION -> Icons.AutoMirrored.Rounded.Chat
         item.upcoming -> Icons.Rounded.Schedule
@@ -240,10 +284,57 @@ private fun ActivityRow(item: ActivityItem, nowMs: Long, onClick: () -> Unit) {
         else -> MaterialTheme.colorScheme.primary
     }
     val time = relativeTime(item.timestampMs, nowMs)
-    ListItem(
-        leadingContent = { Icon(icon, contentDescription = null, tint = tint) },
-        headlineContent = { Text(item.title) },
-        supportingContent = { Text(listOfNotNull(item.subtitle, time).joinToString(" · ")) },
-        modifier = Modifier.clickable(onClick = onClick),
-    )
+    Column {
+        ListItem(
+            leadingContent = { Icon(icon, contentDescription = null, tint = tint) },
+            headlineContent = { Text(item.title) },
+            supportingContent = { Text(listOfNotNull(item.subtitle, time).joinToString(" · ")) },
+            trailingContent = if (expandable) {
+                {
+                    Icon(
+                        if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                        contentDescription = if (isExpanded) "Collapse response" else "Show response",
+                    )
+                }
+            } else {
+                null
+            },
+            modifier = Modifier.clickable(onClick = onClick),
+        )
+        if (expandable && isExpanded) {
+            CronResponseCard(response = response, onRetry = onRetry, onOpenFull = onOpenFull)
+        }
+    }
+}
+
+@Composable
+private fun CronResponseCard(
+    response: MissionControlViewModel.CronResponseUi?,
+    onRetry: () -> Unit,
+    onOpenFull: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            when {
+                response == null || response.loading ->
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                response.error -> {
+                    Text("Couldn't load response", color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = onRetry) { Text("Retry") }
+                }
+                else -> {
+                    Text(
+                        response.text ?: "No text output.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()),
+                    )
+                    TextButton(onClick = onOpenFull) { Text("View full chat") }
+                }
+            }
+        }
+    }
 }

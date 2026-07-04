@@ -22,6 +22,9 @@ data class ActivityItem(
     val status: String?,
     // Navigation route to open the item ("chat/<id>" or "cron_detail/<id>").
     val route: String,
+    // Raw session id for a session-backed row (used to lazily load a cron run's response inline).
+    // Null for cron next-run items.
+    val sessionId: String? = null,
 )
 
 data class ActivitySection(val title: String, val items: List<ActivityItem>)
@@ -44,6 +47,7 @@ fun sessionsToActivity(sessions: List<Session>): List<ActivityItem> = sessions.m
         upcoming = false,
         status = null,
         route = "chat/${s.id}",
+        sessionId = s.id,
     )
 }
 
