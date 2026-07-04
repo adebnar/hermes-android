@@ -18,6 +18,7 @@ data class MissionControlState(
     val loading: Boolean = false,
     val error: String? = null,
     val unauthorized: Boolean = false,
+    val needsYou: List<CronAlert> = emptyList(),
 )
 
 /**
@@ -61,8 +62,14 @@ class MissionControlViewModel @Inject constructor(
             val scoped = if (profile.isNullOrBlank()) all else all.filter { it.profile == profile }
             // A cron failure (e.g. profile without cron) must not blank the whole feed.
             val crons = runCatching { tools.cronJobs(profile) }.getOrDefault(emptyList())
-            val items = sessionsToActivity(scoped) + cronsToActivity(crons)
-            _state.value = MissionControlState(sections = groupActivity(items, System.currentTimeMillis()))
+            val now = System.currentTimeMillis()
+            val alerts = needsAttention(crons, now)
+            val alertIds = alerts.mapTo(mutableSetOf()) { it.jobId }
+            val items = sessionsToActivity(scoped) + cronsToActivity(crons.filterNot { it.id in alertIds })
+            _state.value = MissionControlState(
+                sections = groupActivity(items, now),
+                needsYou = alerts,
+            )
         } catch (e: HermesApiException) {
             if (e.code == 401) _state.value = MissionControlState(unauthorized = true)
             else _state.value = MissionControlState(error = e.message ?: "Failed to load")
