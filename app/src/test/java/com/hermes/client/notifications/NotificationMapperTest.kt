@@ -23,23 +23,15 @@ class NotificationMapperTest {
         assertTrue(spec.actions.all { it.sessionId == "s1" })
     }
 
-    @Test fun cron_and_messaging_make_specs_without_actions() {
-        val cron = toNotificationSpec(event(Notif.EVENT_CRON_DONE, "c1", "name" to "Nightly", "status" to "success"), on)!!
-        assertEquals(Notif.CHANNEL_ACTIVITY, cron.channelId)
-        assertEquals("chat/c1", cron.route)
-        assertTrue(cron.actions.isEmpty())
-        val msg = toNotificationSpec(event(Notif.EVENT_MSG, "m1", "platform" to "Telegram", "preview" to "hi"), on)!!
-        assertTrue(msg.title.contains("Telegram"))
-    }
-
-    @Test fun per_type_toggles_and_master_toggle_suppress() {
+    @Test fun approvals_toggle_and_master_toggle_suppress() {
         assertNull(toNotificationSpec(event(Notif.EVENT_APPROVAL), on.copy(approvals = false)))
-        assertNull(toNotificationSpec(event(Notif.EVENT_CRON_DONE), on.copy(cron = false)))
-        assertNull(toNotificationSpec(event(Notif.EVENT_MSG), on.copy(messaging = false)))
         assertNull(toNotificationSpec(event(Notif.EVENT_APPROVAL), NotificationPrefs(enabled = false)))
     }
 
-    @Test fun unrelated_or_sessionless_events_are_null() {
+    @Test fun non_approval_and_sessionless_events_are_null() {
+        // Only approval.request is notifiable; run/cron/messaging-style events map to nothing.
+        assertNull(toNotificationSpec(event("run.completed", "c1", "status" to "success"), on))
+        assertNull(toNotificationSpec(event("message.received", "m1", "platform" to "Telegram"), on))
         assertNull(toNotificationSpec(event("message.delta"), on))
         assertNull(toNotificationSpec(event(Notif.EVENT_APPROVAL, sid = null), on))
     }
