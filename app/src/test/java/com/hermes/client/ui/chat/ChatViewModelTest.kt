@@ -106,6 +106,40 @@ class ChatViewModelTest {
     }
 
     /**
+     * Highest-risk share invariant: a pending image share must be attached AFTER resume,
+     * using the LIVE post-resume session handle returned by chat.resume() — not the id
+     * open() was called with — since the gateway may hand back a different live handle
+     * and the attach must target the session it actually knows about.
+     */
+    @Test fun open_attaches_pending_image_using_live_resumed_sessionId() = runTest {
+        coEvery { chatRepo.resume("s1", null) } returns "s1-live"
+        pendingShareStore.put(
+            "s1",
+            com.hermes.client.share.PendingShare(imageBase64 = "abc", imageMime = "image/png"),
+        )
+        val vm = buildVm()
+        vm.open("s1")
+        advanceUntilIdle()
+
+        coVerify { chatRepo.attachImageBytes("s1-live", "abc", "image/png") }
+        assertTrue(
+            "an 'Image attached' system message must land in state",
+            vm.state.value.messages.any { it.text.contains("Image attached") },
+        )
+    }
+
+    /** A text-only pending share (no image) must not trigger an attach call at all. */
+    @Test fun open_with_text_only_pending_share_does_not_attach_image() = runTest {
+        pendingShareStore.put("s1", com.hermes.client.share.PendingShare(text = "hello"))
+        val vm = buildVm()
+        vm.open("s1")
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { chatRepo.attachImageBytes(any(), any(), any()) }
+        assertEquals("hello", vm.initialDraft.value)
+    }
+
+    /**
      * I3: when connectionState enters Reconnecting while generation is in progress,
      * the in-flight assistant message must be marked interrupted and isGenerating cleared.
      */
