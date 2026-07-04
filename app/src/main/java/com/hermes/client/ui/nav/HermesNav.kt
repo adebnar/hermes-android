@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
-import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -45,8 +45,8 @@ import com.hermes.client.ui.usage.UsageScreen
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
 private val TABS = listOf(
+    Tab("activity", "Home", Icons.Rounded.Home),
     Tab("sessions", "Chats", Icons.AutoMirrored.Rounded.Chat),
-    Tab("activity", "Agent Activity", Icons.Rounded.Bolt),
     Tab("you", "You", Icons.Rounded.Person),
 )
 
@@ -68,7 +68,7 @@ private val TABS = listOf(
 @Composable
 fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsumed: () -> Unit = {}) {
     val nav = rememberNavController()
-    val start = if (hasConfig) "sessions" else "setup"
+    val start = if (hasConfig) "activity" else "setup"
 
     LaunchedEffect(deepLinkRoute) { deepLinkRoute?.let { nav.navigate(it); onDeepLinkConsumed() } }
 
@@ -123,7 +123,7 @@ fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsu
             composable("setup") {
                 SetupScreen(
                     onSaved = {
-                        nav.navigate("sessions") { popUpTo("setup") { inclusive = true } }
+                        nav.navigate("activity") { popUpTo("setup") { inclusive = true } }
                     },
                 )
             }

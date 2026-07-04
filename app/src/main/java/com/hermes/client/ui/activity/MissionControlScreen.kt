@@ -133,9 +133,9 @@ fun MissionControlScreen(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.padding(padding).fillMaxSize(),
-                key = { names[it] ?: "_$it" },
+                key = { names.getOrNull(it) ?: "_$it" },
             ) { page ->
-                MissionControlPage(profile = names[page], dark = dark, onNavigate = onNavigate)
+                MissionControlPage(profile = names.getOrNull(page), dark = dark, onNavigate = onNavigate)
             }
         }
     }
