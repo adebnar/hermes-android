@@ -34,6 +34,12 @@ class MissionControlViewModel @Inject constructor(
     private val _state = MutableStateFlow(MissionControlState())
     val state: StateFlow<MissionControlState> = _state.asStateFlow()
 
+    /** Lazily-loaded cron-run responses, keyed by sessionId. */
+    data class CronResponseUi(val loading: Boolean = false, val text: String? = null, val error: Boolean = false)
+
+    private val _responses = MutableStateFlow<Map<String, CronResponseUi>>(emptyMap())
+    val responses: StateFlow<Map<String, CronResponseUi>> = _responses.asStateFlow()
+
     private var profile: String? = null
     private var loadJob: kotlinx.coroutines.Job? = null
 
@@ -72,6 +78,25 @@ class MissionControlViewModel @Inject constructor(
     suspend fun switchTo(profile: String?) {
         if (!profile.isNullOrBlank() && profile != profileManager.active.value) {
             profileManager.switchTo(profile)
+        }
+    }
+
+    /**
+     * Fetch a cron run's response on demand (one REST history call), caching by sessionId. A loaded
+     * or in-flight entry is not refetched; a prior error IS retryable (call again).
+     */
+    fun loadResponse(sessionId: String) {
+        val existing = _responses.value[sessionId]
+        if (existing != null && (existing.loading || existing.text != null)) return
+        _responses.value = _responses.value + (sessionId to CronResponseUi(loading = true))
+        viewModelScope.launch {
+            val result = runCatching { sessions.history(sessionId, profile) }
+            _responses.value = _responses.value + (
+                sessionId to result.fold(
+                    onSuccess = { CronResponseUi(text = cronResponse(it)) },
+                    onFailure = { CronResponseUi(error = true) },
+                )
+            )
         }
     }
 }
