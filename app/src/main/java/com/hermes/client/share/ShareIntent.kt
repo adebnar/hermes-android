@@ -20,3 +20,7 @@ fun sharedText(action: String?, type: String?, subject: String?, text: String?):
         else -> null
     }
 }
+
+/** Pure: is this an ACTION_SEND of an image type? */
+fun isImageShare(action: String?, type: String?): Boolean =
+    action == Intent.ACTION_SEND && type != null && type.startsWith("image/")

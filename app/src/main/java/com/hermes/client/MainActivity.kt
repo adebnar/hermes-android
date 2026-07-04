@@ -30,6 +30,7 @@ import androidx.lifecycle.lifecycleScope
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -133,30 +134,67 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Handle an incoming ACTION_SEND text share: open a new chat with the shared text pre-filled.
-     * Reuses the notification deep-link rail (pendingRoute -> HermesNav.deepLinkRoute).
+     * Handle an incoming ACTION_SEND share (text or a single image): open a new chat with the text
+     * pre-filled and/or the image attached. Reuses the notification deep-link rail.
      */
     private fun handleShare(intent: Intent?) {
         val text = com.hermes.client.share.sharedText(
-            intent?.action,
-            intent?.type,
-            intent?.getStringExtra(Intent.EXTRA_SUBJECT),
-            intent?.getStringExtra(Intent.EXTRA_TEXT),
-        ) ?: return
-        // Consume the share so a config-change recreation doesn't re-fire it (mirrors the
-        // extra_route handling) — creating a duplicate session and hijacking navigation.
+            intent?.action, intent?.type,
+            intent?.getStringExtra(Intent.EXTRA_SUBJECT), intent?.getStringExtra(Intent.EXTRA_TEXT),
+        )
+        val isImage = com.hermes.client.share.isImageShare(intent?.action, intent?.type)
+        val imageUri: android.net.Uri? = if (isImage) {
+            if (Build.VERSION.SDK_INT >= 33) {
+                intent?.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION") intent?.getParcelableExtra(Intent.EXTRA_STREAM)
+            }
+        } else null
+
+        if (text == null && imageUri == null) return
+
+        // For an image share the caption (if any) is EXTRA_TEXT; a text share's caption is `text`.
+        val caption = if (isImage) {
+            intent?.getStringExtra(Intent.EXTRA_TEXT)?.trim()?.takeIf { it.isNotEmpty() }
+        } else text
+
+        // Consume the extras so a config-change recreation doesn't re-fire the share.
         intent?.removeExtra(Intent.EXTRA_TEXT)
         intent?.removeExtra(Intent.EXTRA_SUBJECT)
-        // Not configured yet -> the app opens to setup; drop the share in v1.
+        intent?.removeExtra(Intent.EXTRA_STREAM)
+
         if (credentialStore.load() == null) return
+
         lifecycleScope.launch {
+            var b64: String? = null
+            var mime: String? = null
+            if (imageUri != null) {
+                val read = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    runCatching {
+                        val bytes = contentResolver.openInputStream(imageUri)?.use { it.readBytes() }
+                            ?: return@runCatching null
+                        val m = contentResolver.getType(imageUri) ?: "image/*"
+                        android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP) to m
+                    }.getOrNull()
+                }
+                if (read == null) {
+                    android.widget.Toast.makeText(
+                        this@MainActivity, "Couldn't read the image", android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                    if (caption == null) return@launch  // nothing left to share
+                } else {
+                    b64 = read.first; mime = read.second
+                }
+            }
             // connect() first — a cold-start share has no open socket yet, and createSession()
-            // would otherwise fail after the ready-gate timeout. connect() is idempotent, so
-            // this is safe even when already connected.
+            // would otherwise fail after the ready-gate timeout. connect() is idempotent.
             chat.connect()
             runCatching { chat.createSession() }
                 .onSuccess { id ->
-                    pendingShare.put(id, text)
+                    pendingShare.put(
+                        id,
+                        com.hermes.client.share.PendingShare(text = caption, imageBase64 = b64, imageMime = mime),
+                    )
                     pendingRoute.value = "chat/$id"
                 }
                 .onFailure { e ->
