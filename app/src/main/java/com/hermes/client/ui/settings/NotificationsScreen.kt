@@ -46,8 +46,6 @@ class NotificationsViewModel @Inject constructor(
 
     fun setEnabled(v: Boolean) = viewModelScope.launch { settings.setEnabled(v) }
     fun setApprovals(v: Boolean) = viewModelScope.launch { settings.setApprovals(v) }
-    fun setCron(v: Boolean) = viewModelScope.launch { settings.setCron(v) }
-    fun setMessaging(v: Boolean) = viewModelScope.launch { settings.setMessaging(v) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,8 +92,6 @@ fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = hiltVie
             ) { on -> if (on) enable() else { vm.setEnabled(false); GatewayConnectionService.stop(context) } }
             HorizontalDivider()
             ToggleRow("Approval requests", "When the agent needs you to approve an action", prefs.approvals, enabled = prefs.enabled) { vm.setApprovals(it) }
-            ToggleRow("Cron runs", "When a scheduled job finishes", prefs.cron, enabled = prefs.enabled) { vm.setCron(it) }
-            ToggleRow("Messaging replies", "Replies on connected platforms", prefs.messaging, enabled = prefs.enabled) { vm.setMessaging(it) }
         }
     }
 }

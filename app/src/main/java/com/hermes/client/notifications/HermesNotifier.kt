@@ -23,11 +23,6 @@ class HermesNotifier(private val context: Context) {
             },
         )
         sys.createNotificationChannel(
-            NotificationChannel(Notif.CHANNEL_ACTIVITY, "Agent activity", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE
-            },
-        )
-        sys.createNotificationChannel(
             NotificationChannel(Notif.CHANNEL_SERVICE, "Connection", NotificationManager.IMPORTANCE_MIN),
         )
     }

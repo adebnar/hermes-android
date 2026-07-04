@@ -4,9 +4,9 @@ import com.hermes.client.data.network.ServerEvent
 import com.hermes.client.data.network.str
 
 /**
- * Pure mapping from a gateway event to a notification (or null). Centralizes every event-type
- * decision so verifying/adjusting the gateway's event names is a one-line change. A stable id is
- * derived from the session so repeats of the same event update rather than stack.
+ * Pure mapping from a gateway event to a notification (or null). Only `approval.request` is a
+ * notifiable event on the app's WebSocket (see the note on [Notif]); everything else returns null.
+ * A stable id is derived from the session so repeats of the same event update rather than stack.
  */
 fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs): NotificationSpec? {
     if (!prefs.enabled) return null
@@ -27,24 +27,6 @@ fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs): Notificati
                 NotifAction("Deny", Notif.ACTION_DENY, sid),
             ),
             groupKey = "approval",
-        )
-        Notif.EVENT_CRON_DONE -> if (!prefs.cron) null else NotificationSpec(
-            id = id,
-            channelId = Notif.CHANNEL_ACTIVITY,
-            title = event.str("name") ?: "Scheduled job finished",
-            body = "Run ${event.str("status") ?: "finished"}",
-            route = "chat/$sid",
-            actions = emptyList(),
-            groupKey = "cron",
-        )
-        Notif.EVENT_MSG -> if (!prefs.messaging) null else NotificationSpec(
-            id = id,
-            channelId = Notif.CHANNEL_ACTIVITY,
-            title = "Reply on ${event.str("platform") ?: "messaging"}",
-            body = event.str("preview") ?: event.str("text") ?: "New reply",
-            route = "chat/$sid",
-            actions = emptyList(),
-            groupKey = "messaging",
         )
         else -> null
     }
