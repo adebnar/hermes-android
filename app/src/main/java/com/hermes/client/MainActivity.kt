@@ -57,7 +57,9 @@ class MainActivity : ComponentActivity() {
         val hasConfig = credentialStore.load() != null
         val crashReport = CrashReporter.read(this)
         // Resume the notification service if the user previously enabled it.
-        kotlinx.coroutines.MainScope().launch {
+        // lifecycleScope (not a bare MainScope) so the coroutine is cancelled with the activity
+        // instead of leaking on every recreation.
+        lifecycleScope.launch {
             if (notificationSettings.prefs.first().enabled) {
                 // On API 33+ the service posts notifications and needs POST_NOTIFICATIONS at
                 // runtime; if it isn't granted (e.g. revoked since last enable), don't auto-start
