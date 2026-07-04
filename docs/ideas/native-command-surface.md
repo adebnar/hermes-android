@@ -3,6 +3,20 @@
 ## Problem Statement
 **How might we** make Hermes for Android a *full-reach, focused-action* remote for self-hosted agents — one that lets you see and unblock any agent from your phone using only the bridge's existing APIs plus native Android capabilities — **without** shipping Hermes core to the device (the official WebView approach) or requiring a single new gateway endpoint?
 
+## Status (as of 2026-07-04, production 0.1.31)
+
+- **Ship 1 — Model sheet:** ✅ **shipped.** Model picker clarity (0.1.22) + the model selection sheet with provider tabs, local favorites, descriptions, and session-vs-default (0.1.23). The switch-failure reason is surfaced in chat; a **Settings** inline-error remains a minor follow-up.
+- **Ship 2 — Native Pager:** mostly shipped.
+  - Share-to-Hermes: text ✅ (0.1.24), images ✅ (0.1.27).
+  - Quick Settings tile ✅ (0.1.26).
+  - **App Widget:** ❌ **shelved** — its headline content (pending approvals) is already covered by the high-priority notification, sits at "0" most of the time, and is only fresh while the foreground service runs. Opt-in only if revisited.
+  - **Voice quick-capture:** ⏸ **deferred** (off-by-default vitamin).
+- **Ship 3 — Situation Room:** ✅ **shipped, reframed as "Home"** (see `activity-home-and-cron-response.md`). Rather than a new screen, we promoted the existing Mission Control feed: cron-response inline (0.1.29), Home landing + tab relabel (0.1.30, plus a pager launch-crash fix), and a "Needs you" strip (0.1.31). Header now reads "Home".
+
+**Key assumptions — resolved.** The WS stream (`/api/ws`) emits `approval.request/responded`, `run.*`, `tool.*`, `message.*` — but **no** cron-finished or messaging events, and **no** REST list of pending approvals. So notifications became **approvals-only**, and "Needs you" is **cron-only** (failed/overdue); pending approvals are best-effort/live-only, and messaging-waits (`/api/pairing`) is not wired in the app. Share-to-Hermes starts a **new** session. The App-Widget freshness bet was never validated (shelved).
+
+**Remaining:** App Widget (opt-in), Voice (deferred), and minor polish (QS-tile `runBlocking`→async, `canStart` dedup, New-FAB last-used-profile, model-sheet Settings inline-error).
+
 ## Context & Constraints (locked)
 - **Architecture:** thin **native** client → existing Hermes bridge (REST at `:9119` + WS). Never wrap the desktop renderer (that's PR #52673's bet; this is the opposite bet).
 - **No bridge/gateway API changes.** Build only against **documented existing endpoints** (see `Hermes API's As of 7-3-2026`) + **native Android APIs**. If a feature seems to need a new endpoint, it's out until it doesn't.

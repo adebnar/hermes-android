@@ -133,3 +133,6 @@ Idea refined 2026-07-02. Direction: **A now / B later**, hybrid chat, chrome-onl
 profile-accent (primary) with optional Material You base. All four open questions
 resolved (above). Build spine: tokens → components → nav → Sessions rebuild → Chat
 rebuild → motion polish, on `feature/design-system` off `develop`.
+
+**✅ Shipped: 0.1.19** ("interface modernization + Mission Control"), with the per-profile
+accent picker following post-0.1.19 (see Deferred features above). This doc is delivered.
