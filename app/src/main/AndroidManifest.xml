@@ -33,6 +33,16 @@
             android:name=".notifications.GatewayConnectionService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".notifications.NotificationTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_hermes"
+            android:label="Hermes"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
         <receiver
             android:name=".notifications.NotificationActionReceiver"
             android:exported="false" />
