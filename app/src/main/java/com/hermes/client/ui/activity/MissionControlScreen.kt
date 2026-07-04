@@ -148,11 +148,13 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
     val vm: MissionControlViewModel = hiltViewModel(key = "mc-${profile ?: "_"}")
     val state by vm.state.collectAsStateWithLifecycle()
     val responses by vm.responses.collectAsStateWithLifecycle()
-    val expanded = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
+    var expandedIds by androidx.compose.runtime.saveable.rememberSaveable {
+        androidx.compose.runtime.mutableStateOf(emptySet<String>())
+    }
     val onToggle: (ActivityItem) -> Unit = { item ->
-        val open = !(expanded[item.id] ?: false)
-        expanded[item.id] = open
-        if (open) item.sessionId?.let { vm.loadResponse(it) }
+        val nowExpanded = item.id !in expandedIds
+        expandedIds = if (nowExpanded) expandedIds + item.id else expandedIds - item.id
+        if (nowExpanded) item.sessionId?.let { vm.loadResponse(it) }
     }
     val onRetryResponse: (ActivityItem) -> Unit = { item -> item.sessionId?.let { vm.loadResponse(it) } }
     val scope = rememberCoroutineScope()
@@ -178,7 +180,7 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
         ) {
             MissionControlContent(
                 state = state, nowMs = now, onRetry = { vm.refresh() },
-                responses = responses, expanded = expanded,
+                responses = responses, expandedIds = expandedIds,
                 onToggle = onToggle, onRetryResponse = onRetryResponse, onOpen = onOpen,
             )
         }
@@ -191,7 +193,7 @@ private fun MissionControlContent(
     nowMs: Long,
     onRetry: () -> Unit,
     responses: Map<String, MissionControlViewModel.CronResponseUi>,
-    expanded: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Boolean>,
+    expandedIds: Set<String>,
     onToggle: (ActivityItem) -> Unit,
     onRetryResponse: (ActivityItem) -> Unit,
     onOpen: (String) -> Unit,
@@ -236,7 +238,7 @@ private fun MissionControlContent(
                         item = activity,
                         nowMs = nowMs,
                         expandable = expandable,
-                        isExpanded = expanded[activity.id] == true,
+                        isExpanded = activity.id in expandedIds,
                         response = activity.sessionId?.let { responses[it] },
                         onClick = { if (expandable) onToggle(activity) else onOpen(activity.route) },
                         onRetry = { onRetryResponse(activity) },

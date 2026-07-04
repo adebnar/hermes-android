@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -95,15 +96,17 @@ class MissionControlViewModel @Inject constructor(
     fun loadResponse(sessionId: String) {
         val existing = _responses.value[sessionId]
         if (existing != null && (existing.loading || existing.text != null)) return
-        _responses.value = _responses.value + (sessionId to CronResponseUi(loading = true))
+        _responses.update { it + (sessionId to CronResponseUi(loading = true)) }
         viewModelScope.launch {
             val result = runCatching { sessions.history(sessionId, profile) }
-            _responses.value = _responses.value + (
-                sessionId to result.fold(
-                    onSuccess = { CronResponseUi(text = cronResponse(it)) },
-                    onFailure = { CronResponseUi(error = true) },
+            _responses.update {
+                it + (
+                    sessionId to result.fold(
+                        onSuccess = { CronResponseUi(text = cronResponse(it)) },
+                        onFailure = { CronResponseUi(error = true) },
+                    )
                 )
-            )
+            }
         }
     }
 }
