@@ -63,10 +63,12 @@ class MissionControlViewModel @Inject constructor(
             // A cron failure (e.g. profile without cron) must not blank the whole feed.
             val crons = runCatching { tools.cronJobs(profile) }.getOrDefault(emptyList())
             val now = System.currentTimeMillis()
-            val items = sessionsToActivity(scoped) + cronsToActivity(crons)
+            val alerts = needsAttention(crons, now)
+            val alertIds = alerts.mapTo(mutableSetOf()) { it.jobId }
+            val items = sessionsToActivity(scoped) + cronsToActivity(crons.filterNot { it.id in alertIds })
             _state.value = MissionControlState(
                 sections = groupActivity(items, now),
-                needsYou = needsAttention(crons, now),
+                needsYou = alerts,
             )
         } catch (e: HermesApiException) {
             if (e.code == 401) _state.value = MissionControlState(unauthorized = true)
