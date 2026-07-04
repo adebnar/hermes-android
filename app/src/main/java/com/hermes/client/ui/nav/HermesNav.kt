@@ -12,6 +12,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -57,11 +58,19 @@ private val TABS = listOf(
  * [hasConfig] is false the start destination is "setup" and the bar is hidden there.
  *
  * onUnauthorized clears the back stack and routes to "setup" so an expired token forces re-entry.
+ *
+ * [deepLinkRoute], when non-null, is navigated to once (keyed by value) — used to jump straight
+ * to a session when the activity is launched or resumed from a tapped notification.
+ * [onDeepLinkConsumed] is invoked right after that navigation so the caller can clear its
+ * pending-route state; otherwise a config change (rotation, dark-mode/font-scale) would recreate
+ * the activity, re-read the same intent extra, and re-navigate to the same chat.
  */
 @Composable
-fun HermesNav(hasConfig: Boolean) {
+fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsumed: () -> Unit = {}) {
     val nav = rememberNavController()
     val start = if (hasConfig) "sessions" else "setup"
+
+    LaunchedEffect(deepLinkRoute) { deepLinkRoute?.let { nav.navigate(it); onDeepLinkConsumed() } }
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
@@ -187,6 +196,9 @@ fun HermesNav(hasConfig: Boolean) {
                 )
             }
             composable("settings_appearance") { AppearanceScreen(onBack = { nav.popBackStack() }) }
+            composable("settings_notifications") {
+                com.hermes.client.ui.settings.NotificationsScreen(onBack = { nav.popBackStack() })
+            }
             composable("settings_memory") { MemorySettingsScreen(onBack = { nav.popBackStack() }) }
             composable("settings_mcp") { McpSettingsScreen(onBack = { nav.popBackStack() }) }
             composable("settings_env") { EnvScreen(onBack = { nav.popBackStack() }) }

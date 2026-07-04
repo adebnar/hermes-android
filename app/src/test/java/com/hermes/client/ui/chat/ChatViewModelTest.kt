@@ -2,10 +2,10 @@ package com.hermes.client.ui.chat
 
 import app.cash.turbine.test
 import com.hermes.client.data.network.ConnectionState
-import com.hermes.client.data.network.ModelOptionDto
 import com.hermes.client.data.network.ProfileDto
 import com.hermes.client.data.network.ServerEvent
 import com.hermes.client.data.repository.ChatRepository
+import com.hermes.client.data.repository.ModelFavoritesStore
 import com.hermes.client.data.repository.ModelRepository
 import com.hermes.client.data.repository.ProfileRepository
 import com.hermes.client.data.repository.SessionRepository
@@ -38,6 +38,8 @@ class ChatViewModelTest {
     private val modelRepo = mockk<ModelRepository>(relaxed = true)
     private val profileRepo = mockk<ProfileRepository>(relaxed = true)
     private val profileManager = mockk<com.hermes.client.data.repository.ProfileManager>(relaxed = true)
+    private val favoritesStore = mockk<ModelFavoritesStore>(relaxed = true)
+    private val pendingShareStore = com.hermes.client.share.PendingShareStore()
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
@@ -49,10 +51,12 @@ class ChatViewModelTest {
         every { profileManager.active } returns MutableStateFlow<String?>(null)
         coEvery { sessionRepo.history(any(), any()) } returns emptyList()
         coEvery { modelRepo.options() } returns emptyList()
+        coEvery { modelRepo.providers() } returns emptyList()
         coEvery { profileRepo.list() } returns emptyList()
+        every { favoritesStore.favorites } returns MutableStateFlow(emptySet())
     }
 
-    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager)
+    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager, favoritesStore, pendingShareStore)
 
     @Test fun streamed_delta_appears_in_state() = runTest {
         val vm = buildVm()
@@ -102,6 +106,40 @@ class ChatViewModelTest {
     }
 
     /**
+     * Highest-risk share invariant: a pending image share must be attached AFTER resume,
+     * using the LIVE post-resume session handle returned by chat.resume() — not the id
+     * open() was called with — since the gateway may hand back a different live handle
+     * and the attach must target the session it actually knows about.
+     */
+    @Test fun open_attaches_pending_image_using_live_resumed_sessionId() = runTest {
+        coEvery { chatRepo.resume("s1", null) } returns "s1-live"
+        pendingShareStore.put(
+            "s1",
+            com.hermes.client.share.PendingShare(imageBase64 = "abc", imageMime = "image/png"),
+        )
+        val vm = buildVm()
+        vm.open("s1")
+        advanceUntilIdle()
+
+        coVerify { chatRepo.attachImageBytes("s1-live", "abc", "image/png") }
+        assertTrue(
+            "an 'Image attached' system message must land in state",
+            vm.state.value.messages.any { it.text.contains("Image attached") },
+        )
+    }
+
+    /** A text-only pending share (no image) must not trigger an attach call at all. */
+    @Test fun open_with_text_only_pending_share_does_not_attach_image() = runTest {
+        pendingShareStore.put("s1", com.hermes.client.share.PendingShare(text = "hello"))
+        val vm = buildVm()
+        vm.open("s1")
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { chatRepo.attachImageBytes(any(), any(), any()) }
+        assertEquals("hello", vm.initialDraft.value)
+    }
+
+    /**
      * I3: when connectionState enters Reconnecting while generation is in progress,
      * the in-flight assistant message must be marked interrupted and isGenerating cleared.
      */
@@ -141,42 +179,70 @@ class ChatViewModelTest {
         coVerify(exactly = 1) { chatRepo.resume("s1", null) }
     }
 
-    // Changing the model inside a chat must switch THIS session's model (a `/model … --session`
-    // slash), not the global default — otherwise a session pinned to an unavailable model keeps
-    // failing with "model is not available in session" no matter how often the picker is used.
-    @Test fun selectModel_switches_session_model_via_slash() = runTest {
+    // Changing the model inside a chat (SESSION scope, the default) must switch THIS session's
+    // model (a `/model … --session` slash), not the global default — otherwise a session pinned
+    // to an unavailable model keeps failing with "model is not available in session" no matter
+    // how often the picker is used.
+    @Test fun onSelectFromSheet_session_success_switches_via_slash() = runTest {
         val vm = buildVm()
         vm.open("s1")
         advanceUntilIdle()
 
-        vm.selectModel("anthropic", "opus")
+        var onDoneCalled = false
+        vm.onSheetScope(com.hermes.client.ui.models.ModelScope.SESSION)
+        vm.onSelectFromSheet("anthropic", "opus") { onDoneCalled = true }
         advanceUntilIdle()
 
         coVerify { chatRepo.slashExec("s1", "/model opus --provider anthropic --session") }
+        assertEquals("opus", vm.currentModel.value)
+        assertTrue("success must clear any sheet error", vm.modelSheet.value.error == null)
+        assertTrue("onDone must be invoked so the caller dismisses the sheet", onDoneCalled)
     }
 
-    // The model-switch outcome must be visible, not swallowed: the gateway reports it (success
-    // or e.g. a credentials error) in the slash output, which the app must surface.
-    @Test fun selectModel_surfaces_slash_output() = runTest {
-        coEvery { chatRepo.slashExec("s1", any()) } returns "✗ Could not resolve credentials for provider 'Anthropic'"
-        val vm = buildVm()
-        vm.open("s1"); advanceUntilIdle()
-        vm.selectModel("anthropic", "opus"); advanceUntilIdle()
-        assertTrue(
-            "the slash output must appear in the conversation",
-            vm.state.value.messages.any { it.text.contains("Could not resolve credentials") },
-        )
-    }
-
-    // A worker failure ("slash worker closed pipe") throws — it must surface as an error, not
-    // silently do nothing (the original bug).
-    @Test fun selectModel_surfaces_switch_failure() = runTest {
+    // A worker failure ("slash worker closed pipe") throws — it must surface in the sheet's error
+    // (not the chat transcript), and the sheet must stay open (onDone not invoked) so the user can
+    // retry or pick a different model.
+    @Test fun onSelectFromSheet_session_failure_surfaces_sheet_error() = runTest {
         coEvery { chatRepo.slashExec("s1", any()) } throws RuntimeException("slash worker closed pipe")
         val vm = buildVm()
         vm.open("s1"); advanceUntilIdle()
-        vm.selectModel("anthropic", "opus"); advanceUntilIdle()
-        val msg = vm.state.value.messages.lastOrNull()
-        assertTrue("a failed switch must show an error", msg?.isError == true && msg.text.contains("Couldn't switch model"))
+
+        var onDoneCalled = false
+        vm.onSheetScope(com.hermes.client.ui.models.ModelScope.SESSION)
+        vm.onSelectFromSheet("anthropic", "opus") { onDoneCalled = true }
+        advanceUntilIdle()
+
+        assertTrue("a failed switch must surface a sheet error", vm.modelSheet.value.error != null)
+        assertFalse("the sheet must stay open on failure", onDoneCalled)
+    }
+
+    // DEFAULT scope sets the global default model via REST, not the session slash.
+    @Test fun onSelectFromSheet_default_success_sets_default_model() = runTest {
+        val vm = buildVm()
+        vm.open("s1"); advanceUntilIdle()
+
+        var onDoneCalled = false
+        vm.onSheetScope(com.hermes.client.ui.models.ModelScope.DEFAULT)
+        vm.onSelectFromSheet("anthropic", "opus") { onDoneCalled = true }
+        advanceUntilIdle()
+
+        coVerify { modelRepo.set("anthropic", "opus") }
+        assertTrue("success must clear any sheet error", vm.modelSheet.value.error == null)
+        assertTrue("onDone must be invoked so the caller dismisses the sheet", onDoneCalled)
+    }
+
+    @Test fun onSelectFromSheet_default_failure_surfaces_sheet_error() = runTest {
+        coEvery { modelRepo.set(any(), any()) } throws RuntimeException("could not set default")
+        val vm = buildVm()
+        vm.open("s1"); advanceUntilIdle()
+
+        var onDoneCalled = false
+        vm.onSheetScope(com.hermes.client.ui.models.ModelScope.DEFAULT)
+        vm.onSelectFromSheet("anthropic", "opus") { onDoneCalled = true }
+        advanceUntilIdle()
+
+        assertTrue("a failed default switch must surface a sheet error", vm.modelSheet.value.error != null)
+        assertFalse("the sheet must stay open on failure", onDoneCalled)
     }
 
     @Test fun selectProfile_calls_profileRepo_setActive() = runTest {

@@ -25,8 +25,6 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermes.client.data.network.ConnectionState
-import com.hermes.client.data.network.ModelOptionDto
 import com.hermes.client.ui.components.StatusDot
 import com.hermes.client.ui.components.connectionLabel
 
@@ -66,11 +64,20 @@ fun ChatScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val connState by vm.connectionState.collectAsStateWithLifecycle()
     val unauthorized by vm.unauthorized.collectAsStateWithLifecycle()
-    val models by vm.models.collectAsStateWithLifecycle()
+    val currentModel by vm.currentModel.collectAsStateWithLifecycle()
+    val providers by vm.providers.collectAsStateWithLifecycle()
+    val favorites by vm.favorites.collectAsStateWithLifecycle()
+    val currentProvider by vm.currentProvider.collectAsStateWithLifecycle()
+    val modelSheet by vm.modelSheet.collectAsStateWithLifecycle()
+    var modelSheetOpen by rememberSaveable { mutableStateOf(false) }
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
     val commands by vm.commands.collectAsStateWithLifecycle()
     val pathItems by vm.pathItems.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
+    val initialDraft by vm.initialDraft.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(initialDraft) {
+        initialDraft?.takeIf { it.isNotEmpty() }?.let { draft = it; vm.clearInitialDraft() }
+    }
     // Slash-command palette: when the draft is a "/query", show matching commands.
     val slashMatches = if (draft.startsWith("/") && !draft.contains(' ')) {
         val q = draft.drop(1).lowercase()
@@ -127,11 +134,10 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    if (models.isNotEmpty()) {
-                        ModelPickerButton(
-                            models = models,
-                            onSelect = { vm.selectModel(it.provider, it.model) },
-                        )
+                    if (providers.isNotEmpty()) {
+                        androidx.compose.material3.TextButton(onClick = { modelSheetOpen = true }) {
+                            Text(currentModel ?: "Model", maxLines = 1)
+                        }
                     }
                     StatusDot(connState)
                 },
@@ -247,6 +253,22 @@ fun ChatScreen(
             },
         )
     }
+
+    if (modelSheetOpen) {
+        val items = com.hermes.client.ui.models.modelSelectorRows(
+            providers = providers, favorites = favorites, query = modelSheet.query,
+            currentProvider = currentProvider, currentModel = currentModel,
+        )
+        com.hermes.client.ui.models.ModelSelectorSheet(
+            items = items,
+            query = modelSheet.query, onQueryChange = vm::onSheetQuery,
+            scope = modelSheet.scope, onScopeChange = vm::onSheetScope,
+            onToggleFavorite = vm::toggleFavorite,
+            onSelect = { p, m -> vm.onSelectFromSheet(p, m) { modelSheetOpen = false } },
+            pending = modelSheet.pending, error = modelSheet.error,
+            onDismiss = { modelSheetOpen = false },
+        )
+    }
 }
 
 @Composable
@@ -267,25 +289,6 @@ private fun ConnectionBanner(state: ConnectionState, onRetry: () -> Unit) {
         // While Connecting the client is already trying — no point offering a manual retry.
         if (state !is ConnectionState.Connecting) {
             TextButton(onClick = onRetry) { Text("Retry") }
-        }
-    }
-}
-
-@Composable
-private fun ModelPickerButton(
-    models: List<ModelOptionDto>,
-    onSelect: (ModelOptionDto) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    TextButton(onClick = { expanded = true }) {
-        Text("Model")
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            models.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.label ?: "${option.provider}/${option.model}") },
-                    onClick = { onSelect(option); expanded = false },
-                )
-            }
         }
     }
 }
