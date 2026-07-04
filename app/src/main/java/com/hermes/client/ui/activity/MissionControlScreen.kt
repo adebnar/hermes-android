@@ -116,7 +116,7 @@ fun MissionControlScreen(
         Scaffold(
             topBar = {
                 Column {
-                    HermesTopBar(title = "Agent Activity", subtitle = currentProfile?.let { "Profile: $it" })
+                    HermesTopBar(title = "Home", subtitle = currentProfile?.let { "Profile: $it" })
                     if (names.size > 1) {
                         com.hermes.client.ui.components.ProfileChips(
                             names = names.filterNotNull(),
@@ -212,6 +212,12 @@ private fun MissionControlContent(
                 }
             }
         }
+        if (state.needsYou.isNotEmpty()) {
+            item(key = "needs-header") { SectionHeader("Needs you", state.needsYou.size) }
+            items(state.needsYou, key = { "needs-${it.jobId}" }) { alert ->
+                NeedsYouRow(alert, onClick = { onOpen(alert.route) })
+            }
+        }
         when {
             state.loading && state.sections.isEmpty() -> item { LoadingState() }
             state.error != null -> item { ErrorState(message = state.error!!, onRetry = onRetry) }
@@ -257,6 +263,25 @@ private fun SectionHeader(label: String, count: Int) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+@Composable
+private fun NeedsYouRow(alert: CronAlert, onClick: () -> Unit) {
+    ListItem(
+        leadingContent = {
+            Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+        },
+        headlineContent = { Text(alert.name) },
+        supportingContent = {
+            Text(
+                when (alert.reason) {
+                    CronAlertReason.FAILED -> "Last run failed"
+                    CronAlertReason.OVERDUE -> "Overdue"
+                },
+            )
+        },
+        modifier = Modifier.clickable(onClick = onClick),
+    )
 }
 
 @Composable
