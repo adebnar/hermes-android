@@ -2,7 +2,9 @@ package com.hermes.client.share
 
 import android.content.Intent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ShareIntentTest {
@@ -30,5 +32,18 @@ class ShareIntentTest {
         assertNull(sharedText(send, "text/plain", "  ", ""))
         assertNull(sharedText(send, "text/plain", null, null))
         assertNull(sharedText(send, null, "s", "t"))
+    }
+    @Test fun image_send_is_image_share() {
+        assertTrue(isImageShare(Intent.ACTION_SEND, "image/png"))
+        assertTrue(isImageShare(Intent.ACTION_SEND, "image/jpeg"))
+    }
+    @Test fun text_send_is_not_image_share() {
+        assertFalse(isImageShare(Intent.ACTION_SEND, "text/plain"))
+    }
+    @Test fun non_send_image_is_not_image_share() {
+        assertFalse(isImageShare(Intent.ACTION_VIEW, "image/png"))
+    }
+    @Test fun null_type_is_not_image_share() {
+        assertFalse(isImageShare(Intent.ACTION_SEND, null))
     }
 }
