@@ -120,6 +120,19 @@ class ChatViewModel @Inject constructor(
             val handle = runCatching { chat.resume(id, profileManager.active.value) }.getOrNull()
             handle?.let { sessionId = it }
             com.hermes.client.data.diagnostics.DebugLog.log("session", "resume($id) → handle=${handle ?: "none"}")
+            // A share may have handed off an image; attach it now that the session handle is live.
+            ps?.let { share ->
+                val imgB64 = share.imageBase64
+                val imgMime = share.imageMime
+                if (imgB64 != null && imgMime != null) {
+                    runCatching { chat.attachImageBytes(sessionId, imgB64, imgMime) }
+                        .onSuccess { appendSystem("📎 Image attached — it will be sent with your next message.") }
+                        .onFailure { e ->
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            appendError("Attach failed: ${e.message}")
+                        }
+                }
+            }
             // Load model options, profiles, and the slash-command catalog; failures are non-fatal
             launch { runCatching { _providers.value = modelRepo.providers() } }
             launch { runCatching { _profiles.value = profileRepo.list() } }
