@@ -10,7 +10,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -26,18 +25,25 @@ class GatewayConnectionService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob())
 
+    // Latest notification prefs, kept current by a collector so the hot event loop never blocks on
+    // DataStore. @Volatile for cross-thread visibility (scope has no single-thread dispatcher).
+    @Volatile private var latestPrefs = NotificationPrefs()
+
     override fun onCreate() {
         super.onCreate()
         notifier.ensureChannels()
         startForeground(HermesNotifier.SERVICE_NOTIFICATION_ID, notifier.serviceNotification())
         client.connect()
+        // Track the latest prefs reactively so the event loop reads a cached value instead of
+        // collecting DataStore per event. Started first so its replayed value is in place before
+        // events arrive; also picks up mid-run toggles (e.g. approvals turned off).
+        scope.launch { settings.prefs.collect { latestPrefs = it } }
         scope.launch {
             client.events.collect { event ->
                 // One malformed/unexpected event must not crash the process — mirror the guard
                 // ChatViewModel's reduce() uses around event handling.
                 runCatching {
-                    val prefs = settings.prefs.first()
-                    toNotificationSpec(event, prefs)?.let { notifier.post(it) }
+                    toNotificationSpec(event, latestPrefs)?.let { notifier.post(it) }
                 }
             }
         }
