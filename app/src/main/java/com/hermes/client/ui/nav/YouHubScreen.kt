@@ -90,7 +90,7 @@ fun YouHubScreen(
 
             HubRow(Icons.Rounded.People, "Profiles", "Manage tenant profiles") { onNavigate("profiles") }
             HorizontalDivider()
-            HubRow(Icons.Rounded.AutoAwesome, "Models", "Model catalog & defaults") { onNavigate("models") }
+            HubRow(Icons.Rounded.AutoAwesome, "Models", "Browse & pick models") { onNavigate("models") }
             HorizontalDivider()
             HubRow(Icons.Rounded.AdminPanelSettings, "Management", "Admin & session tools") { onNavigate("management") }
             HorizontalDivider()
