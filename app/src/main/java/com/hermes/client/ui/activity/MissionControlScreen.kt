@@ -232,7 +232,7 @@ private fun MissionControlContent(
             }
         }
         if (state.needsYou.isNotEmpty()) {
-            item(key = "needs-header") { SectionHeader("Needs you", state.needsYou.size) }
+            item(key = "needs-header") { SectionHeader("Needs you", state.needsYou.size, onClick = { onOpen("cron") }) }
             items(state.needsYou, key = { "needs-${it.jobId}" }) { alert ->
                 NeedsYouRow(alert, nowMs = nowMs, onClick = { onOpen(alert.route) }, onRunNow = { onRunNow(alert) })
             }
@@ -247,7 +247,7 @@ private fun MissionControlContent(
                 )
             }
             else -> state.sections.forEach { section ->
-                item(key = "h-${section.title}") { SectionHeader(section.title, section.items.size) }
+                item(key = "h-${section.title}") { SectionHeader(section.title, section.items.size, onClick = if (section.title.equals("Upcoming", ignoreCase = true)) ({ onOpen("cron") }) else null) }
                 items(section.items, key = { it.id }) { activity ->
                     val expandable = activity.kind == ActivityKind.CRON &&
                         activity.sessionId != null && !activity.upcoming
@@ -268,8 +268,13 @@ private fun MissionControlContent(
 }
 
 @Composable
-private fun SectionHeader(label: String, count: Int) {
-    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) {
+private fun SectionHeader(label: String, count: Int, onClick: (() -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
             label.uppercase(),
             style = MaterialTheme.typography.titleSmall,
@@ -281,6 +286,13 @@ private fun SectionHeader(label: String, count: Int) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (onClick != null) {
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
