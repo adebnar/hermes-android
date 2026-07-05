@@ -256,7 +256,7 @@ private fun SectionHeader(label: String, count: Int) {
         Text(
             label.uppercase(),
             style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
+            color = LocalProfileAccent.current.accent,
             modifier = Modifier.weight(1f),
         )
         Text(
@@ -308,7 +308,7 @@ private fun ActivityRow(
     val tint = when {
         item.status.equals("error", ignoreCase = true) ||
             item.status.equals("failed", ignoreCase = true) -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.primary
+        else -> LocalProfileAccent.current.accent
     }
     val time = relativeTime(item.timestampMs, nowMs)
     Column {

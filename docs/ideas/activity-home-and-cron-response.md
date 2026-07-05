@@ -3,6 +3,15 @@
 ## Problem Statement
 **How might we** make opening the app land you on *what's happening and what needs you* (never a stale resumed chat), and let you see *what a scheduled job actually answered* without wading through its full transcript — using only existing endpoints + native APIs?
 
+## Status — ✅ shipped (production 0.1.31)
+
+- **Piece 1 — Cron response inline:** ✅ **0.1.29.** Tap a cron run in the feed → its final assistant response expands inline (Product-level, last-tool-result fallback), with "View full chat".
+- **Piece 2 — Home:** ✅
+  - **2a — Home landing + tab relabel** (0.1.30): the app opens to the **Home** tab (Home · Chats · You); notification taps still deep-link. Also fixed a latent MissionControl pager launch-crash exposed by landing there.
+  - **2b — "Needs you" strip + header rename** (0.1.31): a red section pins **failed/overdue cron** to the top of Home (deduped from the feed); the header reads "Home".
+
+**Honesty held:** "Needs you" is **cron-only** — messaging-waits (`/api/pairing`) isn't wired in the app and pending approvals are WS-only/transient (no REST list), so both were deliberately excluded. Auto-refresh rides the existing `ON_RESUME` reload. This idea doc is fully delivered.
+
 ## Context (grounded in the code)
 - **Launch today:** `HermesNav` sets `start = if (hasConfig) "sessions" else "setup"` — a cold launch opens the **Sessions list**. A notification tap already deep-links to `chat/<id>` via the `extra_route` rail.
 - **Agent Activity today:** the `activity` tab is **Mission Control** — already a "unified activity feed merging conversations + cron for the active profile, time-grouped." Cron runs are stored as real `source="cron"` **sessions**; tapping one opens the *full* transcript. `ActivityItem.status` already carries cron `last_status`; `CronJobDto` carries `lastRunAt`/`nextRunAt`.

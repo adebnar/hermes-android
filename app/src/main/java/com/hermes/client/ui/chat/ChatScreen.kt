@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -22,13 +23,16 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.material3.OutlinedTextField
@@ -134,11 +138,21 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    if (providers.isNotEmpty()) {
-                        androidx.compose.material3.TextButton(onClick = { modelSheetOpen = true }) {
-                            Text(currentModel ?: "Model", maxLines = 1)
-                        }
-                    }
+                    AssistChip(
+                        onClick = { modelSheetOpen = true },
+                        label = { Text(currentModel ?: "Model", maxLines = 1) },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Rounded.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        },
+                        colors = androidx.compose.material3.AssistChipDefaults.assistChipColors(
+                            labelColor = com.hermes.client.ui.components.AccentChrome.onBar,
+                            trailingIconContentColor = com.hermes.client.ui.components.AccentChrome.onBar,
+                        ),
+                    )
                     StatusDot(connState)
                 },
             )
@@ -155,6 +169,8 @@ fun ChatScreen(
                     .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                com.hermes.client.ui.components.ProfileAvatar(activeProfile)
+                Spacer(Modifier.width(4.dp))
                 IconButton(onClick = { pickImage.launch("image/*") }, enabled = connected) {
                     Icon(Icons.Rounded.AttachFile, contentDescription = "Attach image")
                 }
@@ -194,7 +210,7 @@ fun ChatScreen(
                 Text(
                     "COMMANDS",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = LocalProfileAccent.current.accent,
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
                 )
                 LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
@@ -211,7 +227,7 @@ fun ChatScreen(
                 Text(
                     "ATTACH / MENTION",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = LocalProfileAccent.current.accent,
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
                 )
                 LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
