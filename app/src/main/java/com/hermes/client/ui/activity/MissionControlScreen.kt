@@ -120,7 +120,7 @@ fun MissionControlScreen(
         Scaffold(
             topBar = {
                 Column {
-                    HermesTopBar(title = "Home", subtitle = currentProfile?.let { "Profile: $it" })
+                    HermesTopBar(title = "Home")
                     if (names.size > 1) {
                         com.hermes.client.ui.components.ProfileSwitcher(
                             names = names.filterNotNull(),
@@ -216,21 +216,6 @@ private fun MissionControlContent(
     onRunNow: (CronAlert) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
-        item(key = "quicklinks") {
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                QUICK_LINKS.forEach { link ->
-                    AssistChip(
-                        onClick = { onOpen(link.route) },
-                        label = { Text(link.label) },
-                        leadingIcon = { Icon(link.icon, contentDescription = null, Modifier.width(18.dp)) },
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-            }
-        }
         if (state.needsYou.isNotEmpty()) {
             item(key = "needs-header") { SectionHeader("Needs you", state.needsYou.size, onClick = { onOpen("cron") }) }
             items(state.needsYou, key = { "needs-${it.jobId}" }) { alert ->
@@ -261,6 +246,21 @@ private fun MissionControlContent(
                         onRetry = { onRetryResponse(activity) },
                         onOpenFull = { onOpen(activity.route) },
                     )
+                }
+            }
+        }
+        item(key = "quicklinks") {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                QUICK_LINKS.forEach { link ->
+                    AssistChip(
+                        onClick = { onOpen(link.route) },
+                        label = { Text(link.label) },
+                        leadingIcon = { Icon(link.icon, contentDescription = null, Modifier.width(18.dp)) },
+                    )
+                    Spacer(Modifier.width(8.dp))
                 }
             }
         }
