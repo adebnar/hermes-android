@@ -20,11 +20,11 @@ import com.hermes.client.ui.theme.rememberProfileAccent
 fun ProfileAvatar(name: String?, modifier: Modifier = Modifier, size: Dp = 28.dp) {
     val accent = rememberProfileAccent(name, isSystemInDarkTheme())
     Box(
-        modifier.size(size).clip(CircleShape).background(accent.accent),
+        Modifier.size(size).clip(CircleShape).background(accent.accent).then(modifier),
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            (name ?: "·").take(1).uppercase(),
+            (name?.takeIf { it.isNotBlank() } ?: "·").take(1).uppercase(),
             color = accent.onAccent,
             style = if (size >= 40.dp) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
         )

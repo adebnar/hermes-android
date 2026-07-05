@@ -148,6 +148,10 @@ fun ChatScreen(
                                 modifier = Modifier.size(18.dp),
                             )
                         },
+                        colors = androidx.compose.material3.AssistChipDefaults.assistChipColors(
+                            labelColor = com.hermes.client.ui.components.AccentChrome.onBar,
+                            trailingIconContentColor = com.hermes.client.ui.components.AccentChrome.onBar,
+                        ),
                     )
                     StatusDot(connState)
                 },
