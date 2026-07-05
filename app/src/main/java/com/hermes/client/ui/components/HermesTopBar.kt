@@ -31,9 +31,9 @@ fun HermesTopBar(
     val dark = isSystemInDarkTheme()
     val barBg = if (dark) accent.container else accent.accent
     val barOn = if (dark) accent.onContainer else accent.onAccent
-    // Soft tint: a pale accent-tinted bar with a contrast-checked dark/light on-color. Keeps
-    // the tenant signal without a heavy fully-saturated header, and — critically — every bit
-    // of chrome text/icon must use `onContainer` so nothing (e.g. action labels) goes illegible.
+    // The app bar carries the active tenant's colour: a bold saturated bar (accent + on-accent)
+    // in light mode, and a soft tinted bar (container + on-container) in dark mode. barBg/barOn
+    // pick the right pair so all chrome text/icons stay legible in both themes.
     val colors: TopAppBarColors = TopAppBarDefaults.topAppBarColors(
         containerColor = barBg,
         titleContentColor = barOn,
