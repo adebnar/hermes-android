@@ -32,7 +32,7 @@ fun bannerLabel(state: ConnectionState): String = when (state) {
 }
 
 @Composable
-fun StatusDot(state: ConnectionState, modifier: Modifier = Modifier) {
+fun StatusDot(state: ConnectionState, modifier: Modifier = Modifier, showLabel: Boolean = false) {
     val color = when (state) {
         ConnectionState.Connected -> Color(0xFF2E7D32)
         ConnectionState.Connecting, ConnectionState.Reconnecting -> Color(0xFFF9A825)
@@ -45,10 +45,12 @@ fun StatusDot(state: ConnectionState, modifier: Modifier = Modifier) {
                 .clip(CircleShape)
                 .background(color),
         )
-        Text(
-            text = connectionLabel(state),
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(start = 6.dp),
-        )
+        if (showLabel) {
+            Text(
+                text = connectionLabel(state),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
     }
 }
