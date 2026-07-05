@@ -17,11 +17,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -109,7 +109,9 @@ fun UsageScreen(
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
                 state.loading -> com.hermes.client.ui.components.LoadingState()
-                state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
+                state.error != null -> com.hermes.client.ui.components.ErrorState(
+                    message = state.error!!, onRetry = { vm.load() },
+                )
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     item {
                         Column(Modifier.padding(16.dp)) {
@@ -125,13 +127,13 @@ fun UsageScreen(
                             }
                             if (state.daily.isNotEmpty()) {
                                 Text("DAILY TOKENS", style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = LocalProfileAccent.current.accent,
                                     modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
                                 DailyTokensChart(state.daily)
                             }
                         }
                         Text("TOP MODELS", style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = LocalProfileAccent.current.accent,
                             modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp))
                     }
                     // No key: model names can repeat across providers (e.g. two "gemma"),

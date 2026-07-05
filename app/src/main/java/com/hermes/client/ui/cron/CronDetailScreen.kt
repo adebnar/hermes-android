@@ -17,6 +17,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -74,7 +75,11 @@ fun CronDetailScreen(
     ) { padding ->
         when {
             state.loading -> com.hermes.client.ui.components.LoadingState()
-            state.job == null -> Text(state.error ?: "Not found", Modifier.padding(padding).padding(24.dp))
+            state.job == null -> com.hermes.client.ui.components.ErrorState(
+                message = state.error ?: "Couldn't load this cron job",
+                modifier = Modifier.padding(padding).fillMaxSize(),
+                onRetry = { vm.load(jobId) },
+            )
             else -> {
                 val job = state.job!!
                 LazyColumn(Modifier.padding(padding).fillMaxSize()) {
@@ -112,7 +117,7 @@ fun CronDetailScreen(
                             job.prompt?.takeIf { it.isNotBlank() }?.let {
                                 Spacer(Modifier.padding(top = 12.dp))
                                 Text("PROMPT", style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary)
+                                    color = LocalProfileAccent.current.accent)
                                 Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 8,
                                     overflow = TextOverflow.Ellipsis)
                             }
@@ -120,7 +125,7 @@ fun CronDetailScreen(
                         Text(
                             "RUN HISTORY (${state.runs.size})",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = LocalProfileAccent.current.accent,
                             modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
                         )
                     }

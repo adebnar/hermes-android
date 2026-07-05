@@ -47,10 +47,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermes.client.ui.components.HermesTopBar
 import com.hermes.client.ui.components.HubRow
 import com.hermes.client.ui.theme.ACCENT_SWATCHES
+import com.hermes.client.ui.theme.LocalProfileAccent
 import com.hermes.client.ui.theme.accentFromHsl
 import com.hermes.client.ui.theme.colorArgbToHsl
 import com.hermes.client.ui.theme.hslToColorArgb
-import com.hermes.client.ui.theme.rememberProfileAccent
 
 /**
  * "You" tab — profile identity + everything about the account/app: the profile quick-switch
@@ -71,7 +71,7 @@ fun YouHubScreen(
             Text(
                 "PROFILES",
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = LocalProfileAccent.current.accent,
                 modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
             )
             ProfileAvatarRow(
@@ -201,33 +201,26 @@ private fun SliderRow(
 /** Quick-switch avatar row: each profile's initial in a chip tinted to that profile's own accent. */
 @Composable
 private fun ProfileAvatarRow(profiles: List<String>, active: String?, onSwitch: (String) -> Unit) {
-    val dark = androidx.compose.foundation.isSystemInDarkTheme()
     Row(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
     ) {
         profiles.forEach { name ->
             val selected = name == active
-            // Each avatar previews that profile's own accent hue, so the switcher itself teaches
-            // the color mapping.
-            val accent = rememberProfileAccent(name, dark)
+            // Each avatar previews that profile's own accent hue (via ProfileAvatar), so the
+            // switcher itself teaches the color mapping.
             Column(
                 Modifier.padding(end = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(accent.accent)
-                        .clickable { onSwitch(name) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(name.take(1).uppercase(), color = accent.onAccent, style = MaterialTheme.typography.titleMedium)
-                }
+                com.hermes.client.ui.components.ProfileAvatar(
+                    name,
+                    modifier = Modifier.clickable { onSwitch(name) },
+                    size = 48.dp,
+                )
                 Text(
                     name,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) LocalProfileAccent.current.accent else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
             }
