@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
@@ -305,14 +306,14 @@ private fun CollapsibleHeader(
             if (collapsed) Icons.Rounded.ChevronRight else Icons.Rounded.ExpandMore,
             contentDescription = if (collapsed) "Expand" else "Collapse",
             tint = if (indent) MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.primary,
+            else LocalProfileAccent.current.accent,
             modifier = Modifier.padding(end = 8.dp).size(18.dp),
         )
         Text(
             if (indent) label else label.uppercase(),
             style = MaterialTheme.typography.labelMedium,
             color = if (indent) MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.primary,
+            else LocalProfileAccent.current.accent,
             modifier = Modifier.weight(1f),
         )
         Text(
@@ -332,7 +333,7 @@ private fun SectionHeader(label: String, count: Int, note: String? = null) {
         Text(
             label.uppercase(),
             style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
-            color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+            color = LocalProfileAccent.current.accent,
         )
         note?.let {
             Text(
@@ -408,7 +409,7 @@ private fun SessionRow(
                         Icons.Rounded.PushPin,
                         contentDescription = "Pinned",
                         modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = LocalProfileAccent.current.accent,
                     )
                 }
             } else null,

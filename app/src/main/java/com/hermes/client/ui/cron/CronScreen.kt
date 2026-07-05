@@ -12,6 +12,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -67,7 +68,7 @@ fun CronScreen(
                                         !job.enabled -> "  · disabled"
                                         else -> ""
                                     },
-                                    color = if (job.enabled && !job.isPaused) MaterialTheme.colorScheme.primary
+                                    color = if (job.enabled && !job.isPaused) LocalProfileAccent.current.accent
                                     else MaterialTheme.colorScheme.error,
                                 )
                             },

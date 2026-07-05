@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermes.client.ui.components.HermesTopBar
 import com.hermes.client.ui.components.HubRow
 import com.hermes.client.ui.theme.ACCENT_SWATCHES
+import com.hermes.client.ui.theme.LocalProfileAccent
 import com.hermes.client.ui.theme.accentFromHsl
 import com.hermes.client.ui.theme.colorArgbToHsl
 import com.hermes.client.ui.theme.hslToColorArgb
@@ -71,7 +72,7 @@ fun YouHubScreen(
             Text(
                 "PROFILES",
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = LocalProfileAccent.current.accent,
                 modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
             )
             ProfileAvatarRow(
@@ -227,7 +228,7 @@ private fun ProfileAvatarRow(profiles: List<String>, active: String?, onSwitch: 
                 Text(
                     name,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) LocalProfileAccent.current.accent else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
             }

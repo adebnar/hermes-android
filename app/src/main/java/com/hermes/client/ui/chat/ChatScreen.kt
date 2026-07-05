@@ -29,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.material3.OutlinedTextField
@@ -194,7 +195,7 @@ fun ChatScreen(
                 Text(
                     "COMMANDS",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = LocalProfileAccent.current.accent,
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
                 )
                 LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
@@ -211,7 +212,7 @@ fun ChatScreen(
                 Text(
                     "ATTACH / MENTION",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = LocalProfileAccent.current.accent,
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
                 )
                 LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
