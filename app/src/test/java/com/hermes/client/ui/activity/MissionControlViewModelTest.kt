@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -55,5 +56,23 @@ class MissionControlViewModelTest {
         vm.loadResponse("s1"); advanceUntilIdle()
         vm.loadResponse("s1"); advanceUntilIdle()
         coVerify(exactly = 1) { sessions.history("s1", any()) }
+    }
+
+    @Test fun runCron_success_triggers_and_reloads() = runTest(dispatcher) {
+        coEvery { tools.triggerCron("j1", any()) } returns Unit
+        coEvery { sessions.activityFeed() } returns emptyList()
+        coEvery { tools.cronJobs(any()) } returns emptyList()
+        val vm = vm()
+        val ok = vm.runCron("j1")
+        advanceUntilIdle()
+        assertTrue(ok)
+        coVerify { tools.triggerCron("j1", any()) }
+        coVerify(atLeast = 1) { sessions.activityFeed() }   // reload happened
+    }
+
+    @Test fun runCron_failure_returns_false() = runTest(dispatcher) {
+        coEvery { tools.triggerCron("j1", any()) } throws RuntimeException("boom")
+        val vm = vm()
+        assertFalse(vm.runCron("j1"))
     }
 }

@@ -179,7 +179,7 @@ fun ChatScreen(
                     value = draft,
                     onValueChange = { draft = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Message Hermes…  (/ commands · @ attach)") },
+                    placeholder = { Text("Message Hermes…") },
                     maxLines = 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { submit() }),

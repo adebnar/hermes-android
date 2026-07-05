@@ -10,9 +10,10 @@ private fun iso(ms: Long) = java.time.Instant.ofEpochMilli(ms).atOffset(java.tim
 private fun job(
     id: String = "j1", name: String? = null, enabled: Boolean = true, state: String? = null,
     pausedAt: String? = null, nextRunAt: String? = null, lastStatus: String? = null,
+    lastRunAt: String? = null,
 ) = CronJobDto(
     id = id, name = name, enabled = enabled, state = state, pausedAt = pausedAt,
-    nextRunAt = nextRunAt, lastStatus = lastStatus,
+    nextRunAt = nextRunAt, lastStatus = lastStatus, lastRunAt = lastRunAt,
 )
 
 class NeedsYouTest {
@@ -56,5 +57,16 @@ class NeedsYouTest {
         val a = needsAttention(listOf(job(id = "abc", name = "  ", lastStatus = "error")), NOW).single()
         assertEquals("abc", a.name)
         assertEquals("cron_detail/abc", a.route)
+    }
+
+    @Test fun failed_alert_carries_lastRunAt_epoch() {
+        val ran = iso(NOW - 2 * 60 * 60_000)
+        val a = needsAttention(listOf(job(lastStatus = "error", lastRunAt = ran)), NOW).single()
+        assertEquals(com.hermes.client.ui.util.isoToEpochMs(ran), a.lastRunAtMs)
+    }
+
+    @Test fun null_lastRunAt_gives_null_lastRunAtMs() {
+        val a = needsAttention(listOf(job(lastStatus = "error")), NOW).single()
+        assertEquals(null, a.lastRunAtMs)
     }
 }
