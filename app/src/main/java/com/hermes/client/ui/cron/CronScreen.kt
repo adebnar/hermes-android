@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.PauseCircleOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -50,7 +51,11 @@ fun CronScreen(
         },
         floatingActionButton = {
             androidx.compose.material3.ExtendedFloatingActionButton(
-                onClick = onNew, text = { Text("New") }, icon = {},
+                onClick = onNew,
+                text = { Text("New") },
+                icon = { Icon(androidx.compose.material.icons.Icons.Rounded.Add, contentDescription = null) },
+                containerColor = com.hermes.client.ui.components.AccentChrome.fabContainer,
+                contentColor = com.hermes.client.ui.components.AccentChrome.onFab,
             )
         },
     ) { padding ->

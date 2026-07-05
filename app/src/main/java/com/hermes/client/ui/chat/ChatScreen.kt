@@ -54,6 +54,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermes.client.data.network.ConnectionState
 import com.hermes.client.ui.components.StatusDot
+import com.hermes.client.ui.components.bannerLabel
 import com.hermes.client.ui.components.connectionLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -297,14 +298,19 @@ private fun ConnectionBanner(state: ConnectionState, onRetry: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = connectionLabel(state),
+            text = bannerLabel(state),
             color = MaterialTheme.colorScheme.onErrorContainer,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.weight(1f),
         )
         // While Connecting the client is already trying — no point offering a manual retry.
         if (state !is ConnectionState.Connecting) {
-            TextButton(onClick = onRetry) { Text("Retry") }
+            TextButton(
+                onClick = onRetry,
+                colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+            ) { Text("Retry") }
         }
     }
 }
