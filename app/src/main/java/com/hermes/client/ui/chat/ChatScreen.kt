@@ -165,6 +165,8 @@ fun ChatScreen(
                     .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                com.hermes.client.ui.components.ProfileAvatar(activeProfile)
+                Spacer(Modifier.width(4.dp))
                 IconButton(onClick = { pickImage.launch("image/*") }, enabled = connected) {
                     Icon(Icons.Rounded.AttachFile, contentDescription = "Attach image")
                 }
