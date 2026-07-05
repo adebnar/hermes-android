@@ -15,7 +15,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -40,7 +39,12 @@ fun AgentsToolsScreen(
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
                 state.loading -> com.hermes.client.ui.components.LoadingState()
-                state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
+                state.error != null -> com.hermes.client.ui.components.ErrorState(
+                    message = state.error!!, onRetry = { vm.load() },
+                )
+                state.skills.isEmpty() && state.toolsets.isEmpty() -> com.hermes.client.ui.components.EmptyState(
+                    title = "No agents or tools",
+                )
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     item { SectionHeader("Skills (${state.skills.size})") }
                     items(state.skills, key = { it.name }) { skill ->

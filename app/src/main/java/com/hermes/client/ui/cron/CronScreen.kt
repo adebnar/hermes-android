@@ -16,7 +16,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -51,11 +50,12 @@ fun CronScreen(
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
                 state.loading -> com.hermes.client.ui.components.LoadingState()
-                state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
-                state.jobs.isEmpty() -> Text(
-                    "No cron jobs for this profile.",
-                    Modifier.align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                state.error != null -> com.hermes.client.ui.components.ErrorState(
+                    message = state.error!!, onRetry = { vm.load() },
+                )
+                state.jobs.isEmpty() -> com.hermes.client.ui.components.EmptyState(
+                    title = "No cron jobs",
+                    subtitle = "Scheduled jobs for this profile will show up here.",
                 )
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     items(state.jobs, key = { it.id }) { job ->

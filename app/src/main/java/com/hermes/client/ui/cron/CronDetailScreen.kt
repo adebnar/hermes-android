@@ -74,7 +74,11 @@ fun CronDetailScreen(
     ) { padding ->
         when {
             state.loading -> com.hermes.client.ui.components.LoadingState()
-            state.job == null -> Text(state.error ?: "Not found", Modifier.padding(padding).padding(24.dp))
+            state.job == null -> com.hermes.client.ui.components.ErrorState(
+                message = state.error ?: "Couldn't load this cron job",
+                modifier = Modifier.padding(padding).fillMaxSize(),
+                onRetry = { vm.load(jobId) },
+            )
             else -> {
                 val job = state.job!!
                 LazyColumn(Modifier.padding(padding).fillMaxSize()) {

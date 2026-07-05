@@ -21,7 +21,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -109,7 +108,9 @@ fun UsageScreen(
         Box(Modifier.padding(padding).fillMaxSize()) {
             when {
                 state.loading -> com.hermes.client.ui.components.LoadingState()
-                state.error != null -> Text(state.error!!, Modifier.align(Alignment.Center))
+                state.error != null -> com.hermes.client.ui.components.ErrorState(
+                    message = state.error!!, onRetry = { vm.load() },
+                )
                 else -> LazyColumn(Modifier.fillMaxSize()) {
                     item {
                         Column(Modifier.padding(16.dp)) {
