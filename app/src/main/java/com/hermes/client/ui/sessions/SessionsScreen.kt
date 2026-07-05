@@ -92,7 +92,7 @@ fun SessionsScreen(
         topBar = {
             Column {
                 com.hermes.client.ui.components.HermesTopBar(
-                    title = "Sessions",
+                    title = "Chats",
                     actions = {
                         TextButton(
                             onClick = onOpenArchived,
@@ -214,6 +214,7 @@ fun SessionsScreen(
                                 SessionRow(
                                     session = s,
                                     isPinned = true,
+                                    showProfile = true,
                                     // Switch to the session's profile (awaited) before navigating,
                                     // so the chat resumes against the right per-profile DB.
                                     onOpen = { scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
@@ -259,6 +260,7 @@ fun SessionsScreen(
                                     SessionRow(
                                         session = s,
                                         isPinned = false,
+                                        showProfile = false,
                                         onOpen = { scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
                                         onTogglePin = { vm.togglePin(s) },
                                         onRename = { vm.rename(s, it) },
@@ -356,6 +358,7 @@ private fun SectionHeader(label: String, count: Int, note: String? = null) {
 private fun SessionRow(
     session: Session,
     isPinned: Boolean,
+    showProfile: Boolean,
     onOpen: () -> Unit,
     onTogglePin: () -> Unit,
     onRename: (String) -> Unit,
@@ -413,10 +416,10 @@ private fun SessionRow(
                     )
                 }
             } else null,
-            // Show the session's true profile (from the cross-profile list) next to its model so
-            // the tenant is unambiguous before the profile grouping lands.
+            // Pinned rows pool across profiles, so the tenant prefix stays to disambiguate;
+            // grouped rows already sit under a profile header, so it would be redundant there.
             supportingContent = {
-                Text(listOfNotNull(session.profile, session.model).joinToString(" · "))
+                Text(listOfNotNull(session.profile?.takeIf { showProfile && it.isNotBlank() }, session.model).joinToString(" · "))
             },
             // Tap opens the session; long-press opens the management menu.
             modifier = Modifier.combinedClickable(

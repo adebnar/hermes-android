@@ -1,5 +1,6 @@
 package com.hermes.client.ui.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -27,26 +28,29 @@ fun HermesTopBar(
     actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
 ) {
     val accent = LocalProfileAccent.current
-    // Soft tint: a pale accent-tinted bar with a contrast-checked dark/light on-color. Keeps
-    // the tenant signal without a heavy fully-saturated header, and — critically — every bit
-    // of chrome text/icon must use `onContainer` so nothing (e.g. action labels) goes illegible.
+    val dark = isSystemInDarkTheme()
+    val barBg = if (dark) accent.container else accent.accent
+    val barOn = if (dark) accent.onContainer else accent.onAccent
+    // The app bar carries the active tenant's colour: a bold saturated bar (accent + on-accent)
+    // in light mode, and a soft tinted bar (container + on-container) in dark mode. barBg/barOn
+    // pick the right pair so all chrome text/icons stay legible in both themes.
     val colors: TopAppBarColors = TopAppBarDefaults.topAppBarColors(
-        containerColor = accent.container,
-        titleContentColor = accent.onContainer,
-        navigationIconContentColor = accent.onContainer,
-        actionIconContentColor = accent.onContainer,
+        containerColor = barBg,
+        titleContentColor = barOn,
+        navigationIconContentColor = barOn,
+        actionIconContentColor = barOn,
     )
     TopAppBar(
         modifier = modifier,
         colors = colors,
         title = {
             Column {
-                Text(title, style = MaterialTheme.typography.titleLarge, color = accent.onContainer)
+                Text(title, style = MaterialTheme.typography.titleLarge, color = barOn)
                 if (subtitle != null) {
                     Text(
                         subtitle,
                         style = MaterialTheme.typography.labelMedium,
-                        color = accent.onContainer.copy(alpha = 0.75f),
+                        color = barOn.copy(alpha = 0.75f),
                     )
                 }
             }
@@ -62,5 +66,7 @@ object AccentChrome {
     val onFab: Color @Composable get() = LocalProfileAccent.current.onAccent
 
     /** Legible content color for anything sitting on the soft-tinted top bar (e.g. action text). */
-    val onBar: Color @Composable get() = LocalProfileAccent.current.onContainer
+    val onBar: Color @Composable get() =
+        if (isSystemInDarkTheme()) LocalProfileAccent.current.onContainer
+        else LocalProfileAccent.current.onAccent
 }
