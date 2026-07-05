@@ -419,7 +419,7 @@ private fun SessionRow(
             // Pinned rows pool across profiles, so the tenant prefix stays to disambiguate;
             // grouped rows already sit under a profile header, so it would be redundant there.
             supportingContent = {
-                Text(listOfNotNull(session.profile.takeIf { showProfile }, session.model).joinToString(" · "))
+                Text(listOfNotNull(session.profile?.takeIf { showProfile && it.isNotBlank() }, session.model).joinToString(" · "))
             },
             // Tap opens the session; long-press opens the management menu.
             modifier = Modifier.combinedClickable(
