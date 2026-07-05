@@ -24,6 +24,13 @@ fun connectionLabel(state: ConnectionState): String = when (state) {
     is ConnectionState.Error -> "Error: ${state.reason}"
 }
 
+/** Friendlier, sentence-form copy for the chat offline/error banner (vs the terse [connectionLabel]). */
+fun bannerLabel(state: ConnectionState): String = when (state) {
+    ConnectionState.Disconnected -> "You're offline — new messages send when you reconnect."
+    is ConnectionState.Error -> "Connection error — tap Retry."
+    else -> connectionLabel(state)
+}
+
 @Composable
 fun StatusDot(state: ConnectionState, modifier: Modifier = Modifier) {
     val color = when (state) {
