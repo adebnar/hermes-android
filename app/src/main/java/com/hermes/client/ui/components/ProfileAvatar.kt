@@ -23,6 +23,10 @@ fun ProfileAvatar(name: String?, modifier: Modifier = Modifier, size: Dp = 28.dp
         modifier.size(size).clip(CircleShape).background(accent.accent),
         contentAlignment = Alignment.Center,
     ) {
-        Text((name ?: "·").take(1).uppercase(), color = accent.onAccent, style = MaterialTheme.typography.labelLarge)
+        Text(
+            (name ?: "·").take(1).uppercase(),
+            color = accent.onAccent,
+            style = if (size >= 40.dp) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelLarge,
+        )
     }
 }
