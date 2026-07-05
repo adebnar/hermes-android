@@ -122,7 +122,7 @@ fun MissionControlScreen(
                 Column {
                     HermesTopBar(title = "Home", subtitle = currentProfile?.let { "Profile: $it" })
                     if (names.size > 1) {
-                        com.hermes.client.ui.components.ProfileChips(
+                        com.hermes.client.ui.components.ProfileSwitcher(
                             names = names.filterNotNull(),
                             active = currentProfile,
                             onSelect = { name ->
