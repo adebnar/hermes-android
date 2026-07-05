@@ -32,6 +32,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -141,6 +142,7 @@ fun ChatScreen(
                 actions = {
                     AssistChip(
                         onClick = { modelSheetOpen = true },
+                        modifier = Modifier.minimumInteractiveComponentSize(),
                         label = { Text(currentModel ?: "Model", maxLines = 1) },
                         trailingIcon = {
                             Icon(
