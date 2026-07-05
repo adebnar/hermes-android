@@ -10,6 +10,7 @@ data class CronAlert(
     val name: String,
     val reason: CronAlertReason,
     val route: String,
+    val lastRunAtMs: Long? = null,
 )
 
 /** Default grace before an un-run scheduled job counts as overdue. */
@@ -29,11 +30,12 @@ fun needsAttention(
     val route = "cron_detail/${job.id}"
     val failed = job.lastStatus.equals("error", ignoreCase = true) ||
         job.lastStatus.equals("failed", ignoreCase = true)
+    val lastRunAtMs = isoToEpochMs(job.lastRunAt)
     when {
-        failed -> CronAlert(job.id, name, CronAlertReason.FAILED, route)
+        failed -> CronAlert(job.id, name, CronAlertReason.FAILED, route, lastRunAtMs)
         job.enabled && !job.isPaused -> {
             val next = isoToEpochMs(job.nextRunAt)
-            if (next != null && next < nowMs - graceMs) CronAlert(job.id, name, CronAlertReason.OVERDUE, route) else null
+            if (next != null && next < nowMs - graceMs) CronAlert(job.id, name, CronAlertReason.OVERDUE, route, lastRunAtMs) else null
         }
         else -> null
     }
