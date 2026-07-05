@@ -109,4 +109,17 @@ class MissionControlViewModel @Inject constructor(
             }
         }
     }
+
+    /** Trigger a cron job now (existing endpoint) and reload the feed on success. Returns success. */
+    suspend fun runCron(jobId: String): Boolean {
+        return try {
+            tools.triggerCron(jobId, profile)
+            load(profile)
+            true
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
+    }
 }

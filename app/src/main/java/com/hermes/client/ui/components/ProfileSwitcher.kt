@@ -13,29 +13,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-/**
- * A single, shared tenant-switcher: a horizontal row of profile chips with the active one
- * selected. Used identically on the Chats and Agent Activity tabs so switching profiles looks
- * and behaves the same everywhere. [onSelect] receives the chosen profile name.
- */
+/** Tenant switcher: a row of chips, each with the profile's coloured initial. One consistent
+ *  control across Home / Chats / You. Same contract as the previous per-screen chip rows. */
 @Composable
-fun ProfileChips(
+fun ProfileSwitcher(
     names: List<String>,
     active: String?,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+        modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
     ) {
         names.forEach { name ->
             FilterChip(
                 selected = name == active,
                 onClick = { onSelect(name) },
                 label = { Text(name) },
+                leadingIcon = { ProfileAvatar(name, size = 18.dp) },
             )
             Spacer(Modifier.width(8.dp))
         }

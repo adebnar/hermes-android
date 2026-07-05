@@ -105,7 +105,7 @@ fun SessionsScreen(
                 // Same tenant switcher as Agent Activity: a chip row, active one selected. Tapping
                 // switches the active profile and the list re-fetches.
                 if (profiles.size > 1) {
-                    com.hermes.client.ui.components.ProfileChips(
+                    com.hermes.client.ui.components.ProfileSwitcher(
                         names = profiles.map { it.name },
                         active = activeProfile,
                         onSelect = vm::switchProfile,
