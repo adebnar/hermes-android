@@ -1,5 +1,6 @@
 package com.hermes.client.ui.activity
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -20,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -46,8 +48,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -158,7 +162,18 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
     }
     val onRetryResponse: (ActivityItem) -> Unit = { item -> item.sessionId?.let { vm.loadResponse(it) } }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val now = remember(state.sections) { System.currentTimeMillis() }
+    val onRunNow: (CronAlert) -> Unit = { alert ->
+        scope.launch {
+            val ok = vm.runCron(alert.jobId)
+            Toast.makeText(
+                context,
+                if (ok) "Triggered ${alert.name}" else "Couldn't run ${alert.name}",
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
 
     LaunchedEffect(profile) { vm.load(profile) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refresh() }
@@ -182,6 +197,7 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
                 state = state, nowMs = now, onRetry = { vm.refresh() },
                 responses = responses, expandedIds = expandedIds,
                 onToggle = onToggle, onRetryResponse = onRetryResponse, onOpen = onOpen,
+                onRunNow = onRunNow,
             )
         }
     }
@@ -197,6 +213,7 @@ private fun MissionControlContent(
     onToggle: (ActivityItem) -> Unit,
     onRetryResponse: (ActivityItem) -> Unit,
     onOpen: (String) -> Unit,
+    onRunNow: (CronAlert) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
         item(key = "quicklinks") {
@@ -217,7 +234,7 @@ private fun MissionControlContent(
         if (state.needsYou.isNotEmpty()) {
             item(key = "needs-header") { SectionHeader("Needs you", state.needsYou.size) }
             items(state.needsYou, key = { "needs-${it.jobId}" }) { alert ->
-                NeedsYouRow(alert, onClick = { onOpen(alert.route) })
+                NeedsYouRow(alert, nowMs = nowMs, onClick = { onOpen(alert.route) }, onRunNow = { onRunNow(alert) })
             }
         }
         when {
@@ -268,19 +285,26 @@ private fun SectionHeader(label: String, count: Int) {
 }
 
 @Composable
-private fun NeedsYouRow(alert: CronAlert, onClick: () -> Unit) {
+private fun NeedsYouRow(alert: CronAlert, nowMs: Long, onClick: () -> Unit, onRunNow: () -> Unit) {
+    val reasonText = when (alert.reason) {
+        CronAlertReason.FAILED -> "Last run failed"
+        CronAlertReason.OVERDUE -> "Overdue"
+    }
+    val supporting = listOfNotNull(
+        reasonText,
+        alert.lastRunAtMs?.let { relativeTime(it, nowMs) },
+    ).joinToString(" · ")
     ListItem(
         leadingContent = {
             Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
         },
         headlineContent = { Text(alert.name) },
-        supportingContent = {
-            Text(
-                when (alert.reason) {
-                    CronAlertReason.FAILED -> "Last run failed"
-                    CronAlertReason.OVERDUE -> "Overdue"
-                },
-            )
+        supportingContent = { Text(supporting) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onRunNow) { Text("Run now") }
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null)
+            }
         },
         modifier = Modifier.clickable(onClick = onClick),
     )
