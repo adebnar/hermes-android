@@ -19,12 +19,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 /**
  * Quick Settings tile that shows and toggles the notification service — mirrors the
  * Settings > Notifications "Enable" switch. On/off state is [NotificationSettings.prefs].enabled.
- * Tile callbacks run reads/writes on a service-owned `Main.immediate` scope so DataStore I/O never blocks the main thread.
+ * The DataStore *write* runs on a service-owned scope so it never blocks the main thread; the
+ * click's decision, the activity/foreground-service start, and the tile re-render stay synchronous
+ * because a TileService's start-from-background token is only valid during onClick's synchronous
+ * body. The synchronous read hits DataStore's in-memory cache (warmed in onStartListening).
  */
 @AndroidEntryPoint
 class NotificationTileService : TileService() {
@@ -44,24 +48,25 @@ class NotificationTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
-        scope.launch {
-            val enabled = settings.prefs.first().enabled
-            val canStart = Build.VERSION.SDK_INT < 33 ||
-                ContextCompat.checkSelfPermission(this@NotificationTileService, Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED
-            when (tileClickAction(enabled, canStart)) {
-                TileAction.ENABLE -> {
-                    settings.setEnabled(true)
-                    GatewayConnectionService.start(this@NotificationTileService)
-                    renderTile(true)
-                }
-                TileAction.DISABLE -> {
-                    settings.setEnabled(false)
-                    GatewayConnectionService.stop(this@NotificationTileService)
-                    renderTile(false)
-                }
-                TileAction.OPEN_FOR_PERMISSION -> openNotificationSettings()
+        // Decide and start synchronously: the start-from-background token is only valid during
+        // onClick's synchronous body, so the activity/service start must not sit behind a suspend.
+        // The read is a warm in-memory cache hit; only the DataStore write is deferred to the scope.
+        val enabled = runBlocking { settings.prefs.first().enabled }
+        val canStart = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        when (tileClickAction(enabled, canStart)) {
+            TileAction.ENABLE -> {
+                GatewayConnectionService.start(this)
+                renderTile(true)
+                scope.launch { settings.setEnabled(true) }
             }
+            TileAction.DISABLE -> {
+                GatewayConnectionService.stop(this)
+                renderTile(false)
+                scope.launch { settings.setEnabled(false) }
+            }
+            TileAction.OPEN_FOR_PERMISSION -> openNotificationSettings()
         }
     }
 
