@@ -29,9 +29,12 @@ fun FeedTabs(
     modifier: Modifier = Modifier,
 ) {
     val accent = LocalProfileAccent.current
+    val counts = androidx.compose.runtime.remember(sections, needsYou, nowMs) {
+        FILTERS.associate { (filter, _) -> filter to feedView(sections, needsYou, nowMs, filter).count }
+    }
     SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
         FILTERS.forEachIndexed { i, (filter, label) ->
-            val count = feedView(sections, needsYou, nowMs, filter).count
+            val count = counts[filter] ?: 0
             SegmentedButton(
                 selected = selected == filter,
                 onClick = { onSelect(filter) },

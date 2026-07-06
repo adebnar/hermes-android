@@ -159,7 +159,7 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
         androidx.compose.runtime.mutableStateOf(FeedFilter.ALL)
     }
     var collapsed by androidx.compose.runtime.saveable.rememberSaveable {
-        androidx.compose.runtime.mutableStateOf(emptySet<String>())
+        androidx.compose.runtime.mutableStateOf(emptyList<String>())
     }
     val onToggleSection: (String) -> Unit = { title ->
         collapsed = if (title in collapsed) collapsed - title else collapsed + title
@@ -202,6 +202,9 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
             isRefreshing = refreshing,
             onRefresh = { refreshing = true; vm.refresh() },
         ) {
+            val view = remember(state.sections, state.needsYou, now, filter) {
+                feedView(state.sections, state.needsYou, now, filter)
+            }
             Column {
                 FeedTabs(
                     sections = state.sections,
@@ -212,7 +215,7 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
                 )
                 MissionControlContent(
                     state = state,
-                    view = feedView(state.sections, state.needsYou, now, filter),
+                    view = view,
                     filter = filter,
                     nowMs = now, onRetry = { vm.refresh() },
                     responses = responses, expandedIds = expandedIds,
@@ -238,7 +241,7 @@ private fun MissionControlContent(
     onRetryResponse: (ActivityItem) -> Unit,
     onOpen: (String) -> Unit,
     onRunNow: (CronAlert) -> Unit,
-    collapsed: Set<String>,
+    collapsed: List<String>,
     onToggleSection: (String) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
