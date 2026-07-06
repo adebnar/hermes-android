@@ -158,6 +158,12 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
     var filter by androidx.compose.runtime.saveable.rememberSaveable {
         androidx.compose.runtime.mutableStateOf(FeedFilter.ALL)
     }
+    var collapsed by androidx.compose.runtime.saveable.rememberSaveable {
+        androidx.compose.runtime.mutableStateOf(emptySet<String>())
+    }
+    val onToggleSection: (String) -> Unit = { title ->
+        collapsed = if (title in collapsed) collapsed - title else collapsed + title
+    }
     val onToggle: (ActivityItem) -> Unit = { item ->
         val nowExpanded = item.id !in expandedIds
         expandedIds = if (nowExpanded) expandedIds + item.id else expandedIds - item.id
@@ -211,6 +217,7 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
                     responses = responses, expandedIds = expandedIds,
                     onToggle = onToggle, onRetryResponse = onRetryResponse, onOpen = onOpen,
                     onRunNow = onRunNow,
+                    collapsed = collapsed, onToggleSection = onToggleSection,
                 )
             }
         }
@@ -229,12 +236,23 @@ private fun MissionControlContent(
     onRetryResponse: (ActivityItem) -> Unit,
     onOpen: (String) -> Unit,
     onRunNow: (CronAlert) -> Unit,
+    collapsed: Set<String>,
+    onToggleSection: (String) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
         if (view.needsYou.isNotEmpty()) {
-            item(key = "needs-header") { SectionHeader("Needs you", view.needsYou.size, onClick = { onOpen("cron") }) }
-            items(view.needsYou, key = { "needs-${it.jobId}" }) { alert ->
-                NeedsYouRow(alert, nowMs = nowMs, onClick = { onOpen(alert.route) }, onRunNow = { onRunNow(alert) })
+            item(key = "needs-header") {
+                SectionHeader(
+                    "Needs you",
+                    view.needsYou.size,
+                    collapsed = "Needs you" in collapsed,
+                    onToggle = { onToggleSection("Needs you") },
+                )
+            }
+            if ("Needs you" !in collapsed) {
+                items(view.needsYou, key = { "needs-${it.jobId}" }) { alert ->
+                    NeedsYouRow(alert, nowMs = nowMs, onClick = { onOpen(alert.route) }, onRunNow = { onRunNow(alert) })
+                }
             }
         }
         when {
@@ -247,20 +265,29 @@ private fun MissionControlContent(
                 )
             }
             else -> view.sections.forEach { section ->
-                item(key = "h-${section.title}") { SectionHeader(section.title, section.items.size, onClick = if (section.title.equals("Upcoming", ignoreCase = true)) ({ onOpen("cron") }) else null) }
-                items(section.items, key = { it.id }) { activity ->
-                    val expandable = activity.kind == ActivityKind.CRON &&
-                        activity.sessionId != null && !activity.upcoming
-                    ActivityRow(
-                        item = activity,
-                        nowMs = nowMs,
-                        expandable = expandable,
-                        isExpanded = activity.id in expandedIds,
-                        response = activity.sessionId?.let { responses[it] },
-                        onClick = { if (expandable) onToggle(activity) else onOpen(activity.route) },
-                        onRetry = { onRetryResponse(activity) },
-                        onOpenFull = { onOpen(activity.route) },
+                item(key = "h-${section.title}") {
+                    SectionHeader(
+                        section.title,
+                        section.items.size,
+                        collapsed = section.title in collapsed,
+                        onToggle = { onToggleSection(section.title) },
                     )
+                }
+                if (section.title !in collapsed) {
+                    items(section.items, key = { it.id }) { activity ->
+                        val expandable = activity.kind == ActivityKind.CRON &&
+                            activity.sessionId != null && !activity.upcoming
+                        ActivityRow(
+                            item = activity,
+                            nowMs = nowMs,
+                            expandable = expandable,
+                            isExpanded = activity.id in expandedIds,
+                            response = activity.sessionId?.let { responses[it] },
+                            onClick = { if (expandable) onToggle(activity) else onOpen(activity.route) },
+                            onRetry = { onRetryResponse(activity) },
+                            onOpenFull = { onOpen(activity.route) },
+                        )
+                    }
                 }
             }
         }
@@ -283,10 +310,9 @@ private fun MissionControlContent(
 }
 
 @Composable
-private fun SectionHeader(label: String, count: Int, onClick: (() -> Unit)? = null) {
+private fun SectionHeader(label: String, count: Int, collapsed: Boolean, onToggle: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+        Modifier.fillMaxWidth().clickable(onClick = onToggle)
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -301,13 +327,11 @@ private fun SectionHeader(label: String, count: Int, onClick: (() -> Unit)? = nu
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (onClick != null) {
-            Icon(
-                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Icon(
+            if (collapsed) Icons.Rounded.ExpandMore else Icons.Rounded.ExpandLess,
+            contentDescription = if (collapsed) "Expand $label" else "Collapse $label",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
