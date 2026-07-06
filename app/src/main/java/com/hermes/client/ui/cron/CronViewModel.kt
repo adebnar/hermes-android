@@ -55,8 +55,8 @@ class CronViewModel @Inject constructor(
             }
         }.isSuccess
         val verb = when (action) { CronAction.PAUSE -> "Paused"; CronAction.RESUME -> "Resumed"; CronAction.RUN -> "Triggered" }
-        _state.value = _state.value.copy(message = if (ok) "$verb $name" else "Couldn't $verb.lowercase() $name")
-        if (ok) load()
+        _state.value = _state.value.copy(message = if (ok) "$verb $name" else "Couldn't ${verb.lowercase()} $name")
+        if (ok) runCatching { tools.cronJobs(p) }.onSuccess { jobs -> _state.value = _state.value.copy(jobs = jobs) }
     }
 
     fun clearMessage() { _state.value = _state.value.copy(message = null) }
