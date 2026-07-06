@@ -3,6 +3,7 @@ package com.hermes.client.ui.activity
 import com.hermes.client.data.network.CronJobDto
 import com.hermes.client.domain.Session
 import com.hermes.client.ui.util.isoToEpochMs
+import com.hermes.client.ui.util.isSameDay
 
 // Mission Control (Phase 2): a unified, time-grouped activity feed merging conversations and cron
 // for the active profile. Sessions and cron jobs are flattened into a common [ActivityItem], then
@@ -94,4 +95,35 @@ fun groupActivity(items: List<ActivityItem>, nowMs: Long): List<ActivitySection>
         upcoming.takeIf { it.isNotEmpty() }?.let { ActivitySection("Upcoming", it) },
         recent.takeIf { it.isNotEmpty() }?.let { ActivitySection("Recent", it) },
     )
+}
+
+enum class FeedFilter { ALL, TODAY, UPCOMING, RECENT }
+
+data class FeedView(val needsYou: List<CronAlert>, val sections: List<ActivitySection>) {
+    val count: Int get() = needsYou.size + sections.sumOf { it.items.size }
+}
+
+/** Filter the assembled feed for the selected tab (grouping headers still apply within a filter). */
+fun feedView(
+    sections: List<ActivitySection>,
+    needsYou: List<CronAlert>,
+    nowMs: Long,
+    filter: FeedFilter,
+): FeedView = when (filter) {
+    FeedFilter.ALL -> FeedView(needsYou, sections)
+    FeedFilter.TODAY -> FeedView(
+        needsYou,
+        sections
+            .map { s -> s.copy(items = s.items.filter { it.timestampMs != null && isSameDay(it.timestampMs, nowMs) }) }
+            .filter { it.items.isNotEmpty() },
+    )
+    FeedFilter.UPCOMING -> FeedView(emptyList(), sections.filter { it.title.equals("Upcoming", ignoreCase = true) })
+    FeedFilter.RECENT -> FeedView(emptyList(), sections.filterNot { it.title.equals("Upcoming", ignoreCase = true) })
+}
+
+/** Short state label for an activity row, or null (plain recent items get no pill). */
+fun statusPill(item: ActivityItem, nowMs: Long): String? = when {
+    item.upcoming -> "Scheduled"
+    item.timestampMs != null && (nowMs - item.timestampMs) in 0..LIVE_WINDOW_MS -> "Live"
+    else -> null
 }
