@@ -232,7 +232,9 @@ private fun ScheduleBuilder(schedule: Schedule, onChange: (Schedule) -> Unit, no
         }
         Spacer(Modifier.height(8.dp))
         val next = schedule.nextRun(nowMs)?.let { epochMs ->
-            " · Next: " + com.hermes.client.ui.util.formatIso(java.time.Instant.ofEpochMilli(epochMs).toString())
+            " · Next: " + com.hermes.client.ui.util.formatIso(
+                java.time.Instant.ofEpochMilli(epochMs).atZone(java.time.ZoneId.systemDefault()).toOffsetDateTime().toString()
+            )
         }.orEmpty()
         Text(schedule.describe() + next, style = MaterialTheme.typography.bodyMedium, color = accent.accent)
     }
