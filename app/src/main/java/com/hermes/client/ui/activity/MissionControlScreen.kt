@@ -362,6 +362,22 @@ private fun NeedsYouRow(alert: CronAlert, nowMs: Long, onClick: () -> Unit, onRu
 }
 
 @Composable
+private fun StatusPill(label: String) {
+    val accent = LocalProfileAccent.current
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+        color = accent.container,
+    ) {
+        Text(
+            label,
+            Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = accent.onContainer,
+        )
+    }
+}
+
+@Composable
 private fun ActivityRow(
     item: ActivityItem,
     nowMs: Long,
@@ -386,17 +402,23 @@ private fun ActivityRow(
         else -> LocalProfileAccent.current.accent
     }
     val time = relativeTime(item.timestampMs, nowMs)
+    val pill = statusPill(item, nowMs)
     Column {
         ListItem(
             leadingContent = { Icon(icon, contentDescription = null, tint = tint) },
             headlineContent = { Text(item.title) },
             supportingContent = { Text(listOfNotNull(item.subtitle, time).joinToString(" · ")) },
-            trailingContent = if (expandable) {
+            trailingContent = if (pill != null || expandable) {
                 {
-                    Icon(
-                        if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                        contentDescription = if (isExpanded) "Collapse response" else "Show response",
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        pill?.let { StatusPill(it); Spacer(Modifier.width(6.dp)) }
+                        if (expandable) {
+                            Icon(
+                                if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                                contentDescription = if (isExpanded) "Collapse response" else "Show response",
+                            )
+                        }
+                    }
                 }
             } else {
                 null
