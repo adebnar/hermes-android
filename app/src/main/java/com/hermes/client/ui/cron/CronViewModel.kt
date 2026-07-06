@@ -12,11 +12,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class CronAction { PAUSE, RESUME, RUN }
+
 data class CronUiState(
     val jobs: List<CronJobDto> = emptyList(),
     val profile: String? = null,
     val loading: Boolean = true,
     val error: String? = null,
+    val message: String? = null,
 )
 
 @HiltViewModel
@@ -41,4 +44,20 @@ class CronViewModel @Inject constructor(
                 _state.value = _state.value.copy(loading = false, error = it.message ?: "Failed to load cron jobs")
             }
     }
+
+    fun runAction(jobId: String, name: String, action: CronAction) = viewModelScope.launch {
+        val p = _state.value.profile
+        val ok = runCatching {
+            when (action) {
+                CronAction.PAUSE -> tools.pauseCron(jobId, p)
+                CronAction.RESUME -> tools.resumeCron(jobId, p)
+                CronAction.RUN -> tools.triggerCron(jobId, p)
+            }
+        }.isSuccess
+        val verb = when (action) { CronAction.PAUSE -> "Paused"; CronAction.RESUME -> "Resumed"; CronAction.RUN -> "Triggered" }
+        _state.value = _state.value.copy(message = if (ok) "$verb $name" else "Couldn't $verb.lowercase() $name")
+        if (ok) load()
+    }
+
+    fun clearMessage() { _state.value = _state.value.copy(message = null) }
 }
