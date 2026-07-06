@@ -213,6 +213,7 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
                 MissionControlContent(
                     state = state,
                     view = feedView(state.sections, state.needsYou, now, filter),
+                    filter = filter,
                     nowMs = now, onRetry = { vm.refresh() },
                     responses = responses, expandedIds = expandedIds,
                     onToggle = onToggle, onRetryResponse = onRetryResponse, onOpen = onOpen,
@@ -228,6 +229,7 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
 private fun MissionControlContent(
     state: MissionControlState,
     view: FeedView,
+    filter: FeedFilter,
     nowMs: Long,
     onRetry: () -> Unit,
     responses: Map<String, MissionControlViewModel.CronResponseUi>,
@@ -259,10 +261,17 @@ private fun MissionControlContent(
             state.loading && state.sections.isEmpty() -> item { LoadingState() }
             state.error != null -> item { ErrorState(message = state.error!!, onRetry = onRetry) }
             view.needsYou.isEmpty() && view.sections.isEmpty() -> item {
-                EmptyState(
-                    title = "Nothing here",
-                    subtitle = "Nothing matches this filter for this profile yet.",
-                )
+                if (filter == FeedFilter.ALL) {
+                    EmptyState(
+                        title = "Nothing happening yet",
+                        subtitle = "Conversations and scheduled runs for this profile will show up here.",
+                    )
+                } else {
+                    EmptyState(
+                        title = "Nothing here",
+                        subtitle = "Nothing matches this filter yet.",
+                    )
+                }
             }
             else -> view.sections.forEach { section ->
                 item(key = "h-${section.title}") {
