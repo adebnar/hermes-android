@@ -155,6 +155,9 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
     var expandedIds by androidx.compose.runtime.saveable.rememberSaveable {
         androidx.compose.runtime.mutableStateOf(emptySet<String>())
     }
+    var filter by androidx.compose.runtime.saveable.rememberSaveable {
+        androidx.compose.runtime.mutableStateOf(FeedFilter.ALL)
+    }
     val onToggle: (ActivityItem) -> Unit = { item ->
         val nowExpanded = item.id !in expandedIds
         expandedIds = if (nowExpanded) expandedIds + item.id else expandedIds - item.id
@@ -193,12 +196,23 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
             isRefreshing = refreshing,
             onRefresh = { refreshing = true; vm.refresh() },
         ) {
-            MissionControlContent(
-                state = state, nowMs = now, onRetry = { vm.refresh() },
-                responses = responses, expandedIds = expandedIds,
-                onToggle = onToggle, onRetryResponse = onRetryResponse, onOpen = onOpen,
-                onRunNow = onRunNow,
-            )
+            Column {
+                FeedTabs(
+                    sections = state.sections,
+                    needsYou = state.needsYou,
+                    nowMs = now,
+                    selected = filter,
+                    onSelect = { filter = it },
+                )
+                MissionControlContent(
+                    state = state,
+                    view = feedView(state.sections, state.needsYou, now, filter),
+                    nowMs = now, onRetry = { vm.refresh() },
+                    responses = responses, expandedIds = expandedIds,
+                    onToggle = onToggle, onRetryResponse = onRetryResponse, onOpen = onOpen,
+                    onRunNow = onRunNow,
+                )
+            }
         }
     }
 }
@@ -206,6 +220,7 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
 @Composable
 private fun MissionControlContent(
     state: MissionControlState,
+    view: FeedView,
     nowMs: Long,
     onRetry: () -> Unit,
     responses: Map<String, MissionControlViewModel.CronResponseUi>,
@@ -216,22 +231,22 @@ private fun MissionControlContent(
     onRunNow: (CronAlert) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
-        if (state.needsYou.isNotEmpty()) {
-            item(key = "needs-header") { SectionHeader("Needs you", state.needsYou.size, onClick = { onOpen("cron") }) }
-            items(state.needsYou, key = { "needs-${it.jobId}" }) { alert ->
+        if (view.needsYou.isNotEmpty()) {
+            item(key = "needs-header") { SectionHeader("Needs you", view.needsYou.size, onClick = { onOpen("cron") }) }
+            items(view.needsYou, key = { "needs-${it.jobId}" }) { alert ->
                 NeedsYouRow(alert, nowMs = nowMs, onClick = { onOpen(alert.route) }, onRunNow = { onRunNow(alert) })
             }
         }
         when {
             state.loading && state.sections.isEmpty() -> item { LoadingState() }
             state.error != null -> item { ErrorState(message = state.error!!, onRetry = onRetry) }
-            state.sections.isEmpty() -> item {
+            view.needsYou.isEmpty() && view.sections.isEmpty() -> item {
                 EmptyState(
-                    title = "Nothing happening yet",
-                    subtitle = "Conversations and scheduled runs for this profile will show up here.",
+                    title = "Nothing here",
+                    subtitle = "Nothing matches this filter for this profile yet.",
                 )
             }
-            else -> state.sections.forEach { section ->
+            else -> view.sections.forEach { section ->
                 item(key = "h-${section.title}") { SectionHeader(section.title, section.items.size, onClick = if (section.title.equals("Upcoming", ignoreCase = true)) ({ onOpen("cron") }) else null) }
                 items(section.items, key = { it.id }) { activity ->
                     val expandable = activity.kind == ActivityKind.CRON &&
