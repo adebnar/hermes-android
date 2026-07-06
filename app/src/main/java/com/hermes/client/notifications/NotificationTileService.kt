@@ -13,40 +13,58 @@ import com.hermes.client.MainActivity
 import com.hermes.client.R
 import com.hermes.client.data.repository.NotificationSettings
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 /**
  * Quick Settings tile that shows and toggles the notification service — mirrors the
  * Settings > Notifications "Enable" switch. On/off state is [NotificationSettings.prefs].enabled.
- * TileService callbacks run on the main thread; a single fast DataStore read via runBlocking is fine.
+ * The DataStore *write* runs on a service-owned scope so it never blocks the main thread; the
+ * click's decision, the activity/foreground-service start, and the tile re-render stay synchronous
+ * because a TileService's start-from-background token is only valid during onClick's synchronous
+ * body. The synchronous read hits DataStore's in-memory cache (warmed in onStartListening).
  */
 @AndroidEntryPoint
 class NotificationTileService : TileService() {
     @Inject lateinit var settings: NotificationSettings
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
+    }
+
     override fun onStartListening() {
         super.onStartListening()
-        renderTile(runBlocking { settings.prefs.first().enabled })
+        scope.launch { renderTile(settings.prefs.first().enabled) }
     }
 
     override fun onClick() {
         super.onClick()
+        // Decide and start synchronously: the start-from-background token is only valid during
+        // onClick's synchronous body, so the activity/service start must not sit behind a suspend.
+        // The read is a warm in-memory cache hit; only the DataStore write is deferred to the scope.
         val enabled = runBlocking { settings.prefs.first().enabled }
         val canStart = Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
         when (tileClickAction(enabled, canStart)) {
             TileAction.ENABLE -> {
-                runBlocking { settings.setEnabled(true) }
                 GatewayConnectionService.start(this)
                 renderTile(true)
+                scope.launch { settings.setEnabled(true) }
             }
             TileAction.DISABLE -> {
-                runBlocking { settings.setEnabled(false) }
                 GatewayConnectionService.stop(this)
                 renderTile(false)
+                scope.launch { settings.setEnabled(false) }
             }
             TileAction.OPEN_FOR_PERMISSION -> openNotificationSettings()
         }
