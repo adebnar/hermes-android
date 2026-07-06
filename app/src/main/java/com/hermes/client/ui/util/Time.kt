@@ -28,6 +28,11 @@ fun isoToEpochMs(iso: String?): Long? =
 /** Convert epoch-seconds (as the gateway reports last_active) to epoch millis. */
 fun secondsToEpochMs(seconds: Double?): Long? = seconds?.let { (it * 1000).toLong() }
 
+/** Check if two epoch-ms timestamps fall on the same calendar day in a given time zone. */
+fun isSameDay(aMs: Long, bMs: Long, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): Boolean =
+    java.time.Instant.ofEpochMilli(aMs).atZone(zone).toLocalDate() ==
+        java.time.Instant.ofEpochMilli(bMs).atZone(zone).toLocalDate()
+
 /**
  * Compact relative time for the activity feed: "just now", "5m ago", "3h ago", "2d ago" for the
  * past; "in 5m", "in 2h" for the future. Pure — [nowMs] is passed in so it is unit-testable.

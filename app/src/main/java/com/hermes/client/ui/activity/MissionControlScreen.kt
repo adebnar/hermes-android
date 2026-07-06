@@ -155,6 +155,15 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
     var expandedIds by androidx.compose.runtime.saveable.rememberSaveable {
         androidx.compose.runtime.mutableStateOf(emptySet<String>())
     }
+    var filter by androidx.compose.runtime.saveable.rememberSaveable {
+        androidx.compose.runtime.mutableStateOf(FeedFilter.ALL)
+    }
+    var collapsed by androidx.compose.runtime.saveable.rememberSaveable {
+        androidx.compose.runtime.mutableStateOf(emptySet<String>())
+    }
+    val onToggleSection: (String) -> Unit = { title ->
+        collapsed = if (title in collapsed) collapsed - title else collapsed + title
+    }
     val onToggle: (ActivityItem) -> Unit = { item ->
         val nowExpanded = item.id !in expandedIds
         expandedIds = if (nowExpanded) expandedIds + item.id else expandedIds - item.id
@@ -193,12 +202,25 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
             isRefreshing = refreshing,
             onRefresh = { refreshing = true; vm.refresh() },
         ) {
-            MissionControlContent(
-                state = state, nowMs = now, onRetry = { vm.refresh() },
-                responses = responses, expandedIds = expandedIds,
-                onToggle = onToggle, onRetryResponse = onRetryResponse, onOpen = onOpen,
-                onRunNow = onRunNow,
-            )
+            Column {
+                FeedTabs(
+                    sections = state.sections,
+                    needsYou = state.needsYou,
+                    nowMs = now,
+                    selected = filter,
+                    onSelect = { filter = it },
+                )
+                MissionControlContent(
+                    state = state,
+                    view = feedView(state.sections, state.needsYou, now, filter),
+                    filter = filter,
+                    nowMs = now, onRetry = { vm.refresh() },
+                    responses = responses, expandedIds = expandedIds,
+                    onToggle = onToggle, onRetryResponse = onRetryResponse, onOpen = onOpen,
+                    onRunNow = onRunNow,
+                    collapsed = collapsed, onToggleSection = onToggleSection,
+                )
+            }
         }
     }
 }
@@ -206,6 +228,8 @@ private fun MissionControlPage(profile: String?, dark: Boolean, onNavigate: (Str
 @Composable
 private fun MissionControlContent(
     state: MissionControlState,
+    view: FeedView,
+    filter: FeedFilter,
     nowMs: Long,
     onRetry: () -> Unit,
     responses: Map<String, MissionControlViewModel.CronResponseUi>,
@@ -214,38 +238,65 @@ private fun MissionControlContent(
     onRetryResponse: (ActivityItem) -> Unit,
     onOpen: (String) -> Unit,
     onRunNow: (CronAlert) -> Unit,
+    collapsed: Set<String>,
+    onToggleSection: (String) -> Unit,
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
-        if (state.needsYou.isNotEmpty()) {
-            item(key = "needs-header") { SectionHeader("Needs you", state.needsYou.size, onClick = { onOpen("cron") }) }
-            items(state.needsYou, key = { "needs-${it.jobId}" }) { alert ->
-                NeedsYouRow(alert, nowMs = nowMs, onClick = { onOpen(alert.route) }, onRunNow = { onRunNow(alert) })
+        if (view.needsYou.isNotEmpty()) {
+            item(key = "needs-header") {
+                SectionHeader(
+                    "Needs you",
+                    view.needsYou.size,
+                    collapsed = "Needs you" in collapsed,
+                    onToggle = { onToggleSection("Needs you") },
+                )
+            }
+            if ("Needs you" !in collapsed) {
+                items(view.needsYou, key = { "needs-${it.jobId}" }) { alert ->
+                    NeedsYouRow(alert, nowMs = nowMs, onClick = { onOpen(alert.route) }, onRunNow = { onRunNow(alert) })
+                }
             }
         }
         when {
             state.loading && state.sections.isEmpty() -> item { LoadingState() }
             state.error != null -> item { ErrorState(message = state.error!!, onRetry = onRetry) }
-            state.sections.isEmpty() -> item {
-                EmptyState(
-                    title = "Nothing happening yet",
-                    subtitle = "Conversations and scheduled runs for this profile will show up here.",
-                )
-            }
-            else -> state.sections.forEach { section ->
-                item(key = "h-${section.title}") { SectionHeader(section.title, section.items.size, onClick = if (section.title.equals("Upcoming", ignoreCase = true)) ({ onOpen("cron") }) else null) }
-                items(section.items, key = { it.id }) { activity ->
-                    val expandable = activity.kind == ActivityKind.CRON &&
-                        activity.sessionId != null && !activity.upcoming
-                    ActivityRow(
-                        item = activity,
-                        nowMs = nowMs,
-                        expandable = expandable,
-                        isExpanded = activity.id in expandedIds,
-                        response = activity.sessionId?.let { responses[it] },
-                        onClick = { if (expandable) onToggle(activity) else onOpen(activity.route) },
-                        onRetry = { onRetryResponse(activity) },
-                        onOpenFull = { onOpen(activity.route) },
+            view.needsYou.isEmpty() && view.sections.isEmpty() -> item {
+                if (filter == FeedFilter.ALL) {
+                    EmptyState(
+                        title = "Nothing happening yet",
+                        subtitle = "Conversations and scheduled runs for this profile will show up here.",
                     )
+                } else {
+                    EmptyState(
+                        title = "Nothing here",
+                        subtitle = "Nothing matches this filter yet.",
+                    )
+                }
+            }
+            else -> view.sections.forEach { section ->
+                item(key = "h-${section.title}") {
+                    SectionHeader(
+                        section.title,
+                        section.items.size,
+                        collapsed = section.title in collapsed,
+                        onToggle = { onToggleSection(section.title) },
+                    )
+                }
+                if (section.title !in collapsed) {
+                    items(section.items, key = { it.id }) { activity ->
+                        val expandable = activity.kind == ActivityKind.CRON &&
+                            activity.sessionId != null && !activity.upcoming
+                        ActivityRow(
+                            item = activity,
+                            nowMs = nowMs,
+                            expandable = expandable,
+                            isExpanded = activity.id in expandedIds,
+                            response = activity.sessionId?.let { responses[it] },
+                            onClick = { if (expandable) onToggle(activity) else onOpen(activity.route) },
+                            onRetry = { onRetryResponse(activity) },
+                            onOpenFull = { onOpen(activity.route) },
+                        )
+                    }
                 }
             }
         }
@@ -268,10 +319,9 @@ private fun MissionControlContent(
 }
 
 @Composable
-private fun SectionHeader(label: String, count: Int, onClick: (() -> Unit)? = null) {
+private fun SectionHeader(label: String, count: Int, collapsed: Boolean, onToggle: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+        Modifier.fillMaxWidth().clickable(onClick = onToggle)
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -286,13 +336,11 @@ private fun SectionHeader(label: String, count: Int, onClick: (() -> Unit)? = nu
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (onClick != null) {
-            Icon(
-                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Icon(
+            if (collapsed) Icons.Rounded.ExpandMore else Icons.Rounded.ExpandLess,
+            contentDescription = if (collapsed) "Expand $label" else "Collapse $label",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -323,6 +371,22 @@ private fun NeedsYouRow(alert: CronAlert, nowMs: Long, onClick: () -> Unit, onRu
 }
 
 @Composable
+private fun StatusPill(label: String) {
+    val accent = LocalProfileAccent.current
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+        color = accent.container,
+    ) {
+        Text(
+            label,
+            Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = accent.onContainer,
+        )
+    }
+}
+
+@Composable
 private fun ActivityRow(
     item: ActivityItem,
     nowMs: Long,
@@ -347,17 +411,23 @@ private fun ActivityRow(
         else -> LocalProfileAccent.current.accent
     }
     val time = relativeTime(item.timestampMs, nowMs)
+    val pill = statusPill(item, nowMs)
     Column {
         ListItem(
             leadingContent = { Icon(icon, contentDescription = null, tint = tint) },
             headlineContent = { Text(item.title) },
             supportingContent = { Text(listOfNotNull(item.subtitle, time).joinToString(" · ")) },
-            trailingContent = if (expandable) {
+            trailingContent = if (pill != null || expandable) {
                 {
-                    Icon(
-                        if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                        contentDescription = if (isExpanded) "Collapse response" else "Show response",
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        pill?.let { StatusPill(it); Spacer(Modifier.width(6.dp)) }
+                        if (expandable) {
+                            Icon(
+                                if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                                contentDescription = if (isExpanded) "Collapse response" else "Show response",
+                            )
+                        }
+                    }
                 }
             } else {
                 null
