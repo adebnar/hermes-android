@@ -39,7 +39,7 @@ import javax.inject.Inject
 
 data class CronEditState(
     val name: String = "",
-    val schedule: String = "",
+    val schedule: Schedule = Schedule.Daily(9, 0),
     val prompt: String = "",
     val isNew: Boolean = true,
     val loading: Boolean = false,
@@ -66,7 +66,7 @@ class CronEditViewModel @Inject constructor(
                 .onSuccess { job ->
                     _state.value = CronEditState(
                         name = job.name ?: "",
-                        schedule = job.scheduleText,
+                        schedule = parseCron(job.schedule?.expr ?: job.scheduleText),
                         prompt = job.prompt ?: "",
                         isNew = false,
                         loading = false,
@@ -77,17 +77,20 @@ class CronEditViewModel @Inject constructor(
     }
 
     fun setName(v: String) { _state.value = _state.value.copy(name = v) }
-    fun setSchedule(v: String) { _state.value = _state.value.copy(schedule = v) }
+    fun setSchedule(v: Schedule) { _state.value = _state.value.copy(schedule = v) }
     fun setPrompt(v: String) { _state.value = _state.value.copy(prompt = v) }
 
     fun save() = viewModelScope.launch {
         val s = _state.value
-        if (s.prompt.isBlank() || s.schedule.isBlank()) {
-            _state.value = s.copy(message = "Schedule and prompt are required"); return@launch
+        val advancedInvalid = s.schedule is Schedule.Advanced && !isValidCron((s.schedule as Schedule.Advanced).expr)
+        if (s.prompt.isBlank() || advancedInvalid) {
+            _state.value = s.copy(message = if (s.prompt.isBlank()) "Prompt is required" else "Schedule is not a valid cron expression")
+            return@launch
         }
+        val cron = s.schedule.toCron()
         runCatching {
-            if (s.isNew) tools.createCron(s.prompt, s.schedule, s.name, profile)
-            else tools.updateCron(jobId, s.prompt, s.schedule, s.name, profile)
+            if (s.isNew) tools.createCron(s.prompt, cron, s.name, profile)
+            else tools.updateCron(jobId, s.prompt, cron, s.name, profile)
         }.onSuccess { _state.value = s.copy(saved = true) }
             .onFailure { _state.value = s.copy(message = "Save failed: ${it.message}") }
     }
@@ -127,8 +130,8 @@ fun CronEditScreen(
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
             OutlinedTextField(state.name, vm::setName, label = { Text("Name (optional)") },
                 singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(state.schedule, vm::setSchedule, label = { Text("Schedule (cron, e.g. 0 9 * * *)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+            OutlinedTextField(state.schedule.describe(), {}, label = { Text("Schedule (cron, e.g. 0 9 * * *)") },
+                singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), enabled = false)
             Text("min hour day month weekday", style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
             OutlinedTextField(state.prompt, vm::setPrompt, label = { Text("Prompt") },
