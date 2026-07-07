@@ -127,7 +127,7 @@ fun ChatScreen(
 
     // Voice dictation: the system speech recognizer returns a transcript we append to the draft.
     // RecognizerIntent needs no RECORD_AUDIO (the system speech app owns the mic + permission).
-    val speechAvailable = remember { android.speech.SpeechRecognizer.isRecognitionAvailable(context) }
+    val speechAvailable = remember(context) { android.speech.SpeechRecognizer.isRecognitionAvailable(context) }
     val speech = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -141,7 +141,7 @@ fun ChatScreen(
     fun startDictation() {
         val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault())
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault().toLanguageTag())
             putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak your message")
         }
         runCatching { speech.launch(intent) }
