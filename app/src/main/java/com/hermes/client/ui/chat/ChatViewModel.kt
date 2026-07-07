@@ -191,7 +191,9 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 atts.forEach { a ->
-                    val b64 = android.util.Base64.encodeToString(a.bytes, android.util.Base64.NO_WRAP)
+                    // java.util.Base64 (minSdk 26): consistent with the share-decode path and,
+                    // unlike android.util.Base64, not stubbed to null under JVM unit tests.
+                    val b64 = java.util.Base64.getEncoder().encodeToString(a.bytes)
                     runCatching { chat.attachImageBytes(sessionId, b64, a.mimeType) }
                         .onFailure { appendError("Attach failed: ${it.message}") }
                 }
