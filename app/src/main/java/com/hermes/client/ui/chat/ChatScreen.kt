@@ -154,6 +154,9 @@ fun ChatScreen(
         if (ok) captureUri?.let { uri -> readBytes(uri)?.let { vm.stageAttachment(it, "image/jpeg") } }
     }
     fun launchCamera() {
+        // Prior captures are already staged in-memory, so their temp files are disposable —
+        // sweep them so cacheDir doesn't grow unbounded across captures.
+        context.cacheDir.listFiles { f -> f.name.startsWith("capture_") }?.forEach { it.delete() }
         val file = File(context.cacheDir, "capture_${System.currentTimeMillis()}.jpg")
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         captureUri = uri
@@ -234,9 +237,7 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(state.pendingAttachments, key = { it.id }) { a ->
-                            val thumb = remember(a.id) {
-                                android.graphics.BitmapFactory.decodeByteArray(a.bytes, 0, a.bytes.size)?.asImageBitmap()
-                            }
+                            val thumb = remember(a.id) { decodeThumbnail(a.bytes, reqPx = 200)?.asImageBitmap() }
                             Box(Modifier.size(56.dp)) {
                                 if (thumb != null) {
                                     Image(
@@ -459,3 +460,17 @@ private fun ConnectionBanner(state: ConnectionState, onRetry: () -> Unit) {
     }
 }
 
+
+/**
+ * Decode [bytes] to a Bitmap downsampled so its largest side is roughly [reqPx] px — a chip thumbnail
+ * never needs full resolution, and decoding a 12MP photo at full size (×ATTACH_CAP) risks OOM/jank.
+ */
+private fun decodeThumbnail(bytes: ByteArray, reqPx: Int): android.graphics.Bitmap? {
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    var sample = 1
+    val maxDim = maxOf(bounds.outWidth, bounds.outHeight)
+    while (maxDim > 0 && maxDim / sample > reqPx * 2) sample *= 2
+    val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+    return android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+}
