@@ -145,7 +145,9 @@ fun ChatScreen(
     }
 
     // Camera: capture into a FileProvider cache uri, then read it back. No CAMERA permission (delegates).
-    var captureUri by remember { mutableStateOf<Uri?>(null) }
+    // rememberSaveable (Uri is Parcelable): survive process death while the camera app is foregrounded,
+    // so the captured photo isn't dropped when we return.
+    var captureUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture(),
     ) { ok ->
