@@ -2,9 +2,15 @@ package com.hermes.client.ui.cron
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -13,6 +19,8 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.PauseCircleOutline
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -21,6 +29,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedButton
 import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -29,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -41,7 +51,7 @@ import android.widget.Toast
 fun CronScreen(
     onMenu: () -> Unit,
     onOpen: (String) -> Unit = {},
-    onNew: () -> Unit = {},
+    onNew: (String) -> Unit = {},
     vm: CronViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -58,7 +68,7 @@ fun CronScreen(
         },
         floatingActionButton = {
             androidx.compose.material3.ExtendedFloatingActionButton(
-                onClick = onNew,
+                onClick = { onNew("new") },
                 text = { Text("New") },
                 icon = { Icon(androidx.compose.material.icons.Icons.Rounded.Add, contentDescription = null) },
                 containerColor = com.hermes.client.ui.components.AccentChrome.fabContainer,
@@ -72,10 +82,7 @@ fun CronScreen(
                 state.error != null -> com.hermes.client.ui.components.ErrorState(
                     message = state.error!!, onRetry = { vm.load() },
                 )
-                state.jobs.isEmpty() -> com.hermes.client.ui.components.EmptyState(
-                    title = "No cron jobs",
-                    subtitle = "Scheduled jobs for this profile will show up here.",
-                )
+                state.jobs.isEmpty() -> CronEmpty(onNew = onNew)
                 else -> {
                     val nowMs = remember(state.jobs) { System.currentTimeMillis() }
                     val menuFor = remember { mutableStateOf<String?>(null) }
@@ -111,10 +118,15 @@ fun CronScreen(
                                         else MaterialTheme.colorScheme.error,
                                     )
                                 },
-                                headlineContent = { Text(job.name ?: job.id) },
+                                headlineContent = { Text(cronDisplayName(job.name, job.prompt, job.id)) },
                                 supportingContent = {
                                     val next = job.nextRunAt?.let { "Next: " + com.hermes.client.ui.util.formatIso(it) }
-                                    Text(next ?: job.prompt?.replace("\n", " ")?.trim()?.take(100).orEmpty())
+                                    // Prompt snippet is only useful here when the headline is the name; when the job is
+                                    // unnamed the headline already shows the prompt (via cronDisplayName), so don't repeat it.
+                                    val fallback = job.name?.takeIf { it.isNotBlank() }?.let {
+                                        job.prompt?.replace("\n", " ")?.trim()?.take(100)
+                                    }
+                                    Text(next ?: fallback.orEmpty())
                                 },
                                 trailingContent = {
                                     Box {
@@ -147,5 +159,29 @@ fun CronScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CronEmpty(onNew: (String) -> Unit) {
+    val accent = com.hermes.client.ui.theme.LocalProfileAccent.current
+    Column(
+        Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(Icons.Rounded.Schedule, contentDescription = null, tint = accent.accent, modifier = Modifier.size(40.dp))
+        Spacer(Modifier.height(12.dp))
+        Text("No cron jobs", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text("Start from a template:", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
+        CRON_TEMPLATES.forEach { t ->
+            OutlinedButton(onClick = { onNew(t.id) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Text(t.label)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = { onNew("new") }) { Text("New cron job") }
     }
 }

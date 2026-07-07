@@ -79,7 +79,15 @@ class CronEditViewModel @Inject constructor(
 
     fun load(id: String) {
         jobId = id
-        if (id == "new") { _state.value = CronEditState(isNew = true); return }
+        val template = cronTemplate(id)
+        if (id == "new" || template != null) {
+            _state.value = if (template != null) {
+                CronEditState(schedule = template.schedule, prompt = template.prompt, isNew = true)
+            } else {
+                CronEditState(isNew = true)
+            }
+            return
+        }
         _state.value = _state.value.copy(loading = true, isNew = false)
         viewModelScope.launch {
             runCatching { tools.cronJob(id, profile) }
