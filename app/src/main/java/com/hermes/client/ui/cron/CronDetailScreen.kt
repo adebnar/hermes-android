@@ -1,11 +1,13 @@
 package com.hermes.client.ui.cron
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +19,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -29,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +64,7 @@ fun CronDetailScreen(
     Scaffold(
         topBar = {
             com.hermes.client.ui.components.HermesTopBar(
-                title = state.job?.name ?: "Cron job",
+                title = state.job?.let { cronDisplayName(it.name, it.prompt, it.id) } ?: "Cron job",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         androidx.compose.material3.Icon(
@@ -86,19 +90,31 @@ fun CronDetailScreen(
                     item {
                         Column(Modifier.padding(16.dp)) {
                             Field("Schedule", job.scheduleText)
-                            Field("Status", if (job.isPaused) "Paused" else if (job.enabled) "Enabled" else "Disabled")
-                            Field("Next run", formatIso(job.nextRunAt))
-                            Field("Last run", formatIso(job.lastRunAt) +
-                                (job.lastStatus?.let { " · $it" } ?: ""))
-                            job.lastError?.takeIf { it.isNotBlank() }?.let {
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    it,
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                            Spacer(Modifier.height(8.dp))
+                            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceVariant) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Field("Status", if (job.isPaused) "Paused" else if (job.enabled) "Enabled" else "Disabled")
+                                    Field("Next run", formatIso(job.nextRunAt))
+                                    Field("Last run", formatIso(job.lastRunAt) + (job.lastStatus?.let { " · $it" } ?: ""))
+                                    job.lastError?.takeIf { it.isNotBlank() }?.let { err ->
+                                        var errorExpanded by rememberSaveable(err) { mutableStateOf(false) }
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(
+                                            err,
+                                            color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = if (errorExpanded) Int.MAX_VALUE else 3,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.clickable { errorExpanded = !errorExpanded },
+                                        )
+                                        Text(
+                                            if (errorExpanded) "Show less" else "Show more",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = LocalProfileAccent.current.accent,
+                                            modifier = Modifier.padding(top = 2.dp).clickable { errorExpanded = !errorExpanded },
+                                        )
+                                    }
+                                }
                             }
                             Spacer(Modifier.padding(top = 12.dp))
                             Row {
