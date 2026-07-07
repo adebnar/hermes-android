@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -120,13 +121,19 @@ class ChatViewModel @Inject constructor(
             val handle = runCatching { chat.resume(id, profileManager.active.value) }.getOrNull()
             handle?.let { sessionId = it }
             com.hermes.client.data.diagnostics.DebugLog.log("session", "resume($id) → handle=${handle ?: "none"}")
-            // A share may have handed off an image; attach it now that the session handle is live.
+            // A share may have handed off an image; stage it so it shows as a chip and is
+            // flushed to the gateway on the next send (rather than attaching immediately).
             ps?.let { share ->
                 val imgB64 = share.imageBase64
                 val imgMime = share.imageMime
                 if (imgB64 != null && imgMime != null) {
-                    runCatching { chat.attachImageBytes(sessionId, imgB64, imgMime) }
-                        .onSuccess { appendSystem("📎 Image attached — it will be sent with your next message.") }
+                    // java.util.Base64 (not android.util.Base64): the latter is stubbed to a
+                    // no-op returning null in the JVM unit-test environment (no Robolectric),
+                    // which would silently drop every shared image under test. java.util.Base64
+                    // is a real JDK class (available since API 26, our minSdk) so it decodes
+                    // correctly both on-device and under test.
+                    runCatching { java.util.Base64.getDecoder().decode(imgB64) }
+                        .onSuccess { bytes -> stageAttachment(bytes, imgMime) }
                         .onFailure { e ->
                             if (e is kotlinx.coroutines.CancellationException) throw e
                             appendError("Attach failed: ${e.message}")
@@ -169,12 +176,27 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    private var attachSeq = 0
+    fun stageAttachment(bytes: ByteArray, mimeType: String) {
+        _state.update { it.withAttachment(PendingAttachment("att-${attachSeq++}", bytes, mimeType)) }
+    }
+    fun removeAttachment(id: String) { _state.update { it.withoutAttachment(id) } }
+
     fun send(text: String) {
-        if (text.isBlank()) return
+        val atts = _state.value.pendingAttachments
+        if (text.isBlank() && atts.isEmpty()) return
         val isSlash = text.trimStart().startsWith("/")
-        _state.value = _state.value.withUserMessage(text)
+        val shown = text.ifBlank { "📎 ${atts.size} image${if (atts.size > 1) "s" else ""}" }
+        _state.value = _state.value.withUserMessage(shown).copy(pendingAttachments = emptyList())
         viewModelScope.launch {
             try {
+                atts.forEach { a ->
+                    // java.util.Base64 (minSdk 26): consistent with the share-decode path and,
+                    // unlike android.util.Base64, not stubbed to null under JVM unit tests.
+                    val b64 = java.util.Base64.getEncoder().encodeToString(a.bytes)
+                    runCatching { chat.attachImageBytes(sessionId, b64, a.mimeType) }
+                        .onFailure { appendError("Attach failed: ${it.message}") }
+                }
                 // A leading "/" is a slash command — execute it (the gateway strips the slash)
                 // rather than prompting the model.
                 if (isSlash) chat.slashExec(sessionId, text.trim())
@@ -194,13 +216,6 @@ class ChatViewModel @Inject constructor(
     }
 
     fun stop() { viewModelScope.launch { runCatching { chat.interrupt(sessionId) } } }
-
-    /** Attach an image (base64) to the session; surfaces a system note when done. */
-    fun attachImage(dataBase64: String, mimeType: String) = viewModelScope.launch {
-        runCatching { chat.attachImageBytes(sessionId, dataBase64, mimeType) }
-            .onSuccess { appendSystem("📎 Image attached — it will be sent with your next message.") }
-            .onFailure { appendError("Attach failed: ${it.message}") }
-    }
 
     private fun appendSystem(text: String) {
         _state.value = _state.value.copy(

@@ -1,11 +1,18 @@
 package com.hermes.client.ui.chat
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
+import android.net.Uri
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
+import java.io.File
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,17 +25,23 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +50,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.launch
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -50,8 +64,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -103,7 +120,7 @@ fun ChatScreen(
         draft = base + text + (if (text.endsWith(":")) "" else " ")
     }
     val connected = connState is ConnectionState.Connected
-    val canSend = connected && draft.isNotBlank() && !state.isGenerating
+    val canSend = canSend(connected, draft.isNotBlank(), state.pendingAttachments.isNotEmpty(), state.isGenerating)
     val haptic = LocalHapticFeedback.current
 
     fun submit() {
@@ -113,19 +130,46 @@ fun ChatScreen(
         draft = ""
     }
 
-    // Image attach: pick an image, base64-encode its bytes, attach to the session.
+    // Image attach: read picked/captured bytes and stage them onto the session.
     val context = androidx.compose.ui.platform.LocalContext.current
-    val pickImage = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                val mime = context.contentResolver.getType(uri) ?: "image/*"
-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching
-                val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-                vm.attachImage(b64, mime)
+    val attachScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    fun readBytes(uri: Uri): ByteArray? =
+        runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+
+    // Photo library: multi-select via the system photo picker (no permission).
+    // Read bytes off the main thread (large images would otherwise jank/ANR the UI).
+    val pickPhotos = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(ATTACH_CAP),
+    ) { uris ->
+        attachScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            uris.forEach { uri ->
+                readBytes(uri)?.let { vm.stageAttachment(it, context.contentResolver.getType(uri) ?: "image/*") }
             }
         }
+    }
+
+    // Camera: capture into a FileProvider cache uri, then read it back. No CAMERA permission (delegates).
+    // rememberSaveable (Uri is Parcelable): survive process death while the camera app is foregrounded,
+    // so the captured photo isn't dropped when we return.
+    var captureUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { ok ->
+        if (ok) captureUri?.let { uri ->
+            attachScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                readBytes(uri)?.let { vm.stageAttachment(it, "image/jpeg") }
+            }
+        }
+    }
+    fun launchCamera() {
+        // Prior captures are already staged in-memory, so their temp files are disposable —
+        // sweep them so cacheDir doesn't grow unbounded across captures.
+        context.cacheDir.listFiles { f -> f.name.startsWith("capture_") }?.forEach { it.delete() }
+        val file = File(context.cacheDir, "capture_${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        captureUri = uri
+        runCatching { takePhoto.launch(uri) }
     }
 
     // Voice dictation: the system speech recognizer returns a transcript we append to the draft.
@@ -187,53 +231,125 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            Row(
+            Column(
                 // targetSdk 35+ forces edge-to-edge on Android 15+, so the window no
                 // longer resizes for the keyboard — the composer must inset itself.
                 // union() takes max(ime, navBars) so it lifts above the keyboard when
                 // open and clears the nav bar when closed, without double-padding.
                 Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
             ) {
-                com.hermes.client.ui.components.ProfileAvatar(activeProfile)
-                Spacer(Modifier.width(4.dp))
-                IconButton(onClick = { pickImage.launch("image/*") }, enabled = connected) {
-                    Icon(Icons.Rounded.AttachFile, contentDescription = "Attach image")
-                }
-                if (speechAvailable) {
-                    IconButton(onClick = { startDictation() }) {
-                        Icon(
-                            Icons.Rounded.Mic,
-                            contentDescription = "Voice input",
-                            tint = com.hermes.client.ui.components.AccentChrome.fabContainer,
-                        )
+                if (state.pendingAttachments.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(state.pendingAttachments, key = { it.id }) { a ->
+                            // Decode off the main thread (produceState) — bitmap decode is CPU-heavy.
+                            val thumb by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, a.id) {
+                                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    decodeThumbnail(a.bytes, reqPx = 200)?.asImageBitmap()
+                                }
+                            }
+                            Box(Modifier.size(56.dp)) {
+                                val bmp = thumb
+                                if (bmp != null) {
+                                    Image(
+                                        bitmap = bmp,
+                                        contentDescription = "Attachment",
+                                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)),
+                                        contentScale = ContentScale.Crop,
+                                    )
+                                } else {
+                                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant))
+                                }
+                                // Remove badge: a dark circular scrim + white ✕ for contrast over any
+                                // thumbnail, with a comfortably tappable target (a 20.dp icon was too small).
+                                Box(
+                                    Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(2.dp)
+                                        .size(26.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f))
+                                        .clickable { vm.removeAttachment(a.id) },
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Close,
+                                        contentDescription = "Remove attachment",
+                                        tint = androidx.compose.ui.graphics.Color.White,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    modifier = Modifier.weight(1f).focusRequester(focusRequester),
-                    placeholder = { Text("Message Hermes…") },
-                    maxLines = 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { submit() }),
-                )
-                Spacer(Modifier.width(8.dp))
-                if (state.isGenerating) {
-                    IconButton(onClick = { vm.stop() }) {
-                        Icon(Icons.Rounded.Stop, contentDescription = "Stop")
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    com.hermes.client.ui.components.ProfileAvatar(activeProfile)
+                    Spacer(Modifier.width(4.dp))
+                    var attachMenu by remember { mutableStateOf(false) }
+                    Box {
+                        // Not gated on connection: attaching only stages locally now; the upload
+                        // happens on Send, which canSend() already gates on being connected.
+                        IconButton(onClick = { attachMenu = true }) {
+                            Icon(Icons.Rounded.AttachFile, contentDescription = "Attach")
+                        }
+                        DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Camera") },
+                                onClick = { attachMenu = false; launchCamera() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Photo library") },
+                                onClick = {
+                                    attachMenu = false
+                                    pickPhotos.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                    )
+                                },
+                            )
+                        }
                     }
-                } else {
-                    IconButton(onClick = { submit() }, enabled = canSend) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.Send,
-                            contentDescription = "Send",
-                            tint = if (canSend) com.hermes.client.ui.components.AccentChrome.fabContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        )
+                    if (speechAvailable) {
+                        IconButton(onClick = { startDictation() }) {
+                            Icon(
+                                Icons.Rounded.Mic,
+                                contentDescription = "Voice input",
+                                tint = com.hermes.client.ui.components.AccentChrome.fabContainer,
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        modifier = Modifier.weight(1f).focusRequester(focusRequester),
+                        placeholder = { Text("Message Hermes…") },
+                        maxLines = 5,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { submit() }),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    if (state.isGenerating) {
+                        IconButton(onClick = { vm.stop() }) {
+                            Icon(Icons.Rounded.Stop, contentDescription = "Stop")
+                        }
+                    } else {
+                        IconButton(onClick = { submit() }, enabled = canSend) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.Send,
+                                contentDescription = "Send",
+                                tint = if (canSend) com.hermes.client.ui.components.AccentChrome.fabContainer
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            )
+                        }
                     }
                 }
             }
@@ -359,3 +475,17 @@ private fun ConnectionBanner(state: ConnectionState, onRetry: () -> Unit) {
     }
 }
 
+
+/**
+ * Decode [bytes] to a Bitmap downsampled so its largest side is roughly [reqPx] px — a chip thumbnail
+ * never needs full resolution, and decoding a 12MP photo at full size (×ATTACH_CAP) risks OOM/jank.
+ */
+private fun decodeThumbnail(bytes: ByteArray, reqPx: Int): android.graphics.Bitmap? {
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    var sample = 1
+    val maxDim = maxOf(bounds.outWidth, bounds.outHeight)
+    while (maxDim > 0 && maxDim / sample > reqPx * 2) sample *= 2
+    val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+    return android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+}
