@@ -97,7 +97,7 @@ fun CronDetailScreen(
                                     Field("Next run", formatIso(job.nextRunAt))
                                     Field("Last run", formatIso(job.lastRunAt) + (job.lastStatus?.let { " · $it" } ?: ""))
                                     job.lastError?.takeIf { it.isNotBlank() }?.let { err ->
-                                        var errorExpanded by rememberSaveable { mutableStateOf(false) }
+                                        var errorExpanded by rememberSaveable(err) { mutableStateOf(false) }
                                         Spacer(Modifier.height(6.dp))
                                         Text(
                                             err,
@@ -111,7 +111,7 @@ fun CronDetailScreen(
                                             if (errorExpanded) "Show less" else "Show more",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = LocalProfileAccent.current.accent,
-                                            modifier = Modifier.clickable { errorExpanded = !errorExpanded }.padding(top = 2.dp),
+                                            modifier = Modifier.padding(top = 2.dp).clickable { errorExpanded = !errorExpanded },
                                         )
                                     }
                                 }
