@@ -6,6 +6,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import java.io.File
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -24,13 +25,17 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
@@ -58,8 +63,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -111,7 +119,7 @@ fun ChatScreen(
         draft = base + text + (if (text.endsWith(":")) "" else " ")
     }
     val connected = connState is ConnectionState.Connected
-    val canSend = connected && draft.isNotBlank() && !state.isGenerating
+    val canSend = canSend(connected, draft.isNotBlank(), state.pendingAttachments.isNotEmpty(), state.isGenerating)
     val haptic = LocalHapticFeedback.current
 
     fun submit() {
@@ -209,71 +217,110 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            Row(
+            Column(
                 // targetSdk 35+ forces edge-to-edge on Android 15+, so the window no
                 // longer resizes for the keyboard — the composer must inset itself.
                 // union() takes max(ime, navBars) so it lifts above the keyboard when
                 // open and clears the nav bar when closed, without double-padding.
                 Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
             ) {
-                com.hermes.client.ui.components.ProfileAvatar(activeProfile)
-                Spacer(Modifier.width(4.dp))
-                var attachMenu by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { attachMenu = true }, enabled = connected) {
-                        Icon(Icons.Rounded.AttachFile, contentDescription = "Attach")
-                    }
-                    DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Camera") },
-                            onClick = { attachMenu = false; launchCamera() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Photo library") },
-                            onClick = {
-                                attachMenu = false
-                                pickPhotos.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                                )
-                            },
-                        )
+                if (state.pendingAttachments.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(state.pendingAttachments, key = { it.id }) { a ->
+                            val thumb = remember(a.id) {
+                                android.graphics.BitmapFactory.decodeByteArray(a.bytes, 0, a.bytes.size)?.asImageBitmap()
+                            }
+                            Box(Modifier.size(56.dp)) {
+                                if (thumb != null) {
+                                    Image(
+                                        bitmap = thumb,
+                                        contentDescription = "Attachment",
+                                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)),
+                                        contentScale = ContentScale.Crop,
+                                    )
+                                } else {
+                                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant))
+                                }
+                                IconButton(
+                                    onClick = { vm.removeAttachment(a.id) },
+                                    modifier = Modifier.align(Alignment.TopEnd).size(20.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Close,
+                                        contentDescription = "Remove attachment",
+                                        tint = com.hermes.client.ui.components.AccentChrome.fabContainer,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-                if (speechAvailable) {
-                    IconButton(onClick = { startDictation() }) {
-                        Icon(
-                            Icons.Rounded.Mic,
-                            contentDescription = "Voice input",
-                            tint = com.hermes.client.ui.components.AccentChrome.fabContainer,
-                        )
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    com.hermes.client.ui.components.ProfileAvatar(activeProfile)
+                    Spacer(Modifier.width(4.dp))
+                    var attachMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { attachMenu = true }, enabled = connected) {
+                            Icon(Icons.Rounded.AttachFile, contentDescription = "Attach")
+                        }
+                        DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Camera") },
+                                onClick = { attachMenu = false; launchCamera() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Photo library") },
+                                onClick = {
+                                    attachMenu = false
+                                    pickPhotos.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                    )
+                                },
+                            )
+                        }
                     }
-                }
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    modifier = Modifier.weight(1f).focusRequester(focusRequester),
-                    placeholder = { Text("Message Hermes…") },
-                    maxLines = 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { submit() }),
-                )
-                Spacer(Modifier.width(8.dp))
-                if (state.isGenerating) {
-                    IconButton(onClick = { vm.stop() }) {
-                        Icon(Icons.Rounded.Stop, contentDescription = "Stop")
+                    if (speechAvailable) {
+                        IconButton(onClick = { startDictation() }) {
+                            Icon(
+                                Icons.Rounded.Mic,
+                                contentDescription = "Voice input",
+                                tint = com.hermes.client.ui.components.AccentChrome.fabContainer,
+                            )
+                        }
                     }
-                } else {
-                    IconButton(onClick = { submit() }, enabled = canSend) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.Send,
-                            contentDescription = "Send",
-                            tint = if (canSend) com.hermes.client.ui.components.AccentChrome.fabContainer
-                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        )
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        modifier = Modifier.weight(1f).focusRequester(focusRequester),
+                        placeholder = { Text("Message Hermes…") },
+                        maxLines = 5,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { submit() }),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    if (state.isGenerating) {
+                        IconButton(onClick = { vm.stop() }) {
+                            Icon(Icons.Rounded.Stop, contentDescription = "Stop")
+                        }
+                    } else {
+                        IconButton(onClick = { submit() }, enabled = canSend) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.Send,
+                                contentDescription = "Send",
+                                tint = if (canSend) com.hermes.client.ui.components.AccentChrome.fabContainer
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            )
+                        }
                     }
                 }
             }
