@@ -15,6 +15,7 @@ data class ChatUiState(
     val pendingApproval: ApprovalRequest? = null,
     val pendingClarify: ClarifyRequest? = null,
     val isGenerating: Boolean = false,
+    val pendingAttachments: List<PendingAttachment> = emptyList(),
 ) {
     companion object { fun empty() = ChatUiState() }
 }
@@ -114,3 +115,9 @@ fun ChatUiState.markInterrupted(): ChatUiState {
     }
     return copy(messages = newMessages, isGenerating = false)
 }
+
+fun ChatUiState.withAttachment(a: PendingAttachment): ChatUiState =
+    copy(pendingAttachments = pendingAttachments.plusCapped(a))
+
+fun ChatUiState.withoutAttachment(id: String): ChatUiState =
+    copy(pendingAttachments = pendingAttachments.filterNot { it.id == id })
