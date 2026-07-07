@@ -64,7 +64,7 @@ fun CronDetailScreen(
     Scaffold(
         topBar = {
             com.hermes.client.ui.components.HermesTopBar(
-                title = state.job?.name ?: "Cron job",
+                title = state.job?.let { cronDisplayName(it.name, it.prompt, it.id) } ?: "Cron job",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         androidx.compose.material3.Icon(

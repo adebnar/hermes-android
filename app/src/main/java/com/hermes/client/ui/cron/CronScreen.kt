@@ -121,7 +121,12 @@ fun CronScreen(
                                 headlineContent = { Text(cronDisplayName(job.name, job.prompt, job.id)) },
                                 supportingContent = {
                                     val next = job.nextRunAt?.let { "Next: " + com.hermes.client.ui.util.formatIso(it) }
-                                    Text(next ?: job.prompt?.replace("\n", " ")?.trim()?.take(100).orEmpty())
+                                    // Prompt snippet is only useful here when the headline is the name; when the job is
+                                    // unnamed the headline already shows the prompt (via cronDisplayName), so don't repeat it.
+                                    val fallback = job.name?.takeIf { it.isNotBlank() }?.let {
+                                        job.prompt?.replace("\n", " ")?.trim()?.take(100)
+                                    }
+                                    Text(next ?: fallback.orEmpty())
                                 },
                                 trailingContent = {
                                     Box {

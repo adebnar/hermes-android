@@ -3,6 +3,8 @@ package com.hermes.client.ui.cron
 /** A one-tap starting point for a new cron job (a preset schedule + a starter prompt). */
 data class CronTemplate(val id: String, val label: String, val schedule: Schedule, val prompt: String)
 
+// Template ids (new_daily, new_weekly, etc.) are a distinct namespace from server job ids (c1, etc.),
+// so cronTemplate(id) matching in the edit VM can't collide with a real job.
 val CRON_TEMPLATES = listOf(
     CronTemplate(
         "new_daily", "Daily summary · 9:00", Schedule.Daily(9, 0),
