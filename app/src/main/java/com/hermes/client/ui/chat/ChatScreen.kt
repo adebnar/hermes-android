@@ -248,14 +248,23 @@ fun ChatScreen(
                                 } else {
                                     Box(Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant))
                                 }
-                                IconButton(
-                                    onClick = { vm.removeAttachment(a.id) },
-                                    modifier = Modifier.align(Alignment.TopEnd).size(20.dp),
+                                // Remove badge: a dark circular scrim + white ✕ for contrast over any
+                                // thumbnail, with a comfortably tappable target (a 20.dp icon was too small).
+                                Box(
+                                    Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(2.dp)
+                                        .size(26.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f))
+                                        .clickable { vm.removeAttachment(a.id) },
+                                    contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
                                         Icons.Rounded.Close,
                                         contentDescription = "Remove attachment",
-                                        tint = com.hermes.client.ui.components.AccentChrome.fabContainer,
+                                        tint = androidx.compose.ui.graphics.Color.White,
+                                        modifier = Modifier.size(16.dp),
                                     )
                                 }
                             }
@@ -272,7 +281,9 @@ fun ChatScreen(
                     Spacer(Modifier.width(4.dp))
                     var attachMenu by remember { mutableStateOf(false) }
                     Box {
-                        IconButton(onClick = { attachMenu = true }, enabled = connected) {
+                        // Not gated on connection: attaching only stages locally now; the upload
+                        // happens on Send, which canSend() already gates on being connected.
+                        IconButton(onClick = { attachMenu = true }) {
                             Icon(Icons.Rounded.AttachFile, contentDescription = "Attach")
                         }
                         DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
