@@ -50,6 +50,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -81,6 +83,7 @@ fun ChatScreen(
     val commands by vm.commands.collectAsStateWithLifecycle()
     val pathItems by vm.pathItems.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
     val initialDraft by vm.initialDraft.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(initialDraft) {
         initialDraft?.takeIf { it.isNotEmpty() }?.let { draft = it; vm.clearInitialDraft() }
@@ -212,7 +215,7 @@ fun ChatScreen(
                 OutlinedTextField(
                     value = draft,
                     onValueChange = { draft = it },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).focusRequester(focusRequester),
                     placeholder = { Text("Message Hermes…") },
                     maxLines = 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -275,7 +278,14 @@ fun ChatScreen(
                     }
                 }
             } else {
-                ChatMessageList(state = state, sessionId = sessionId, modifier = Modifier.weight(1f))
+                ChatMessageList(
+                    state = state,
+                    sessionId = sessionId,
+                    modifier = Modifier.weight(1f),
+                    isGenerating = state.isGenerating,
+                    onRegenerate = { vm.regenerate() },
+                    onEditResend = { text -> draft = text; focusRequester.requestFocus() },
+                )
             }
         }
     }

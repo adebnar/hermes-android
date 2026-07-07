@@ -31,6 +31,8 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.hermes.client.ui.theme.LocalProfileAccent
@@ -76,8 +78,14 @@ fun ChatMessageList(
     sessionId: String,
     modifier: Modifier = Modifier,
     listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
+    isGenerating: Boolean = false,
+    onEditResend: (String) -> Unit = {},
+    onRegenerate: () -> Unit = {},
 ) {
     val lastIndex = state.messages.lastIndex
+    // Only the most recent assistant turn can be regenerated — regenerating an earlier one
+    // would silently drop everything the user and agent said after it.
+    val lastAssistantId = state.messages.lastOrNull { it.role == Role.ASSISTANT }?.id
     // Length of the last (streaming) message: changes on every delta so we follow the stream.
     val tailLen = state.messages.lastOrNull()?.text?.length ?: 0
 
@@ -154,7 +162,10 @@ fun ChatMessageList(
         itemsIndexed(
             state.messages,
             key = { index, msg -> "$index:${msg.id}" },
-        ) { _, msg -> MessageBubble(msg) }
+        ) { _, msg ->
+            val canRegenerate = msg.id == lastAssistantId && !isGenerating
+            MessageBubble(msg, canRegenerate, onEditResend, onRegenerate)
+        }
     }
 }
 
@@ -163,74 +174,107 @@ fun ChatMessageList(
 // code, and tool traces have room to breathe and read as a transcript rather than an SMS thread.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(msg: ChatMessage) {
+private fun MessageBubble(
+    msg: ChatMessage,
+    canRegenerate: Boolean,
+    onEditResend: (String) -> Unit,
+    onRegenerate: () -> Unit,
+) {
     when (msg.role) {
-        Role.USER -> UserBubble(msg)
-        else -> AssistantTurn(msg)
+        Role.USER -> UserBubble(msg, onEditResend)
+        else -> AssistantTurn(msg, canRegenerate, onRegenerate)
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun UserBubble(msg: ChatMessage) {
+private fun UserBubble(msg: ChatMessage, onEditResend: (String) -> Unit) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    var menuOpen by remember { mutableStateOf(false) }
     val bg = if (msg.isError) MaterialTheme.colorScheme.errorContainer
     else MaterialTheme.colorScheme.primaryContainer
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        Column(
-            Modifier
-                .widthIn(max = 320.dp)
-                // Asymmetric corners (a small "tail" corner) mark this as the sender's bubble.
-                .clip(RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp))
-                .background(bg)
-                .combinedClickable(onClick = {}, onLongClick = { copyToClipboard(msg.text, clipboard, context) })
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-        ) {
-            if (msg.text.isNotBlank()) Text(msg.text, style = MaterialTheme.typography.bodyLarge)
+        Box {
+            Column(
+                Modifier
+                    .widthIn(max = 320.dp)
+                    // Asymmetric corners (a small "tail" corner) mark this as the sender's bubble.
+                    .clip(RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp))
+                    .background(bg)
+                    .combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                if (msg.text.isNotBlank()) Text(msg.text, style = MaterialTheme.typography.bodyLarge)
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text("Copy") },
+                    onClick = { copyToClipboard(msg.text, clipboard, context); menuOpen = false },
+                )
+                DropdownMenuItem(
+                    text = { Text("Edit & resend") },
+                    onClick = { onEditResend(msg.text); menuOpen = false },
+                )
+            }
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AssistantTurn(msg: ChatMessage) {
+private fun AssistantTurn(msg: ChatMessage, canRegenerate: Boolean, onRegenerate: () -> Unit) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = { copyToClipboard(msg.text, clipboard, context) })
-            .padding(vertical = 2.dp),
-    ) {
-        if (msg.thinking.isNotBlank()) ThinkingCard(msg.thinking)
-        msg.tools.forEach { ToolCard(it) }
-        if (msg.text.isNotBlank()) {
-            if (msg.isError) {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        msg.text,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(12.dp),
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
+                .padding(vertical = 2.dp),
+        ) {
+            if (msg.thinking.isNotBlank()) ThinkingCard(msg.thinking)
+            msg.tools.forEach { ToolCard(it) }
+            if (msg.text.isNotBlank()) {
+                if (msg.isError) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            msg.text,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(12.dp),
+                        )
+                    }
+                } else {
+                    val mdComponents = remember { chatMarkdownComponents() }
+                    Markdown(
+                        content = msg.text,
+                        colors = markdownColor(),
+                        typography = markdownTypography(),
+                        components = mdComponents,
                     )
                 }
-            } else {
-                val mdComponents = remember { chatMarkdownComponents() }
-                Markdown(
-                    content = msg.text,
-                    colors = markdownColor(),
-                    typography = markdownTypography(),
-                    components = mdComponents,
-                )
+            }
+            if (msg.isStreaming && msg.text.isBlank() && msg.tools.isEmpty()) {
+                TypingIndicator()
             }
         }
-        if (msg.isStreaming && msg.text.isBlank() && msg.tools.isEmpty()) {
-            TypingIndicator()
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text("Copy") },
+                onClick = { copyToClipboard(msg.text, clipboard, context); menuOpen = false },
+            )
+            if (canRegenerate) {
+                DropdownMenuItem(
+                    text = { Text("Regenerate") },
+                    onClick = { onRegenerate(); menuOpen = false },
+                )
+            }
         }
     }
 }
