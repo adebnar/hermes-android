@@ -111,7 +111,7 @@ fun CronScreen(
                                         else MaterialTheme.colorScheme.error,
                                     )
                                 },
-                                headlineContent = { Text(job.name ?: job.id) },
+                                headlineContent = { Text(cronDisplayName(job.name, job.prompt, job.id)) },
                                 supportingContent = {
                                     val next = job.nextRunAt?.let { "Next: " + com.hermes.client.ui.util.formatIso(it) }
                                     Text(next ?: job.prompt?.replace("\n", " ")?.trim()?.take(100).orEmpty())
