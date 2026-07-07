@@ -50,6 +50,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.launch
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -131,16 +132,20 @@ fun ChatScreen(
 
     // Image attach: read picked/captured bytes and stage them onto the session.
     val context = androidx.compose.ui.platform.LocalContext.current
+    val attachScope = androidx.compose.runtime.rememberCoroutineScope()
 
     fun readBytes(uri: Uri): ByteArray? =
         runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
 
     // Photo library: multi-select via the system photo picker (no permission).
+    // Read bytes off the main thread (large images would otherwise jank/ANR the UI).
     val pickPhotos = androidx.activity.compose.rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(ATTACH_CAP),
     ) { uris ->
-        uris.forEach { uri ->
-            readBytes(uri)?.let { vm.stageAttachment(it, context.contentResolver.getType(uri) ?: "image/*") }
+        attachScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            uris.forEach { uri ->
+                readBytes(uri)?.let { vm.stageAttachment(it, context.contentResolver.getType(uri) ?: "image/*") }
+            }
         }
     }
 
@@ -151,7 +156,11 @@ fun ChatScreen(
     val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture(),
     ) { ok ->
-        if (ok) captureUri?.let { uri -> readBytes(uri)?.let { vm.stageAttachment(it, "image/jpeg") } }
+        if (ok) captureUri?.let { uri ->
+            attachScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                readBytes(uri)?.let { vm.stageAttachment(it, "image/jpeg") }
+            }
+        }
     }
     fun launchCamera() {
         // Prior captures are already staged in-memory, so their temp files are disposable —
@@ -237,11 +246,17 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(state.pendingAttachments, key = { it.id }) { a ->
-                            val thumb = remember(a.id) { decodeThumbnail(a.bytes, reqPx = 200)?.asImageBitmap() }
+                            // Decode off the main thread (produceState) — bitmap decode is CPU-heavy.
+                            val thumb by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, a.id) {
+                                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    decodeThumbnail(a.bytes, reqPx = 200)?.asImageBitmap()
+                                }
+                            }
                             Box(Modifier.size(56.dp)) {
-                                if (thumb != null) {
+                                val bmp = thumb
+                                if (bmp != null) {
                                     Image(
-                                        bitmap = thumb,
+                                        bitmap = bmp,
                                         contentDescription = "Attachment",
                                         modifier = Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)),
                                         contentScale = ContentScale.Crop,
