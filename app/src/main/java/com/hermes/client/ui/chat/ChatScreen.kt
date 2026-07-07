@@ -1,11 +1,17 @@
 package com.hermes.client.ui.chat
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
+import android.net.Uri
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
@@ -29,6 +35,8 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -113,18 +121,33 @@ fun ChatScreen(
         draft = ""
     }
 
-    // Image attach: pick an image, base64-encode its bytes, attach to the session.
+    // Image attach: read picked/captured bytes and stage them onto the session.
     val context = androidx.compose.ui.platform.LocalContext.current
-    val pickImage = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                val mime = context.contentResolver.getType(uri) ?: "image/*"
-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching
-                vm.stageAttachment(bytes, mime)
-            }
+
+    fun readBytes(uri: Uri): ByteArray? =
+        runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+
+    // Photo library: multi-select via the system photo picker (no permission).
+    val pickPhotos = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(ATTACH_CAP),
+    ) { uris ->
+        uris.forEach { uri ->
+            readBytes(uri)?.let { vm.stageAttachment(it, context.contentResolver.getType(uri) ?: "image/*") }
         }
+    }
+
+    // Camera: capture into a FileProvider cache uri, then read it back. No CAMERA permission (delegates).
+    var captureUri by remember { mutableStateOf<Uri?>(null) }
+    val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture(),
+    ) { ok ->
+        if (ok) captureUri?.let { uri -> readBytes(uri)?.let { vm.stageAttachment(it, "image/jpeg") } }
+    }
+    fun launchCamera() {
+        val file = File(context.cacheDir, "capture_${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        captureUri = uri
+        runCatching { takePhoto.launch(uri) }
     }
 
     // Voice dictation: the system speech recognizer returns a transcript we append to the draft.
@@ -199,8 +222,26 @@ fun ChatScreen(
             ) {
                 com.hermes.client.ui.components.ProfileAvatar(activeProfile)
                 Spacer(Modifier.width(4.dp))
-                IconButton(onClick = { pickImage.launch("image/*") }, enabled = connected) {
-                    Icon(Icons.Rounded.AttachFile, contentDescription = "Attach image")
+                var attachMenu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { attachMenu = true }, enabled = connected) {
+                        Icon(Icons.Rounded.AttachFile, contentDescription = "Attach")
+                    }
+                    DropdownMenu(expanded = attachMenu, onDismissRequest = { attachMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Camera") },
+                            onClick = { attachMenu = false; launchCamera() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Photo library") },
+                            onClick = {
+                                attachMenu = false
+                                pickPhotos.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
+                        )
+                    }
                 }
                 if (speechAvailable) {
                     IconButton(onClick = { startDictation() }) {
