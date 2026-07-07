@@ -106,26 +106,24 @@ class ChatViewModelTest {
     }
 
     /**
-     * Highest-risk share invariant: a pending image share must be attached AFTER resume,
-     * using the LIVE post-resume session handle returned by chat.resume() — not the id
-     * open() was called with — since the gateway may hand back a different live handle
-     * and the attach must target the session it actually knows about.
+     * A pending image share must be staged as a local attachment chip (not attached to the
+     * gateway immediately) — it's flushed on the next send() using whatever the live
+     * post-resume sessionId is at that time.
      */
-    @Test fun open_attaches_pending_image_using_live_resumed_sessionId() = runTest {
+    @Test fun open_stages_pending_share_image_as_attachment() = runTest {
         coEvery { chatRepo.resume("s1", null) } returns "s1-live"
         pendingShareStore.put(
             "s1",
-            com.hermes.client.share.PendingShare(imageBase64 = "abc", imageMime = "image/png"),
+            // Valid base64 (decodes to "abc") — real decode logic runs in unit tests.
+            com.hermes.client.share.PendingShare(imageBase64 = "YWJj", imageMime = "image/png"),
         )
         val vm = buildVm()
         vm.open("s1")
         advanceUntilIdle()
 
-        coVerify { chatRepo.attachImageBytes("s1-live", "abc", "image/png") }
-        assertTrue(
-            "an 'Image attached' system message must land in state",
-            vm.state.value.messages.any { it.text.contains("Image attached") },
-        )
+        coVerify(exactly = 0) { chatRepo.attachImageBytes(any(), any(), any()) }
+        assertEquals(1, vm.state.value.pendingAttachments.size)
+        assertEquals("image/png", vm.state.value.pendingAttachments.first().mimeType)
     }
 
     /** A text-only pending share (no image) must not trigger an attach call at all. */

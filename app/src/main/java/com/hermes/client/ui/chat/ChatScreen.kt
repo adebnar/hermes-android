@@ -122,8 +122,7 @@ fun ChatScreen(
             runCatching {
                 val mime = context.contentResolver.getType(uri) ?: "image/*"
                 val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching
-                val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-                vm.attachImage(b64, mime)
+                vm.stageAttachment(bytes, mime)
             }
         }
     }
