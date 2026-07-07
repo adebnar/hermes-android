@@ -159,7 +159,7 @@ fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsu
                 CronScreen(
                     onMenu = back,
                     onOpen = { id -> nav.navigate("cron_detail/$id") },
-                    onNew = { nav.navigate("cron_edit/new") },
+                    onNew = { seed -> nav.navigate("cron_edit/$seed") },
                 )
             }
             composable("cron_detail/{id}") { entry ->
