@@ -202,8 +202,8 @@ private fun UserBubble(msg: ChatMessage, onEditResend: (String) -> Unit) {
                     // Asymmetric corners (a small "tail" corner) mark this as the sender's bubble.
                     .clip(RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp))
                     .background(bg)
-                    .combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .combinedClickable(onClick = {}, onLongClick = { menuOpen = true }),
             ) {
                 if (msg.text.isNotBlank()) Text(msg.text, style = MaterialTheme.typography.bodyLarge)
             }
@@ -231,8 +231,8 @@ private fun AssistantTurn(msg: ChatMessage, canRegenerate: Boolean, onRegenerate
         Column(
             Modifier
                 .fillMaxWidth()
-                .combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
-                .padding(vertical = 2.dp),
+                .padding(vertical = 2.dp)
+                .combinedClickable(onClick = {}, onLongClick = { menuOpen = true }),
         ) {
             if (msg.thinking.isNotBlank()) ThinkingCard(msg.thinking)
             msg.tools.forEach { ToolCard(it) }
