@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -124,6 +125,28 @@ fun ChatScreen(
         }
     }
 
+    // Voice dictation: the system speech recognizer returns a transcript we append to the draft.
+    // RecognizerIntent needs no RECORD_AUDIO (the system speech app owns the mic + permission).
+    val speechAvailable = remember { android.speech.SpeechRecognizer.isRecognitionAvailable(context) }
+    val speech = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val spoken = result.data
+                ?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull().orEmpty()
+            draft = appendDictation(draft, spoken)
+        }
+    }
+    fun startDictation() {
+        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale.getDefault())
+            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak your message")
+        }
+        runCatching { speech.launch(intent) }
+    }
+
     // I1: route back to Setup when the server returns 401
     LaunchedEffect(unauthorized) {
         if (unauthorized) onUnauthorized()
@@ -176,6 +199,15 @@ fun ChatScreen(
                 Spacer(Modifier.width(4.dp))
                 IconButton(onClick = { pickImage.launch("image/*") }, enabled = connected) {
                     Icon(Icons.Rounded.AttachFile, contentDescription = "Attach image")
+                }
+                if (speechAvailable) {
+                    IconButton(onClick = { startDictation() }) {
+                        Icon(
+                            Icons.Rounded.Mic,
+                            contentDescription = "Voice input",
+                            tint = com.hermes.client.ui.components.AccentChrome.fabContainer,
+                        )
+                    }
                 }
                 OutlinedTextField(
                     value = draft,
