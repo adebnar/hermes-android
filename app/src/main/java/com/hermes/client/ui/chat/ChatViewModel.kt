@@ -186,6 +186,13 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /** Re-ask: re-submit the last user prompt (appends a new answer; the gateway can't replace). */
+    fun regenerate() {
+        if (_state.value.isGenerating) return
+        val prompt = lastUserMessageText(_state.value.messages) ?: return
+        send(prompt)
+    }
+
     fun stop() { viewModelScope.launch { runCatching { chat.interrupt(sessionId) } } }
 
     /** Attach an image (base64) to the session; surfaces a system note when done. */
