@@ -8,7 +8,7 @@ enum class Weekday(val cron: Int, val short: String) {
     SUN(0, "Sun"), MON(1, "Mon"), TUE(2, "Tue"), WED(3, "Wed"), THU(4, "Thu"), FRI(5, "Fri"), SAT(6, "Sat");
 
     companion object {
-        fun fromCron(v: Int): Weekday? = values().firstOrNull { it.cron == v % 7 }
+        fun fromCron(v: Int): Weekday? = entries.firstOrNull { it.cron == v % 7 }
     }
 }
 
@@ -82,8 +82,12 @@ fun Schedule.nextRun(nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): Long? 
 
 private fun String.toIntOrStar(): Int? = toIntOrNull()
 
+private val WHITESPACE = Regex("\\s+")
+private const val CRON_PART = "(\\*|\\d+(-\\d+)?)(/\\d+)?"
+private val CRON_FIELD = Regex("^$CRON_PART(,$CRON_PART)*$")
+
 fun parseCron(expr: String): Schedule {
-    val f = expr.trim().split(Regex("\\s+"))
+    val f = expr.trim().split(WHITESPACE)
     if (f.size != 5) return Schedule.Advanced(expr.trim())
     val minS = f[0]
     val hourS = f[1]
@@ -108,11 +112,9 @@ private fun dowIsList(s: String): Boolean =
     s != "*" && s.split(",").all { it.toIntOrNull()?.let { n -> n in 0..7 } == true }
 
 fun isValidCron(expr: String): Boolean {
-    val f = expr.trim().split(Regex("\\s+"))
+    val f = expr.trim().split(WHITESPACE)
     if (f.size != 5) return false
     // A field is "*" (optionally with a /step) or a comma-separated list of
     // numbers/ranges, each optionally with a /step, e.g. "9-17/2,30".
-    val part = "(\\*|\\d+(-\\d+)?)(/\\d+)?"
-    val token = Regex("^$part(,$part)*$")
-    return f.all { token.matches(it) }
+    return f.all { CRON_FIELD.matches(it) }
 }

@@ -151,7 +151,8 @@ fun CronEditScreen(
             OutlinedTextField(state.name, vm::setName, label = { Text("Name (optional)") },
                 singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            ScheduleBuilder(schedule = state.schedule, onChange = vm::setSchedule, nowMs = System.currentTimeMillis())
+            val nowMs = androidx.compose.runtime.remember(state.schedule) { System.currentTimeMillis() }
+            ScheduleBuilder(schedule = state.schedule, onChange = vm::setSchedule, nowMs = nowMs)
             OutlinedTextField(state.prompt, vm::setPrompt, label = { Text("Prompt") },
                 minLines = 5, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
             Button(
@@ -295,7 +296,7 @@ private fun WeekdayChips(days: Set<Weekday>, onChange: (Set<Weekday>) -> Unit) {
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Weekday.values().sortedBy { it.cron }.forEach { day ->
+        Weekday.entries.forEach { day ->
             val selected = day in days
             FilterChip(
                 selected = selected,
