@@ -10,18 +10,21 @@ import kotlinx.coroutines.flow.map
 
 private val Context.notificationDataStore by preferencesDataStore(name = "notifications")
 
-/** Device-local notification preferences (master toggle + approvals). Off by default. */
+/** Device-local notification preferences (master toggle + approvals + run-finished). Off by default. */
 class NotificationSettings(private val context: Context) {
     private val kEnabled = booleanPreferencesKey("enabled")
     private val kApprovals = booleanPreferencesKey("approvals")
+    private val kRunFinished = booleanPreferencesKey("runFinished")
 
     val prefs: Flow<NotificationPrefs> = context.notificationDataStore.data.map { p ->
         NotificationPrefs(
             enabled = p[kEnabled] ?: false,
             approvals = p[kApprovals] ?: true,
+            runFinished = p[kRunFinished] ?: true,
         )
     }
 
     suspend fun setEnabled(v: Boolean) = context.notificationDataStore.edit { it[kEnabled] = v }
     suspend fun setApprovals(v: Boolean) = context.notificationDataStore.edit { it[kApprovals] = v }
+    suspend fun setRunFinished(v: Boolean) = context.notificationDataStore.edit { it[kRunFinished] = v }
 }
