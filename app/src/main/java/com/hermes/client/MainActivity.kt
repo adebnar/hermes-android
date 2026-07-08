@@ -191,7 +191,7 @@ class MainActivity : ComponentActivity() {
             // connect() first — a cold-start share has no open socket yet, and createSession()
             // would otherwise fail after the ready-gate timeout. connect() is idempotent.
             chat.connect()
-            runCatching { chat.createSession() }
+            runCatching { chat.createSession(profileManager.active.value) }
                 .onSuccess { id ->
                     pendingShare.put(
                         id,
