@@ -29,11 +29,29 @@ class GatewayConnectionService : Service() {
     // DataStore. @Volatile for cross-thread visibility (scope has no single-thread dispatcher).
     @Volatile private var latestPrefs = NotificationPrefs()
 
+    // Whether the app process is currently in the foreground, kept current by a
+    // ProcessLifecycleOwner observer so the event loop can suppress notifications the user is
+    // already looking at. @Volatile for cross-thread visibility (scope has no single-thread
+    // dispatcher).
+    @Volatile private var appInForeground = false
+
     override fun onCreate() {
         super.onCreate()
         notifier.ensureChannels()
         startForeground(HermesNotifier.SERVICE_NOTIFICATION_ID, notifier.serviceNotification())
         client.connect()
+        // ProcessLifecycleOwner must be observed from the main thread.
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(
+                androidx.lifecycle.LifecycleEventObserver { _, e ->
+                    when (e) {
+                        androidx.lifecycle.Lifecycle.Event.ON_START -> appInForeground = true
+                        androidx.lifecycle.Lifecycle.Event.ON_STOP -> appInForeground = false
+                        else -> {}
+                    }
+                },
+            )
+        }
         // Track the latest prefs reactively so the event loop reads a cached value instead of
         // collecting DataStore per event. Started first so its replayed value is in place before
         // events arrive; also picks up mid-run toggles (e.g. approvals turned off).
@@ -43,9 +61,7 @@ class GatewayConnectionService : Service() {
                 // One malformed/unexpected event must not crash the process — mirror the guard
                 // ChatViewModel's reduce() uses around event handling.
                 runCatching {
-                    // TODO(later task): thread real foreground state through; for now this service
-                    // only runs the background event loop, so treat it as always-backgrounded.
-                    toNotificationSpec(event, latestPrefs, appInForeground = false)?.let { notifier.post(it) }
+                    toNotificationSpec(event, latestPrefs, appInForeground)?.let { notifier.post(it) }
                 }
             }
         }
