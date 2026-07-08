@@ -38,7 +38,6 @@ class GatewayConnectionService : Service() {
     // ProcessLifecycleOwner is a process-lifetime singleton; hold the observer so onDestroy can
     // remove it — otherwise each stop/start of this service (e.g. toggling notifications) would
     // leak the retired Service instance (and its injected WS client) forever.
-    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var lifecycleObserver: androidx.lifecycle.LifecycleEventObserver? = null
 
     override fun onCreate() {
@@ -46,18 +45,17 @@ class GatewayConnectionService : Service() {
         notifier.ensureChannels()
         startForeground(HermesNotifier.SERVICE_NOTIFICATION_ID, notifier.serviceNotification())
         client.connect()
-        // ProcessLifecycleOwner must be observed from the main thread.
-        mainHandler.post {
-            val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
-                when (e) {
-                    androidx.lifecycle.Lifecycle.Event.ON_START -> appInForeground = true
-                    androidx.lifecycle.Lifecycle.Event.ON_STOP -> appInForeground = false
-                    else -> {}
-                }
+        // Service.onCreate() runs on the main thread — where ProcessLifecycleOwner must be observed —
+        // so register synchronously (addObserver replays the current state immediately, no race).
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            when (e) {
+                androidx.lifecycle.Lifecycle.Event.ON_START -> appInForeground = true
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> appInForeground = false
+                else -> {}
             }
-            lifecycleObserver = obs
-            androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(obs)
         }
+        lifecycleObserver = obs
+        androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(obs)
         // Track the latest prefs reactively so the event loop reads a cached value instead of
         // collecting DataStore per event. Started first so its replayed value is in place before
         // events arrive; also picks up mid-run toggles (e.g. approvals turned off).
@@ -90,11 +88,10 @@ class GatewayConnectionService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
-        // Remove the process-lifecycle observer (main thread) so this Service instance isn't retained.
-        mainHandler.post {
-            lifecycleObserver?.let { androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.removeObserver(it) }
-            lifecycleObserver = null
-        }
+        // onDestroy() runs on the main thread — remove the observer synchronously so this Service
+        // instance isn't retained (and no event can hit a defunct instance in a deferred window).
+        lifecycleObserver?.let { androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.removeObserver(it) }
+        lifecycleObserver = null
         super.onDestroy()
     }
 
