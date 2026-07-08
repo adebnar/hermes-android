@@ -11,6 +11,8 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -31,6 +33,7 @@ class SessionsViewModelTest {
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
+        every { chatRepo.events } returns kotlinx.coroutines.flow.MutableSharedFlow()
         every { profileManager.active } returns MutableStateFlow<String?>("personal")
         every { pinStore.pinned } returns MutableStateFlow<Set<String>>(emptySet())
         every { groupExpansion.collapsed } returns MutableStateFlow<Set<String>>(emptySet())
@@ -83,6 +86,30 @@ class SessionsViewModelTest {
         val ids = vm.state.value.sessions.map { it.id }
         assertTrue("refresh must surface the newly-added session", ids.contains("s2"))
         assertEquals(2, ids.size)
+    }
+
+    // Regression: after a new chat's first message, the gateway auto-generates a title and pushes a
+    // `session.title` WS event. The list must re-fetch on that event so the AI title replaces
+    // "Untitled" — mirroring the desktop. Without this the new chat stays "Untitled" forever.
+    @Test fun session_title_event_refreshes_the_list() = runTest {
+        val events = kotlinx.coroutines.flow.MutableSharedFlow<com.hermes.client.data.network.ServerEvent>(extraBufferCapacity = 8)
+        every { chatRepo.events } returns events
+        var fetches = 0
+        coEvery { sessionRepo.listAllProfiles() } coAnswers { fetches++; emptyList() }
+        buildVm()
+        advanceUntilIdle()
+        val before = fetches
+
+        events.emit(
+            com.hermes.client.data.network.ServerEvent(
+                type = "session.title",
+                sessionId = "sk1",
+                payload = buildJsonObject { put("title", "Fix the login bug") },
+            ),
+        )
+        advanceUntilIdle()
+
+        assertTrue("a session.title event must trigger a list refresh", fetches > before)
     }
 
     // The list is scoped to the active profile (one tenant at a time, like the desktop): a session

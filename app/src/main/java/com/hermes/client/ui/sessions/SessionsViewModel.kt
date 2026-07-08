@@ -72,6 +72,12 @@ class SessionsViewModel @Inject constructor(
         // The list is scoped to the active profile (like the desktop, one tenant at a time), so it
         // reloads whenever the selected profile changes — including the first value once it loads.
         viewModelScope.launch { profileManager.active.collect { refresh() } }
+        // The gateway auto-titles a new chat after its first message and pushes a `session.title`
+        // event; re-fetch so the AI title replaces "Untitled" (and the now-non-empty chat appears).
+        // This VM stays in the back stack while a chat is open, so it catches the event live.
+        viewModelScope.launch {
+            chat.events.collect { if (it.type == "session.title") refresh() }
+        }
     }
 
     fun refresh() = viewModelScope.launch {
