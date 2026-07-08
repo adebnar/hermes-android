@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -72,26 +73,42 @@ class SessionsViewModel @Inject constructor(
         // The list is scoped to the active profile (like the desktop, one tenant at a time), so it
         // reloads whenever the selected profile changes — including the first value once it loads.
         viewModelScope.launch { profileManager.active.collect { refresh() } }
+        // The gateway auto-titles a new chat after its first message and pushes a `session.title`
+        // event; re-fetch so the AI title replaces "Untitled" (and the now-non-empty chat appears).
+        // This VM stays in the back stack while a chat is open, so it catches the event live.
+        viewModelScope.launch {
+            chat.events.collect { if (it.type == "session.title") refresh() }
+        }
     }
 
-    fun refresh() = viewModelScope.launch {
-        _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
-        try {
-            // Fetch the cross-profile list (true per-session profile + cron/empty already filtered),
-            // then scope to the active profile so only that tenant's sessions show. Until the active
-            // profile is known, fall back to showing everything rather than a blank list.
-            val active = profileManager.active.value
-            val all = sessions.listAllProfiles()
-            val list = if (active.isNullOrBlank()) all else all.filter { it.profile == active }
-            _state.value = SessionsUiState(sessions = list)
-        } catch (e: HermesApiException) {
-            if (e.code == 401) {
-                _state.value = SessionsUiState(unauthorized = true)
-            } else {
+    // Several triggers call refresh() (profile change, session.title event, manual). Cancel any
+    // in-flight refresh before starting a new one so a slow older request can't complete last and
+    // overwrite the list with stale data (latest-wins).
+    private var refreshJob: Job? = null
+
+    fun refresh() {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null, unauthorized = false)
+            try {
+                // Fetch the cross-profile list (true per-session profile + cron/empty already filtered),
+                // then scope to the active profile so only that tenant's sessions show. Until the active
+                // profile is known, fall back to showing everything rather than a blank list.
+                val active = profileManager.active.value
+                val all = sessions.listAllProfiles()
+                val list = if (active.isNullOrBlank()) all else all.filter { it.profile == active }
+                _state.value = SessionsUiState(sessions = list)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e // a superseded refresh is cancelled, not an error — don't clobber state
+            } catch (e: HermesApiException) {
+                if (e.code == 401) {
+                    _state.value = SessionsUiState(unauthorized = true)
+                } else {
+                    _state.value = SessionsUiState(error = e.message ?: "Failed to load")
+                }
+            } catch (e: Exception) {
                 _state.value = SessionsUiState(error = e.message ?: "Failed to load")
             }
-        } catch (e: Exception) {
-            _state.value = SessionsUiState(error = e.message ?: "Failed to load")
         }
     }
 
