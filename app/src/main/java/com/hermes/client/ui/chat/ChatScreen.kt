@@ -36,7 +36,10 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -100,6 +103,16 @@ fun ChatScreen(
     val commands by vm.commands.collectAsStateWithLifecycle()
     val pathItems by vm.pathItems.collectAsStateWithLifecycle()
     var draft by remember { mutableStateOf("") }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var currentMatch by rememberSaveable { mutableStateOf(0) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val matches = remember(query, state.messages) { matchIndices(state.messages, query) }
+    LaunchedEffect(matches) { currentMatch = 0 }
+    val highlightIndex = if (searchOpen) matches.getOrNull(currentMatch) else null
+    LaunchedEffect(currentMatch, matches) {
+        matches.getOrNull(currentMatch)?.let { listState.animateScrollToItem(it) }
+    }
     val focusRequester = remember { FocusRequester() }
     val initialDraft by vm.initialDraft.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(initialDraft) {
@@ -215,6 +228,13 @@ fun ChatScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { searchOpen = !searchOpen; if (!searchOpen) query = "" }) {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Rounded.Search,
+                            contentDescription = "Search in chat",
+                            tint = com.hermes.client.ui.components.AccentChrome.onBar,
+                        )
+                    }
                     AssistChip(
                         onClick = { modelSheetOpen = true },
                         modifier = Modifier.minimumInteractiveComponentSize(),
@@ -399,14 +419,61 @@ fun ChatScreen(
                     }
                 }
             } else {
-                ChatMessageList(
-                    state = state,
-                    sessionId = sessionId,
-                    modifier = Modifier.weight(1f),
-                    isGenerating = state.isGenerating,
-                    onRegenerate = { vm.regenerate() },
-                    onEditResend = { text -> draft = text; focusRequester.requestFocus() },
-                )
+                Column(Modifier.fillMaxSize()) {
+                    if (searchOpen) {
+                        val accent = LocalProfileAccent.current.accent
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OutlinedTextField(
+                                value = query,
+                                onValueChange = { query = it },
+                                placeholder = { Text("Search in chat…") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                if (matches.isEmpty()) "0/0" else "${currentMatch + 1}/${matches.size}",
+                                color = accent,
+                                modifier = Modifier.padding(horizontal = 8.dp),
+                            )
+                            IconButton(
+                                onClick = { if (matches.isNotEmpty()) currentMatch = (currentMatch - 1 + matches.size) % matches.size },
+                                enabled = matches.isNotEmpty(),
+                            ) {
+                                Icon(
+                                    androidx.compose.material.icons.Icons.Rounded.KeyboardArrowUp,
+                                    contentDescription = "Previous match",
+                                    tint = accent,
+                                )
+                            }
+                            IconButton(
+                                onClick = { if (matches.isNotEmpty()) currentMatch = (currentMatch + 1) % matches.size },
+                                enabled = matches.isNotEmpty(),
+                            ) {
+                                Icon(
+                                    androidx.compose.material.icons.Icons.Rounded.KeyboardArrowDown,
+                                    contentDescription = "Next match",
+                                    tint = accent,
+                                )
+                            }
+                            IconButton(onClick = { searchOpen = false; query = "" }) {
+                                Icon(androidx.compose.material.icons.Icons.Rounded.Close, contentDescription = "Close search")
+                            }
+                        }
+                    }
+                    ChatMessageList(
+                        state = state,
+                        sessionId = sessionId,
+                        listState = listState,
+                        highlightIndex = highlightIndex,
+                        isGenerating = state.isGenerating,
+                        onEditResend = { text -> draft = text; focusRequester.requestFocus() },
+                        onRegenerate = { vm.regenerate() },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
