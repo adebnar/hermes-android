@@ -111,10 +111,14 @@ fun ChatScreen(
     // Reset the cursor when the QUERY changes — not when `matches` changes: `matches` is a fresh
     // list instance on every streamed token, which would otherwise yank the cursor to 0 mid-search.
     LaunchedEffect(query, searchOpen) { currentMatch = 0 }
-    val highlightIndex = if (searchOpen) matches.getOrNull(currentMatch) else null
+    // Coerce currentMatch into range so the highlight stays in sync with the (coerced) counter during
+    // the transient window after `matches` shrinks but before the reset effect runs.
+    val highlightIndex = if (searchOpen && matches.isNotEmpty()) matches[currentMatch.coerceAtMost(matches.lastIndex)] else null
     // Key the scroll on the resolved match index, so it only animates when the active match actually
     // moves — not on every streamed token (which changes `matches`'s identity but not the target).
     LaunchedEffect(highlightIndex) { highlightIndex?.let { listState.animateScrollToItem(it) } }
+    // System back closes the search bar first (rather than leaving the chat) when it's open.
+    androidx.activity.compose.BackHandler(enabled = searchOpen) { searchOpen = false; query = "" }
     val focusRequester = remember { FocusRequester() }
     val initialDraft by vm.initialDraft.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(initialDraft) {
