@@ -2,6 +2,7 @@ package com.hermes.client.ui.chat
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -81,6 +82,7 @@ fun ChatMessageList(
     isGenerating: Boolean = false,
     onEditResend: (String) -> Unit = {},
     onRegenerate: () -> Unit = {},
+    highlightIndex: Int? = null,
 ) {
     val lastIndex = state.messages.lastIndex
     // Only the most recent assistant turn can be regenerated — regenerating an earlier one
@@ -162,9 +164,9 @@ fun ChatMessageList(
         itemsIndexed(
             state.messages,
             key = { index, msg -> "$index:${msg.id}" },
-        ) { _, msg ->
+        ) { index, msg ->
             val canRegenerate = msg.id == lastAssistantId && !isGenerating
-            MessageBubble(msg, canRegenerate, onEditResend, onRegenerate)
+            MessageBubble(msg, canRegenerate, onEditResend, onRegenerate, highlighted = index == highlightIndex)
         }
     }
 }
@@ -179,29 +181,33 @@ private fun MessageBubble(
     canRegenerate: Boolean,
     onEditResend: (String) -> Unit,
     onRegenerate: () -> Unit,
+    highlighted: Boolean = false,
 ) {
     when (msg.role) {
-        Role.USER -> UserBubble(msg, onEditResend)
-        else -> AssistantTurn(msg, canRegenerate, onRegenerate)
+        Role.USER -> UserBubble(msg, onEditResend, highlighted = highlighted)
+        else -> AssistantTurn(msg, canRegenerate, onRegenerate, highlighted = highlighted)
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun UserBubble(msg: ChatMessage, onEditResend: (String) -> Unit) {
+private fun UserBubble(msg: ChatMessage, onEditResend: (String) -> Unit, highlighted: Boolean = false) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
     val bg = if (msg.isError) MaterialTheme.colorScheme.errorContainer
     else MaterialTheme.colorScheme.primaryContainer
+    val accent = LocalProfileAccent.current.accent
+    val userShape = RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Box {
             Column(
                 Modifier
                     .widthIn(max = 320.dp)
                     // Asymmetric corners (a small "tail" corner) mark this as the sender's bubble.
-                    .clip(RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp))
+                    .clip(userShape)
                     .background(bg)
+                    .then(if (highlighted) Modifier.background(accent.copy(alpha = 0.18f)).border(1.5.dp, accent, userShape) else Modifier)
                     .padding(horizontal = 14.dp, vertical = 10.dp)
                     .combinedClickable(onClick = {}, onLongClick = { menuOpen = true }),
             ) {
@@ -223,14 +229,17 @@ private fun UserBubble(msg: ChatMessage, onEditResend: (String) -> Unit) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AssistantTurn(msg: ChatMessage, canRegenerate: Boolean, onRegenerate: () -> Unit) {
+private fun AssistantTurn(msg: ChatMessage, canRegenerate: Boolean, onRegenerate: () -> Unit, highlighted: Boolean = false) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
+    val accent = LocalProfileAccent.current.accent
+    val hlShape = RoundedCornerShape(12.dp)
     Box {
         Column(
             Modifier
                 .fillMaxWidth()
+                .then(if (highlighted) Modifier.clip(hlShape).background(accent.copy(alpha = 0.12f)).border(1.5.dp, accent, hlShape).padding(6.dp) else Modifier)
                 .padding(vertical = 2.dp)
                 .combinedClickable(onClick = {}, onLongClick = { menuOpen = true }),
         ) {
