@@ -108,11 +108,13 @@ fun ChatScreen(
     var currentMatch by rememberSaveable { mutableStateOf(0) }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val matches = remember(query, state.messages) { matchIndices(state.messages, query) }
-    LaunchedEffect(matches) { currentMatch = 0 }
+    // Reset the cursor when the QUERY changes — not when `matches` changes: `matches` is a fresh
+    // list instance on every streamed token, which would otherwise yank the cursor to 0 mid-search.
+    LaunchedEffect(query, searchOpen) { currentMatch = 0 }
     val highlightIndex = if (searchOpen) matches.getOrNull(currentMatch) else null
-    LaunchedEffect(currentMatch, matches) {
-        matches.getOrNull(currentMatch)?.let { listState.animateScrollToItem(it) }
-    }
+    // Key the scroll on the resolved match index, so it only animates when the active match actually
+    // moves — not on every streamed token (which changes `matches`'s identity but not the target).
+    LaunchedEffect(highlightIndex) { highlightIndex?.let { listState.animateScrollToItem(it) } }
     val focusRequester = remember { FocusRequester() }
     val initialDraft by vm.initialDraft.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(initialDraft) {
@@ -433,8 +435,11 @@ fun ChatScreen(
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
                             )
+                            // Coerce into range: `currentMatch` can transiently exceed a shrunk match
+                            // set before the reset effect runs — avoids a glitchy counter like "5/2".
+                            val displayIndex = if (matches.isEmpty()) 0 else currentMatch.coerceAtMost(matches.lastIndex) + 1
                             Text(
-                                if (matches.isEmpty()) "0/0" else "${currentMatch + 1}/${matches.size}",
+                                "$displayIndex/${matches.size}",
                                 color = accent,
                                 modifier = Modifier.padding(horizontal = 8.dp),
                             )

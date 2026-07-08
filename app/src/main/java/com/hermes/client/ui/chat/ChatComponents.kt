@@ -239,7 +239,9 @@ private fun AssistantTurn(msg: ChatMessage, canRegenerate: Boolean, onRegenerate
         Column(
             Modifier
                 .fillMaxWidth()
-                .then(if (highlighted) Modifier.clip(hlShape).background(accent.copy(alpha = 0.12f)).border(1.5.dp, accent, hlShape).padding(6.dp) else Modifier)
+                // No conditional padding here: background/border draw within existing bounds, so
+                // toggling the highlight causes no layout shift (a conditional .padding would).
+                .then(if (highlighted) Modifier.clip(hlShape).background(accent.copy(alpha = 0.12f)).border(1.5.dp, accent, hlShape) else Modifier)
                 .padding(vertical = 2.dp)
                 .combinedClickable(onClick = {}, onLongClick = { menuOpen = true }),
         ) {
