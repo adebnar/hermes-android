@@ -163,13 +163,18 @@ fun ChatScreen(
         }
     }
     fun launchCamera() {
-        // Prior captures are already staged in-memory, so their temp files are disposable —
-        // sweep them so cacheDir doesn't grow unbounded across captures.
-        context.cacheDir.listFiles { f -> f.name.startsWith("capture_") }?.forEach { it.delete() }
-        val file = File(context.cacheDir, "capture_${System.currentTimeMillis()}.jpg")
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        captureUri = uri
-        runCatching { takePhoto.launch(uri) }
+        attachScope.launch {
+            // Do the cache sweep + file creation off the main thread (disk I/O can jank/ANR),
+            // then return to the main thread to set the uri and launch the camera.
+            val uri = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                // Prior captures are already staged in-memory, so their temp files are disposable.
+                context.cacheDir.listFiles { f -> f.name.startsWith("capture_") }?.forEach { it.delete() }
+                val file = File(context.cacheDir, "capture_${System.currentTimeMillis()}.jpg")
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            }
+            captureUri = uri
+            runCatching { takePhoto.launch(uri) }
+        }
     }
 
     // Voice dictation: the system speech recognizer returns a transcript we append to the draft.

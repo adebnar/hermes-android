@@ -176,9 +176,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private var attachSeq = 0
     fun stageAttachment(bytes: ByteArray, mimeType: String) {
-        _state.update { it.withAttachment(PendingAttachment("att-${attachSeq++}", bytes, mimeType)) }
+        // Generate the id outside update{}: staging is called from background (IO) threads, and the
+        // update lambda can re-run under CAS contention — a shared counter would race/collide. UUID
+        // is collision-free across threads.
+        val id = "att-${java.util.UUID.randomUUID()}"
+        _state.update { it.withAttachment(PendingAttachment(id, bytes, mimeType)) }
     }
     fun removeAttachment(id: String) { _state.update { it.withoutAttachment(id) } }
 
