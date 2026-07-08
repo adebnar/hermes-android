@@ -43,7 +43,9 @@ class GatewayConnectionService : Service() {
                 // One malformed/unexpected event must not crash the process — mirror the guard
                 // ChatViewModel's reduce() uses around event handling.
                 runCatching {
-                    toNotificationSpec(event, latestPrefs)?.let { notifier.post(it) }
+                    // TODO(later task): thread real foreground state through; for now this service
+                    // only runs the background event loop, so treat it as always-backgrounded.
+                    toNotificationSpec(event, latestPrefs, appInForeground = false)?.let { notifier.post(it) }
                 }
             }
         }
