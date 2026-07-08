@@ -46,6 +46,7 @@ class NotificationsViewModel @Inject constructor(
 
     fun setEnabled(v: Boolean) = viewModelScope.launch { settings.setEnabled(v) }
     fun setApprovals(v: Boolean) = viewModelScope.launch { settings.setApprovals(v) }
+    fun setRunFinished(v: Boolean) = viewModelScope.launch { settings.setRunFinished(v) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,6 +93,13 @@ fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = hiltVie
             ) { on -> if (on) enable() else { vm.setEnabled(false); GatewayConnectionService.stop(context) } }
             HorizontalDivider()
             ToggleRow("Approval requests", "When the agent needs you to approve an action", prefs.approvals, enabled = prefs.enabled) { vm.setApprovals(it) }
+            HorizontalDivider()
+            ToggleRow(
+                "Run finished",
+                "Notify when an agent run completes (while the app is in the background)",
+                prefs.runFinished,
+                enabled = prefs.enabled,
+            ) { vm.setRunFinished(it) }
         }
     }
 }

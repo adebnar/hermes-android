@@ -4,11 +4,13 @@ import com.hermes.client.data.network.ServerEvent
 import com.hermes.client.data.network.str
 
 /**
- * Pure mapping from a gateway event to a notification (or null). Only `approval.request` is a
- * notifiable event on the app's WebSocket (see the note on [Notif]); everything else returns null.
- * A stable id is derived from the session so repeats of the same event update rather than stack.
+ * Pure mapping from a gateway event to a notification (or null). `approval.request` and
+ * `clarify.request` always notify (they need the user's input regardless of whether the app is
+ * foregrounded); `run.completed`/`run.failed` only notify when the app is backgrounded — see the
+ * note on [Notif]. A stable id is derived from the session so repeats of the same event update
+ * rather than stack.
  */
-fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs): NotificationSpec? {
+fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs, appInForeground: Boolean): NotificationSpec? {
     if (!prefs.enabled) return null
     val sid = event.sessionId ?: return null
     var id = (event.type + sid).hashCode()
@@ -27,6 +29,21 @@ fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs): Notificati
                 NotifAction("Deny", Notif.ACTION_DENY, sid),
             ),
             groupKey = "approval",
+        )
+        // Needs-you: always notify (ignores foreground); tap opens the chat to answer.
+        Notif.EVENT_CLARIFY -> if (!prefs.approvals) null else NotificationSpec(
+            id = id, channelId = Notif.CHANNEL_APPROVALS, title = "Needs your input",
+            body = event.str("question") ?: "The agent has a question.",
+            route = "chat/$sid", actions = emptyList(), groupKey = "approval",
+        )
+        // Run finished: only when backgrounded; generic body (no showable payload fields client-side).
+        Notif.EVENT_RUN_COMPLETED -> if (!prefs.runFinished || appInForeground) null else NotificationSpec(
+            id = id, channelId = Notif.CHANNEL_ACTIVITY, title = "Run finished",
+            body = "Your agent finished — tap to view.", route = "chat/$sid", actions = emptyList(), groupKey = "run",
+        )
+        Notif.EVENT_RUN_FAILED -> if (!prefs.runFinished || appInForeground) null else NotificationSpec(
+            id = id, channelId = Notif.CHANNEL_ACTIVITY, title = "Run failed",
+            body = "The agent run failed — tap to view.", route = "chat/$sid", actions = emptyList(), groupKey = "run",
         )
         else -> null
     }
