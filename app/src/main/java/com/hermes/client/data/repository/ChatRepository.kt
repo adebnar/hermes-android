@@ -25,8 +25,17 @@ class ChatRepository(private val client: HermesGatewayClient) {
     /** Force an immediate reconnect, skipping the backoff wait (user tapped "Retry"). */
     fun reconnect() = client.reconnectNow()
 
-    suspend fun createSession(): String {
-        val result = client.call("session.create", buildJsonObject {})
+    /**
+     * Creates a new session. [profile] MUST be the active profile: the gateway binds the session to
+     * a per-profile state.db at creation time, and with no profile it defaults to the gateway's
+     * launch profile. Messages then persist under that default profile, but the session list is
+     * scoped to the active profile — so a chat created (and messaged) under the wrong profile is
+     * invisible in both the app and the desktop. Same per-profile rule as [resume].
+     */
+    suspend fun createSession(profile: String? = null): String {
+        val result = client.call("session.create", buildJsonObject {
+            if (!profile.isNullOrBlank()) put("profile", profile)
+        })
         return result.jsonObject["session_id"]?.jsonPrimitive?.content
             ?: error("session.create returned no id")
     }

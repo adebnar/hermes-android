@@ -191,7 +191,11 @@ class MainActivity : ComponentActivity() {
             // connect() first — a cold-start share has no open socket yet, and createSession()
             // would otherwise fail after the ready-gate timeout. connect() is idempotent.
             chat.connect()
-            runCatching { chat.createSession() }
+            // Load the active profile before creating: on a cold-start share nothing has called
+            // refresh() yet (that normally happens when SessionsViewModel inits), so active would be
+            // null and the new session would orphan to the gateway's default profile.
+            profileManager.refresh()
+            runCatching { chat.createSession(profileManager.active.value) }
                 .onSuccess { id ->
                     pendingShare.put(
                         id,

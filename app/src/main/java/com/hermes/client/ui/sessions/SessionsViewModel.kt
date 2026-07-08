@@ -136,7 +136,8 @@ class SessionsViewModel @Inject constructor(
     }
 
     /** Returns the new session id, or null if creation failed (so the UI doesn't crash). */
-    suspend fun createSession(): String? = runCatching { chat.createSession() }.getOrNull()
+    suspend fun createSession(): String? =
+        runCatching { chat.createSession(profileManager.active.value) }.getOrNull()
 
     fun rename(session: Session, title: String) = viewModelScope.launch {
         runCatching { sessions.rename(session.id, title, session.profile) }.onSuccess { refresh() }
