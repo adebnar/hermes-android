@@ -29,11 +29,33 @@ class GatewayConnectionService : Service() {
     // DataStore. @Volatile for cross-thread visibility (scope has no single-thread dispatcher).
     @Volatile private var latestPrefs = NotificationPrefs()
 
+    // Whether the app process is currently in the foreground, kept current by a
+    // ProcessLifecycleOwner observer so the event loop can suppress notifications the user is
+    // already looking at. @Volatile for cross-thread visibility (scope has no single-thread
+    // dispatcher).
+    @Volatile private var appInForeground = false
+
+    // ProcessLifecycleOwner is a process-lifetime singleton; hold the observer so onDestroy can
+    // remove it — otherwise each stop/start of this service (e.g. toggling notifications) would
+    // leak the retired Service instance (and its injected WS client) forever.
+    private var lifecycleObserver: androidx.lifecycle.LifecycleEventObserver? = null
+
     override fun onCreate() {
         super.onCreate()
         notifier.ensureChannels()
         startForeground(HermesNotifier.SERVICE_NOTIFICATION_ID, notifier.serviceNotification())
         client.connect()
+        // Service.onCreate() runs on the main thread — where ProcessLifecycleOwner must be observed —
+        // so register synchronously (addObserver replays the current state immediately, no race).
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            when (e) {
+                androidx.lifecycle.Lifecycle.Event.ON_START -> appInForeground = true
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> appInForeground = false
+                else -> {}
+            }
+        }
+        lifecycleObserver = obs
+        androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(obs)
         // Track the latest prefs reactively so the event loop reads a cached value instead of
         // collecting DataStore per event. Started first so its replayed value is in place before
         // events arrive; also picks up mid-run toggles (e.g. approvals turned off).
@@ -43,7 +65,7 @@ class GatewayConnectionService : Service() {
                 // One malformed/unexpected event must not crash the process — mirror the guard
                 // ChatViewModel's reduce() uses around event handling.
                 runCatching {
-                    toNotificationSpec(event, latestPrefs)?.let { notifier.post(it) }
+                    toNotificationSpec(event, latestPrefs, appInForeground)?.let { notifier.post(it) }
                 }
             }
         }
@@ -66,6 +88,10 @@ class GatewayConnectionService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
+        // onDestroy() runs on the main thread — remove the observer synchronously so this Service
+        // instance isn't retained (and no event can hit a defunct instance in a deferred window).
+        lifecycleObserver?.let { androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.removeObserver(it) }
+        lifecycleObserver = null
         super.onDestroy()
     }
 

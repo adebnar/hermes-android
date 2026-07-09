@@ -25,6 +25,9 @@ class HermesNotifier(private val context: Context) {
         sys.createNotificationChannel(
             NotificationChannel(Notif.CHANNEL_SERVICE, "Connection", NotificationManager.IMPORTANCE_MIN),
         )
+        sys.createNotificationChannel(
+            NotificationChannel(Notif.CHANNEL_ACTIVITY, "Activity", NotificationManager.IMPORTANCE_DEFAULT),
+        )
     }
 
     fun serviceNotification(): Notification =
