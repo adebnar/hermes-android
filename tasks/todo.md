@@ -1,6 +1,6 @@
 # TODO — Session Parity (Direction A)
 
-Branch: `feature/session-parity` off `develop`. Full plan: `tasks/plan.md`.
+Branch: `feature/session-parity` off `dev`. Full plan: `tasks/plan.md`.
 
 ## Phase 1 — Foundation
 - [x] **T1** All-profiles list; each session under its true profile
@@ -38,8 +38,8 @@ Branch: `feature/session-parity` off `develop`. Full plan: `tasks/plan.md`.
 - [x] **CHECKPOINT C** — human review (full behavioral review)
 
 ## Phase 4 — Ship
-- [x] **T6** Build, test, beta APK, ship to develop
+- [x] **T6** Build, test, beta APK, ship to dev
   - [x] Bump versionCode/versionName
   - [x] gitleaks clean; full unit suite green
-  - [x] Build beta APK, deliver, commit, PR into `develop`
+  - [x] Build beta APK, deliver, commit, PR into `dev`
   - [x] Update README / idea doc status
