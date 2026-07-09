@@ -97,7 +97,7 @@ dependencies {
     // Hilt 2.59.2 bundles kotlin-metadata-jvm capped at metadata 2.3.0, but Kotlin 2.3.10 emits
     // 2.4.0. Dagger 2.57+ unshades kotlin-metadata-jvm, so pin a matching version on the Hilt
     // processing classpaths (KSP + the plugin's javac aggregation) to read the newer metadata.
-    val kotlinMetadataJvm = "org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.10"
+    val kotlinMetadataJvm = "org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlin.get()}"
     ksp(kotlinMetadataJvm)
     annotationProcessor(kotlinMetadataJvm)
     kspAndroidTest(kotlinMetadataJvm)
