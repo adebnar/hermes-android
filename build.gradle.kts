@@ -11,8 +11,8 @@ buildscript {
                 if (requested.group == "io.netty") useVersion("4.1.135.Final")
             }
             force(
-                "com.google.protobuf:protobuf-java:3.25.5",
-                "com.google.protobuf:protobuf-kotlin:3.25.5",
+                "com.google.protobuf:protobuf-java:3.25.9",
+                "com.google.protobuf:protobuf-kotlin:3.25.9",
                 "org.bouncycastle:bcpg-jdk18on:1.84",
                 "org.bitbucket.b_c:jose4j:0.9.6",
                 "org.jdom:jdom2:2.0.6.1",
