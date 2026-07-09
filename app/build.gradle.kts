@@ -48,7 +48,7 @@ android {
             signingConfig = signingConfigs.findByName("release")
         }
         // Beta channel: a separate applicationId + "Hermes Beta" label so testers can run
-        // the beta alongside the production app. Cut from the `develop` branch as a GitHub
+        // the beta alongside the production app. Cut from the `dev` branch as a GitHub
         // pre-release. Inherits the release signing config.
         create("beta") {
             initWith(getByName("release"))

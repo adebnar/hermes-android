@@ -1,7 +1,7 @@
 # Plan — Direction A: Mobile↔Desktop Session Parity
 
 Spec: `docs/ideas/mobile-desktop-parity.md`
-Branch: `feature/session-parity` off `develop` (PRs into `develop`; never push `main`)
+Branch: `feature/session-parity` off `dev` (PRs into `dev`; never push `main`)
 
 ## Goal
 Make the mobile session list a faithful desktop mirror: all profiles in one
@@ -176,16 +176,16 @@ Full behavioral review before building the beta.
 
 ## Phase 4 — Ship
 
-### T6 — Build, test, beta APK, ship to develop
+### T6 — Build, test, beta APK, ship to dev
 - Bump `versionCode`/`versionName` in `app/build.gradle.kts`.
 - `gitleaks git --no-banner --redact` (must be clean).
 - Full unit suite green.
 - Build the **beta** variant APK, deliver to the user, commit to
-  `feature/session-parity`, open PR into `develop`.
+  `feature/session-parity`, open PR into `dev`.
 - Update `README.md`/`docs/ideas/mobile-desktop-parity.md` status as needed.
 
 Acceptance: signed beta APK installs alongside release; all parity behaviors work
-on-device; PR open into `develop` with green CI.
+on-device; PR open into `dev` with green CI.
 
 ---
 

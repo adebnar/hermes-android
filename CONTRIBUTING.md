@@ -37,11 +37,11 @@ agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Branches & pull requests
 
-New work lands on `develop` first; `main` is the protected, always-releasable branch (see
+New work lands on `dev` first; `main` is the protected, always-releasable branch (see
 [Development & release workflow](README.md#development--release-workflow)).
 
-1. Branch from `develop`: `git switch develop && git switch -c feature/my-change`.
-2. Open a PR **into `develop`**. Keep it focused and incremental; describe what changed and
+1. Branch from `dev`: `git switch dev && git switch -c feature/my-change`.
+2. Open a PR **into `dev`**. Keep it focused and incremental; describe what changed and
    how you verified it.
 3. CI (build + unit tests + CodeQL + secret scan) must pass, and review conversations must be
    resolved, before merge.
