@@ -1,33 +1,35 @@
 [versions]
-# Mature, fully-stable toolchain. AGP 9.x uses built-in Kotlin (rejects the kotlin-android
-# plugin) and the newest AndroidX (core 1.19.0+) demands AGP 9.1 / compileSdk 37 — too
-# bleeding-edge for a maintainable app. We pin AGP 8.13.2 + compileSdk 36 + Gradle 8.14.5
-# with the proven mid-2025 AndroidX set below.
-# Kotlin pinned to 2.2.21 (NOT 2.3.x/2.4.0): Hilt 2.57.1 (the last Hilt that supports AGP 8.x;
-# Hilt 2.59.2 requires AGP 9) caps at Kotlin metadata 2.2.0, which Kotlin 2.2.x emits.
-agp = "8.13.2"
-kotlin = "2.2.21"
-ksp = "2.2.21-2.0.5"
+# AGP 9.1 toolchain (migrated from AGP 8.13.2), needed by the current AndroidX set
+# (lifecycle 2.11 / hilt-navigation 1.4 / compileSdk 37). Key constraints:
+#  - AGP 9.1.0 requires Gradle 9.3.1+ (see gradle-wrapper.properties).
+#  - AGP 9 defaults to `newDsl`/built-in Kotlin, which rejects the kotlin-android plugin.
+#    We keep the plugin via `android.newDsl=false` (gradle.properties) — a temporary bridge;
+#    migrate to built-in Kotlin before AGP 10 removes the opt-out.
+#  - Kotlin 2.3.10 emits metadata 2.4.0; Hilt 2.59.2 caps at 2.3.0, so we pin the (unshaded,
+#    Dagger 2.57+) kotlin-metadata-jvm on the Hilt processor classpath in app/build.gradle.kts.
+agp = "9.1.0"
+kotlin = "2.3.10"
+ksp = "2.3.10"
 coreKtx = "1.16.0"
-lifecycle = "2.9.4"
-activityCompose = "1.10.1"
-composeBom = "2025.06.01"
-navigationCompose = "2.8.9"
-hilt = "2.57.1"
-hiltNavigation = "1.2.0"
+lifecycle = "2.11.0"
+activityCompose = "1.13.0"
+composeBom = "2025.12.01"
+navigationCompose = "2.9.8"
+hilt = "2.59.2"
+hiltNavigation = "1.4.0"
 okhttp = "5.4.0"
 serialization = "1.11.0"
 coroutines = "1.11.0"
-datastore = "1.1.7"
-securityCrypto = "1.0.0"
-markdown = "0.35.0"
-material = "1.12.0"
+datastore = "1.2.1"
+securityCrypto = "1.1.0"
+markdown = "0.43.0"
+material = "1.14.0"
 turbine = "1.2.1"
-mockk = "1.13.13"
+mockk = "1.14.11"
 junit = "4.13.2"
-androidxTestCore = "1.6.1"
-androidxTestJunit = "1.2.1"
-androidxTestRunner = "1.6.2"
+androidxTestCore = "1.7.0"
+androidxTestJunit = "1.3.0"
+androidxTestRunner = "1.7.0"
 
 [libraries]
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }

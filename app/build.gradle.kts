@@ -19,14 +19,14 @@ plugins {
 
 android {
     namespace = "com.hermes.client"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.hermes.client"
         minSdk = 26
-        targetSdk = 36
-        versionCode = 47
-        versionName = "0.1.46"
+        targetSdk = 37
+        versionCode = 48
+        versionName = "0.1.47"
         testInstrumentationRunner = "com.hermes.client.HiltTestRunner"
         // App name; the beta build type overrides this so both can be installed at once.
         manifestPlaceholders["appLabel"] = "Hermes"
@@ -94,6 +94,13 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    // Hilt 2.59.2 bundles kotlin-metadata-jvm capped at metadata 2.3.0, but Kotlin 2.3.10 emits
+    // 2.4.0. Dagger 2.57+ unshades kotlin-metadata-jvm, so pin a matching version on the Hilt
+    // processing classpaths (KSP + the plugin's javac aggregation) to read the newer metadata.
+    val kotlinMetadataJvm = "org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.10"
+    ksp(kotlinMetadataJvm)
+    annotationProcessor(kotlinMetadataJvm)
+    kspAndroidTest(kotlinMetadataJvm)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.okhttp)
     implementation(libs.serialization.json)
