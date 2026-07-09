@@ -154,7 +154,11 @@ class SessionsViewModel @Inject constructor(
 
     /** Returns the new session id, or null if creation failed (so the UI doesn't crash). */
     suspend fun createSession(): String? =
-        runCatching { chat.createSession(profileManager.active.value) }.getOrNull()
+        runCatching { chat.createSession(profileManager.active.value) }
+            // runCatching also catches CancellationException — rethrow it so cancelling the caller
+            // isn't swallowed and mistaken for a failed creation.
+            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+            .getOrNull()
 
     fun rename(session: Session, title: String) = viewModelScope.launch {
         runCatching { sessions.rename(session.id, title, session.profile) }.onSuccess { refresh() }
