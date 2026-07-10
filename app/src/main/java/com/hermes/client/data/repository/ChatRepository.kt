@@ -3,6 +3,7 @@ package com.hermes.client.data.repository
 import com.hermes.client.data.network.ConnectionState
 import com.hermes.client.data.network.HermesGatewayClient
 import com.hermes.client.data.network.ServerEvent
+import com.hermes.client.ui.chat.ApprovalChoice
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonObject
@@ -123,11 +124,11 @@ class ChatRepository(private val client: HermesGatewayClient) {
         })
     }
 
-    suspend fun respondApproval(sessionId: String, choice: com.hermes.client.ui.chat.ApprovalChoice) {
+    suspend fun respondApproval(sessionId: String, choice: ApprovalChoice) {
         client.call("approval.respond", buildJsonObject {
             put("session_id", sessionId)
             put("choice", choice.wire)
-            put("approved", choice != com.hermes.client.ui.chat.ApprovalChoice.DENY)
+            put("approved", choice != ApprovalChoice.DENY)
         })
     }
 

@@ -5,7 +5,6 @@ import com.hermes.client.ui.chat.ApprovalChoice
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.slot
-import io.mockk.coVerify
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

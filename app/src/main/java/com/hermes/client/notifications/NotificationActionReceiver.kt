@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
-/** Handles the Approve/Deny actions on an approval notification by sending the approval RPC. */
+/** Handles the Allow once/Deny actions on an approval notification by sending the approval RPC. */
 @AndroidEntryPoint
 class NotificationActionReceiver : BroadcastReceiver() {
     @Inject lateinit var chat: ChatRepository
