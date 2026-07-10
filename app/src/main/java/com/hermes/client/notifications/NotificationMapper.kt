@@ -6,8 +6,9 @@ import com.hermes.client.data.network.str
 /**
  * Pure mapping from a gateway event to a notification (or null). `approval.request` and
  * `clarify.request` always notify (they need the user's input regardless of whether the app is
- * foregrounded); `run.completed`/`run.failed` only notify when the app is backgrounded — see the
- * note on [Notif]. A stable id is derived from the session so repeats of the same event update
+ * foregrounded); `message.complete` (run finished) and `error` (run failed) only notify when the
+ * app is backgrounded — see the note on [Notif] for why these are the real /api/ws events. A stable
+ * id is derived from the session so a turn's repeated `message.complete`s update one notification
  * rather than stack.
  */
 fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs, appInForeground: Boolean): NotificationSpec? {
@@ -36,14 +37,18 @@ fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs, appInForegr
             body = event.str("question") ?: "The agent has a question.",
             route = "chat/$sid", actions = emptyList(), groupKey = "approval",
         )
-        // Run finished: only when backgrounded; generic body (no showable payload fields client-side).
-        Notif.EVENT_RUN_COMPLETED -> if (!prefs.runFinished || appInForeground) null else NotificationSpec(
+        // Run finished: `message.complete` is the end-of-turn event on /api/ws (the app also uses it
+        // to stop the "generating" spinner). Only notify when backgrounded; the per-session id above
+        // collapses a turn's repeated message.completes into one updating notification, not a stack.
+        Notif.EVENT_MESSAGE_COMPLETE -> if (!prefs.runFinished || appInForeground) null else NotificationSpec(
             id = id, channelId = Notif.CHANNEL_ACTIVITY, title = "Run finished",
             body = "Your agent finished — tap to view.", route = "chat/$sid", actions = emptyList(), groupKey = "run",
         )
-        Notif.EVENT_RUN_FAILED -> if (!prefs.runFinished || appInForeground) null else NotificationSpec(
+        // Run failed: the gateway emits `error` on a turn-fatal failure (carries a message).
+        Notif.EVENT_ERROR -> if (!prefs.runFinished || appInForeground) null else NotificationSpec(
             id = id, channelId = Notif.CHANNEL_ACTIVITY, title = "Run failed",
-            body = "The agent run failed — tap to view.", route = "chat/$sid", actions = emptyList(), groupKey = "run",
+            body = event.str("message") ?: "The agent run failed — tap to view.",
+            route = "chat/$sid", actions = emptyList(), groupKey = "run",
         )
         else -> null
     }

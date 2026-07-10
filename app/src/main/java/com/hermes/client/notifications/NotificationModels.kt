@@ -27,14 +27,18 @@ object Notif {
     const val CHANNEL_SERVICE = "service"
     const val CHANNEL_ACTIVITY = "activity"
 
-    // `approval.request` is the only notifiable event on the app's WebSocket (/api/ws). Verified
-    // against the gateway source: it broadcasts approval + run/tool/message-stream lifecycle events,
-    // but NOT cron-finished (cron delivers to messaging platforms) or a messaging-inbound event —
-    // so those aren't offered here. See docs/superpowers/specs/2026-07-03-notifications-approvals-only.
+    // Notifiable events on the app's WebSocket (/api/ws), verified against the gateway source:
+    //  - approval.request / clarify.request -> the agent needs the user (always notify)
+    //  - message.complete                   -> a turn finished (the "Run finished" alert)
+    //  - error                              -> a turn failed (the "Run failed" alert)
+    // The gateway's /api/ws emits `message.complete` at end-of-turn (tui_gateway/server.py); it does
+    // NOT emit `run.completed`/`run.failed` (those belong to the separate messaging-platform HTTP/SSE
+    // API the app never connects to) — which is why the earlier run.completed mapping never fired.
+    // Cron-finished isn't offered (cron delivers to messaging platforms).
     const val EVENT_APPROVAL = "approval.request"
-    const val EVENT_RUN_COMPLETED = "run.completed"
-    const val EVENT_RUN_FAILED = "run.failed"
     const val EVENT_CLARIFY = "clarify.request"
+    const val EVENT_MESSAGE_COMPLETE = "message.complete"
+    const val EVENT_ERROR = "error"
 
     const val ACTION_APPROVE = "approve"
     const val ACTION_DENY = "deny"
