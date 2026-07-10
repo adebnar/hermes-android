@@ -1,8 +1,10 @@
 package com.hermes.client.data.network
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -35,3 +37,9 @@ internal fun ServerEvent.str(key: String): String? = when (val el = payload[key]
 
 internal fun JsonObject.objOrEmpty(key: String): JsonObject =
     (this[key] as? JsonObject) ?: JsonObject(emptyMap())
+
+internal fun ServerEvent.bool(key: String): Boolean? =
+    (payload[key] as? JsonPrimitive)?.booleanOrNull
+
+internal fun ServerEvent.strList(key: String): List<String> =
+    (payload[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: emptyList()
