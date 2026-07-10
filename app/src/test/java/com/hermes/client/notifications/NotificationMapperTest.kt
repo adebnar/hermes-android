@@ -16,12 +16,31 @@ class NotificationMapperTest {
         ServerEvent(type, sid, buildJsonObject { pairs.forEach { (k, v) -> put(k, v) } })
 
     @Test fun approval_makes_high_priority_spec_with_actions() {
-        val spec = toNotificationSpec(event(Notif.EVENT_APPROVAL, "s1", "prompt" to "Delete file?"), on, appInForeground = false)!!
+        val e = ServerEvent("approval.request", "s1", buildJsonObject {
+            put("session_id", "s1"); put("command", "Delete file?"); put("allow_permanent", true)
+        })
+        val spec = toNotificationSpec(e, on, appInForeground = false)!!
         assertEquals(Notif.CHANNEL_APPROVALS, spec.channelId)
         assertEquals("chat/s1", spec.route)
         assertTrue(spec.body.contains("Delete file?"))
-        assertEquals(listOf(Notif.ACTION_APPROVE, Notif.ACTION_DENY), spec.actions.map { it.action })
+        assertEquals(listOf(Notif.ACTION_ALLOW_ONCE, Notif.ACTION_DENY), spec.actions.map { it.action })
         assertTrue(spec.actions.all { it.sessionId == "s1" })
+    }
+
+    @Test fun standard_approval_offers_allow_once_and_deny() {
+        val e = ServerEvent("approval.request", "s1", buildJsonObject {
+            put("session_id", "s1"); put("command", "git push -f"); put("allow_permanent", true)
+        })
+        val spec = toNotificationSpec(e, on, appInForeground = false)!!
+        assertEquals(listOf(Notif.ACTION_ALLOW_ONCE, Notif.ACTION_DENY), spec.actions.map { it.action })
+    }
+
+    @Test fun elevated_approval_offers_deny_only() {
+        val e = ServerEvent("approval.request", "s1", buildJsonObject {
+            put("session_id", "s1"); put("command", "rm -rf /"); put("allow_permanent", false)
+        })
+        val spec = toNotificationSpec(e, on, appInForeground = false)!!
+        assertEquals(listOf(Notif.ACTION_DENY), spec.actions.map { it.action })
     }
 
     @Test fun approval_notifies_regardless_of_foreground() {

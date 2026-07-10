@@ -22,8 +22,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val sid = intent.getStringExtra("session_id") ?: return
         val notifId = intent.getIntExtra("notif_id", -1)
-        val approve = intent.action == Notif.ACTION_APPROVE
-        val choice = if (approve) ApprovalChoice.ONCE else ApprovalChoice.DENY
+        val choice = when (intent.action) {
+            Notif.ACTION_ALLOW_ONCE -> ApprovalChoice.ONCE
+            else -> ApprovalChoice.DENY
+        }
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -34,7 +36,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         if (notifId != -1) notifier.cancel(notifId)
                     }
                     .onFailure { e ->
-                        DebugLog.log("notif", "approval response failed session=$sid approve=$approve: ${e.message}")
+                        DebugLog.log("notif", "approval response failed session=$sid choice=$choice: ${e.message}")
                     }
             } finally {
                 pending.finish()

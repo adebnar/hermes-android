@@ -40,6 +40,6 @@ object Notif {
     const val EVENT_MESSAGE_COMPLETE = "message.complete"
     const val EVENT_ERROR = "error"
 
-    const val ACTION_APPROVE = "approve"
+    const val ACTION_ALLOW_ONCE = "allow_once"
     const val ACTION_DENY = "deny"
 }
