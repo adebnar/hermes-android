@@ -53,7 +53,6 @@ fun FeedTabs(
                     "$label $count",
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
-                    softWrap = false,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
