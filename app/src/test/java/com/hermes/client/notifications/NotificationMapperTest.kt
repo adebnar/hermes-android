@@ -76,6 +76,12 @@ class NotificationMapperTest {
         assertNull(toNotificationSpec(event(Notif.EVENT_ERROR, "c1"), on, appInForeground = true))
     }
 
+    @Test fun error_falls_back_to_default_body_when_message_missing_or_blank() {
+        val fallback = "The agent run failed — tap to view."
+        assertEquals(fallback, toNotificationSpec(event(Notif.EVENT_ERROR, "c1"), on, appInForeground = false)!!.body)
+        assertEquals(fallback, toNotificationSpec(event(Notif.EVENT_ERROR, "c1", "message" to "   "), on, appInForeground = false)!!.body)
+    }
+
     // Regression: the gateway's /api/ws never emits run.completed/run.failed (those are on the
     // separate messaging API), so the app must NOT key on them — the 0.1.44 feature did and could
     // never fire. message.complete/error are the real end-of-turn events.

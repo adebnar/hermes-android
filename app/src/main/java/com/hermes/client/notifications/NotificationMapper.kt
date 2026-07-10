@@ -47,7 +47,7 @@ fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs, appInForegr
         // Run failed: the gateway emits `error` on a turn-fatal failure (carries a message).
         Notif.EVENT_ERROR -> if (!prefs.runFinished || appInForeground) null else NotificationSpec(
             id = id, channelId = Notif.CHANNEL_ACTIVITY, title = "Run failed",
-            body = event.str("message") ?: "The agent run failed — tap to view.",
+            body = event.str("message")?.takeIf { it.isNotBlank() } ?: "The agent run failed — tap to view.",
             route = "chat/$sid", actions = emptyList(), groupKey = "run",
         )
         else -> null
