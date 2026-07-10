@@ -2,9 +2,8 @@
 # AGP 9.1 toolchain (migrated from AGP 8.13.2), needed by the current AndroidX set
 # (lifecycle 2.11 / hilt-navigation 1.4 / compileSdk 37). Key constraints:
 #  - AGP 9.1.0 requires Gradle 9.3.1+ (see gradle-wrapper.properties).
-#  - AGP 9 defaults to `newDsl`/built-in Kotlin, which rejects the kotlin-android plugin.
-#    We keep the plugin via `android.newDsl=false` (gradle.properties) — a temporary bridge;
-#    migrate to built-in Kotlin before AGP 10 removes the opt-out.
+#  - Uses AGP 9's built-in Kotlin (no kotlin-android plugin; newDsl/builtInKotlin at their AGP 9
+#    defaults). The kotlin.plugin.compose / kotlin.plugin.serialization / ksp plugins still apply.
 #  - Kotlin 2.3.10 emits metadata 2.4.0; Hilt 2.59.2 caps at 2.3.0, so we pin the (unshaded,
 #    Dagger 2.57+) kotlin-metadata-jvm on the Hilt processor classpath in app/build.gradle.kts.
 agp = "9.1.0"
@@ -70,7 +69,6 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "android
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
