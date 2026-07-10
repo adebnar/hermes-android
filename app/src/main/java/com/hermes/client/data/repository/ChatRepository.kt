@@ -123,10 +123,11 @@ class ChatRepository(private val client: HermesGatewayClient) {
         })
     }
 
-    suspend fun respondApproval(sessionId: String, approve: Boolean) {
+    suspend fun respondApproval(sessionId: String, choice: com.hermes.client.ui.chat.ApprovalChoice) {
         client.call("approval.respond", buildJsonObject {
             put("session_id", sessionId)
-            put("approved", approve)
+            put("choice", choice.wire)
+            put("approved", choice != com.hermes.client.ui.chat.ApprovalChoice.DENY)
         })
     }
 

@@ -241,9 +241,9 @@ class ChatViewModel @Inject constructor(
 
     fun clearPathItems() { _pathItems.value = emptyList() }
 
-    fun approve(approve: Boolean) {
+    fun respondApproval(choice: com.hermes.client.ui.chat.ApprovalChoice) {
         _state.value = _state.value.copy(pendingApproval = null)
-        viewModelScope.launch { runCatching { chat.respondApproval(sessionId, approve) } }
+        viewModelScope.launch { runCatching { chat.respondApproval(sessionId, choice) } }
     }
 
     fun clarify(answer: String) {
