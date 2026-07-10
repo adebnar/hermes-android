@@ -2,12 +2,14 @@ package com.hermes.client.ui.activity
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.hermes.client.ui.theme.LocalProfileAccent
 
@@ -43,7 +45,18 @@ fun FeedTabs(
                     activeContainerColor = accent.accent,
                     activeContentColor = accent.onAccent,
                 ),
-            ) { Text("$label $count") }
+            ) {
+                // Keep every segment on one line: the four share the row width equally, and the
+                // longest label ("Upcoming N") wraps under Material3's newer SegmentedButton
+                // defaults. A smaller label style + single line + ellipsis keeps them uniform.
+                Text(
+                    "$label $count",
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
