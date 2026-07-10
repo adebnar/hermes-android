@@ -12,8 +12,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,7 +38,12 @@ fun ApprovalSheet(req: ApprovalRequest, onRespond: (ApprovalChoice) -> Unit, onD
     val badge = if (tier == ApprovalTier.ELEVATED) error else accent.accent
     val label = req.patternKeys.firstOrNull()?.let { " · $it" } ?: ""
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // An approval must be an explicit choice: veto the Hidden transition so a swipe / scrim-tap
+    // can't dismiss the sheet while pendingApproval is still set (which would desync — sheet gone
+    // but state still blocked). The sheet leaves composition only when a choice clears the pending.
+    val sheetState = rememberModalBottomSheetState(confirmValueChange = { it != SheetValue.Hidden })
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
             Text(
                 (if (tier == ApprovalTier.ELEVATED) "Elevated" else "Approval needed") + label,

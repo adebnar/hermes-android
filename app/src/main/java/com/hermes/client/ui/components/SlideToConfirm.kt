@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,9 @@ fun SlideToConfirm(label: String, accent: Color, onConfirm: () -> Unit, modifier
     var trackPx by remember { mutableFloatStateOf(0f) }
     var dragPx by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
+    // pointerInput(Unit) captures its lambdas once; wrap onConfirm so a drag-end always calls the
+    // CURRENT lambda (the caller swaps it when the Once/Session toggle flips) rather than a stale one.
+    val currentOnConfirm by rememberUpdatedState(onConfirm)
     Box(
         modifier
             .fillMaxWidth()
@@ -61,7 +65,7 @@ fun SlideToConfirm(label: String, accent: Color, onConfirm: () -> Unit, modifier
                 .background(accent, CircleShape)
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
-                        onDragEnd = { if (isConfirmed(slideProgress(dragPx, trackPx))) onConfirm() else dragPx = 0f },
+                        onDragEnd = { if (isConfirmed(slideProgress(dragPx, trackPx))) currentOnConfirm() else dragPx = 0f },
                         onHorizontalDrag = { _, delta -> dragPx = (dragPx + delta).coerceIn(0f, trackPx) },
                     )
                 },

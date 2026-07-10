@@ -243,7 +243,14 @@ class ChatViewModel @Inject constructor(
 
     fun respondApproval(choice: ApprovalChoice) {
         _state.value = _state.value.copy(pendingApproval = null)
-        viewModelScope.launch { runCatching { chat.respondApproval(sessionId, choice) } }
+        viewModelScope.launch {
+            runCatching { chat.respondApproval(sessionId, choice) }
+                .onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    // The sheet is already gone; surface the failure so a lost approve/deny is visible.
+                    appendError("Couldn't send your approval — check the connection and try again.")
+                }
+        }
     }
 
     fun clarify(answer: String) {
