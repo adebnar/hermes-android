@@ -54,25 +54,52 @@ class NotificationMapperTest {
         assertNull(toNotificationSpec(e, on.copy(approvals = false), appInForeground = false))
     }
 
-    @Test fun run_completed_only_when_backgrounded() {
-        val e = event(Notif.EVENT_RUN_COMPLETED, "c1")
-        assertNotNull(toNotificationSpec(e, on, appInForeground = false))
+    @Test fun message_complete_is_run_finished_only_when_backgrounded() {
+        val e = event(Notif.EVENT_MESSAGE_COMPLETE, "c1")
+        val spec = toNotificationSpec(e, on, appInForeground = false)!!
+        assertEquals("Run finished", spec.title)
+        assertEquals(Notif.CHANNEL_ACTIVITY, spec.channelId)
+        assertEquals("chat/c1", spec.route)
         assertNull(toNotificationSpec(e, on, appInForeground = true))
     }
 
-    @Test fun run_completed_off_when_pref_off() {
-        val e = event(Notif.EVENT_RUN_COMPLETED, "c1")
+    @Test fun message_complete_off_when_pref_off() {
+        val e = event(Notif.EVENT_MESSAGE_COMPLETE, "c1")
         assertNull(toNotificationSpec(e, on.copy(runFinished = false), appInForeground = false))
     }
 
-    @Test fun run_failed_title() {
-        val spec = toNotificationSpec(event(Notif.EVENT_RUN_FAILED, "c1"), on, appInForeground = false)!!
+    @Test fun error_maps_to_run_failed_with_message() {
+        val spec = toNotificationSpec(event(Notif.EVENT_ERROR, "c1", "message" to "boom"), on, appInForeground = false)!!
         assertEquals("Run failed", spec.title)
+        assertEquals("boom", spec.body)
         assertEquals(Notif.CHANNEL_ACTIVITY, spec.channelId)
+        assertNull(toNotificationSpec(event(Notif.EVENT_ERROR, "c1"), on, appInForeground = true))
+    }
+
+    @Test fun error_falls_back_to_default_body_when_message_missing_or_blank() {
+        val fallback = "The agent run failed — tap to view."
+        assertEquals(fallback, toNotificationSpec(event(Notif.EVENT_ERROR, "c1"), on, appInForeground = false)!!.body)
+        assertEquals(fallback, toNotificationSpec(event(Notif.EVENT_ERROR, "c1", "message" to "   "), on, appInForeground = false)!!.body)
+    }
+
+    // Regression: the gateway's /api/ws never emits run.completed/run.failed (those are on the
+    // separate messaging API), so the app must NOT key on them — the 0.1.44 feature did and could
+    // never fire. message.complete/error are the real end-of-turn events.
+    @Test fun legacy_run_events_do_not_notify() {
+        assertNull(toNotificationSpec(event("run.completed", "c1"), on, appInForeground = false))
+        assertNull(toNotificationSpec(event("run.failed", "c1"), on, appInForeground = false))
+    }
+
+    // A turn can emit several message.completes; the per-session id keeps them one updating
+    // notification rather than a growing stack.
+    @Test fun repeated_message_complete_share_one_notification_id() {
+        val a = toNotificationSpec(event(Notif.EVENT_MESSAGE_COMPLETE, "c1"), on, appInForeground = false)!!
+        val b = toNotificationSpec(event(Notif.EVENT_MESSAGE_COMPLETE, "c1"), on, appInForeground = false)!!
+        assertEquals(a.id, b.id)
     }
 
     @Test fun no_session_is_null() {
-        assertNull(toNotificationSpec(event(Notif.EVENT_RUN_COMPLETED, null), on, appInForeground = false))
+        assertNull(toNotificationSpec(event(Notif.EVENT_MESSAGE_COMPLETE, null), on, appInForeground = false))
     }
 
     @Test fun disabled_is_null() {
