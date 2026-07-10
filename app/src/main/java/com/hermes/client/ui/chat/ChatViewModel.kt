@@ -150,7 +150,7 @@ class ChatViewModel @Inject constructor(
             chat.events.filter { it.sessionId == null || it.sessionId == sessionId }
                 // Defense in depth: a single malformed event must never crash the chat.
                 // reduce() is pure, so on a bad event keep the prior state and drop it.
-                .onEach { event -> runCatching { reduce(_state.value, event) }.onSuccess { _state.value = it } }
+                .onEach { event -> runCatching { _state.value.reduce(event) }.onSuccess { _state.value = it } }
                 .collect {}
         }
         // C2 + I3: watch connection transitions
@@ -241,9 +241,16 @@ class ChatViewModel @Inject constructor(
 
     fun clearPathItems() { _pathItems.value = emptyList() }
 
-    fun approve(approve: Boolean) {
+    fun respondApproval(choice: ApprovalChoice) {
         _state.value = _state.value.copy(pendingApproval = null)
-        viewModelScope.launch { runCatching { chat.respondApproval(sessionId, approve) } }
+        viewModelScope.launch {
+            runCatching { chat.respondApproval(sessionId, choice) }
+                .onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    // The sheet is already gone; surface the failure so a lost approve/deny is visible.
+                    appendError("Couldn't send your approval — check the connection and try again.")
+                }
+        }
     }
 
     fun clarify(answer: String) {

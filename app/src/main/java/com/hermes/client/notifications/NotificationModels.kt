@@ -7,7 +7,7 @@ data class NotificationPrefs(
     val runFinished: Boolean = true,
 )
 
-/** An inline notification action (Approve/Deny) carrying the target session. */
+/** An inline notification action (Allow once/Deny) carrying the target session. */
 data class NotifAction(val label: String, val action: String, val sessionId: String)
 
 /** A platform-independent description of a notification, so mapping stays unit-testable. */
@@ -40,6 +40,6 @@ object Notif {
     const val EVENT_MESSAGE_COMPLETE = "message.complete"
     const val EVENT_ERROR = "error"
 
-    const val ACTION_APPROVE = "approve"
+    const val ACTION_ALLOW_ONCE = "allow_once"
     const val ACTION_DENY = "deny"
 }

@@ -1,7 +1,10 @@
 package com.hermes.client.notifications
 
 import com.hermes.client.data.network.ServerEvent
+import com.hermes.client.data.network.bool
 import com.hermes.client.data.network.str
+import com.hermes.client.ui.chat.ApprovalTier
+import com.hermes.client.ui.chat.tierFor
 
 /**
  * Pure mapping from a gateway event to a notification (or null). `approval.request` and
@@ -19,18 +22,24 @@ fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs, appInForegr
     // ongoing foreground-service notification, and notify()-ing over it would clobber it.
     if (id == 1001) id = 1002
     return when (event.type) {
-        Notif.EVENT_APPROVAL -> if (!prefs.approvals) null else NotificationSpec(
-            id = id,
-            channelId = Notif.CHANNEL_APPROVALS,
-            title = "Approval needed",
-            body = event.str("prompt") ?: "The agent is waiting for your approval.",
-            route = "chat/$sid",
-            actions = listOf(
-                NotifAction("Approve", Notif.ACTION_APPROVE, sid),
-                NotifAction("Deny", Notif.ACTION_DENY, sid),
-            ),
-            groupKey = "approval",
-        )
+        Notif.EVENT_APPROVAL -> if (!prefs.approvals) null else {
+            val elevated = tierFor(event.bool("allow_permanent") ?: false) == ApprovalTier.ELEVATED
+            NotificationSpec(
+                id = id,
+                channelId = Notif.CHANNEL_APPROVALS,
+                title = "Approval needed",
+                body = event.str("description")?.ifBlank { null }
+                    ?: event.str("command")?.ifBlank { null }
+                    ?: "The agent is waiting for your approval.",
+                route = "chat/$sid",
+                actions = if (elevated) listOf(NotifAction("Deny", Notif.ACTION_DENY, sid))
+                          else listOf(
+                              NotifAction("Allow once", Notif.ACTION_ALLOW_ONCE, sid),
+                              NotifAction("Deny", Notif.ACTION_DENY, sid),
+                          ),
+                groupKey = "approval",
+            )
+        }
         // Needs-you: always notify (ignores foreground); tap opens the chat to answer.
         Notif.EVENT_CLARIFY -> if (!prefs.approvals) null else NotificationSpec(
             id = id, channelId = Notif.CHANNEL_APPROVALS, title = "Needs your input",
