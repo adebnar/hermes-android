@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.hermes.client.data.diagnostics.DebugLog
 import com.hermes.client.data.repository.ChatRepository
+import com.hermes.client.ui.chat.ApprovalChoice
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,10 +23,11 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val sid = intent.getStringExtra("session_id") ?: return
         val notifId = intent.getIntExtra("notif_id", -1)
         val approve = intent.action == Notif.ACTION_APPROVE
+        val choice = if (approve) ApprovalChoice.ONCE else ApprovalChoice.DENY
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                runCatching { withTimeout(8_000) { chat.respondApproval(sid, approve) } }
+                runCatching { withTimeout(8_000) { chat.respondApproval(sid, choice) } }
                     .onSuccess {
                         // Only clear the notification once the RPC actually succeeded — on
                         // failure, leave it so the action isn't silently lost.

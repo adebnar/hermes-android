@@ -488,10 +488,10 @@ fun ChatScreen(
     }
 
     state.pendingApproval?.let { req ->
-        ApprovalDialog(
-            prompt = req.prompt,
-            onApprove = { vm.approve(true) },
-            onDeny = { vm.approve(false) },
+        ApprovalSheet(
+            req = req,
+            onRespond = { vm.respondApproval(it) },
+            onDismiss = { /* keep pending: do nothing until the user chooses */ },
         )
     }
 

@@ -30,7 +30,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -427,13 +426,3 @@ private fun ToolCard(tool: ToolCall) {
     }
 }
 
-@Composable
-fun ApprovalDialog(prompt: String, onApprove: () -> Unit, onDeny: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDeny,
-        title = { Text("Approval requested") },
-        text = { Text(prompt) },
-        confirmButton = { TextButton(onClick = onApprove) { Text("Approve") } },
-        dismissButton = { TextButton(onClick = onDeny) { Text("Deny") } },
-    )
-}
