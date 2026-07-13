@@ -121,7 +121,7 @@ fun SessionsScreen(
                     Text(
                         "Projects · ${activeProfile ?: "default"}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = com.hermes.client.ui.components.AccentChrome.onBar,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                     )
                 }
