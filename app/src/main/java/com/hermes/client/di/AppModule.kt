@@ -10,6 +10,7 @@ import com.hermes.client.data.network.HermesRestApi
 import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.ModelRepository
 import com.hermes.client.data.repository.ProfileRepository
+import com.hermes.client.data.repository.ProjectsRepository
 import com.hermes.client.data.repository.SessionRepository
 import com.hermes.client.data.repository.ToolsRepository
 import dagger.Module
@@ -106,6 +107,14 @@ object AppModule {
     @Singleton
     fun provideChatRepository(client: HermesGatewayClient): ChatRepository =
         ChatRepository(client)
+
+    @Provides
+    @Singleton
+    fun provideProjectsRepository(
+        client: HermesGatewayClient,
+        json: Json,
+    ): ProjectsRepository =
+        ProjectsRepository(client, json)
 
     @Provides
     @Singleton
