@@ -163,6 +163,8 @@ fun SessionsScreen(
                                 message = projectsState.error!!,
                                 onRetry = { vm.loadProjectTree() },
                             )
+                        projectsState.scope != null && projectsState.scopeLoading ->
+                            com.hermes.client.ui.components.LoadingState()
                         projectsState.scope != null ->
                             ProjectScopeView(
                                 project = projectsState.scope!!,

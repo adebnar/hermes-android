@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -69,7 +69,7 @@ fun ProjectScopeView(project: Project, onBack: () -> Unit, onOpenSession: (Sessi
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start,
             ) {
-                Icon(Icons.Rounded.ArrowBack, contentDescription = "Back", tint = LocalProfileAccent.current.accent, modifier = Modifier.padding(end = 8.dp))
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = LocalProfileAccent.current.accent, modifier = Modifier.padding(end = 8.dp))
                 Text(project.label, style = MaterialTheme.typography.titleSmall, color = LocalProfileAccent.current.accent)
             }
         }
