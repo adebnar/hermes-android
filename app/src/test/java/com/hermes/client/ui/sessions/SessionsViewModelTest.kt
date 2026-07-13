@@ -254,4 +254,35 @@ class SessionsViewModelTest {
         vm.exitProject()
         assertNull(vm.projectsState.value.scope)
     }
+
+    // Regression: exitProject must cancel an in-flight enterProject so a stale projectSessions
+    // result does NOT resurrect the scope. The old code had no job tracking, so rapid exit
+    // after enter would let the delayed fetch complete and set scope back to the hydrated
+    // project (looking like the user can't leave the detail view). This test verifies the race
+    // is fixed: exitProject cancels the pending fetch, scope stays null.
+    @Test fun exitProject_cancels_in_flight_enterProject_so_stale_result_does_not_resurrect_scope() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val overview = com.hermes.client.domain.Project("p1", "Alpha", null, null, false, 2, null, emptyList(), emptyList())
+        val hydrated = overview.copy(
+            repos = listOf(
+                com.hermes.client.domain.ProjectRepo("r", "alpha", null, 1, listOf(
+                    com.hermes.client.domain.ProjectLane("main", "main", null, true, listOf(session("s1", "Hi"))),
+                )),
+            ),
+        )
+        // Mock projectSessions with a delay so it's still in flight when exitProject runs
+        coEvery { projects.projectSessions("p1") } coAnswers {
+            kotlinx.coroutines.delay(1000)
+            hydrated
+        }
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.enterProject(overview)
+        vm.exitProject()
+        advanceUntilIdle()
+
+        assertNull(vm.projectsState.value.scope)
+        assertFalse(vm.projectsState.value.scopeLoading)
+    }
 }

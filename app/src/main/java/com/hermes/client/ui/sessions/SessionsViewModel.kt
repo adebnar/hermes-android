@@ -97,6 +97,7 @@ class SessionsViewModel @Inject constructor(
     }
 
     private var projectTreeJob: Job? = null
+    private var projectScopeJob: Job? = null
 
     /** Fetch the project overview (also the retry entry point). Latest-wins like [refresh]. */
     fun loadProjectTree() {
@@ -116,7 +117,8 @@ class SessionsViewModel @Inject constructor(
 
     /** Drill into a project: hydrate its sessions. Falls back to the overview node on failure. */
     fun enterProject(project: Project) {
-        viewModelScope.launch {
+        projectScopeJob?.cancel()
+        projectScopeJob = viewModelScope.launch {
             _projects.value = _projects.value.copy(scope = project, scopeLoading = true)
             val hydrated = runCatching { projects.projectSessions(project.id) }
                 .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
@@ -127,7 +129,8 @@ class SessionsViewModel @Inject constructor(
 
     /** Return to the project overview. */
     fun exitProject() {
-        _projects.value = _projects.value.copy(scope = null)
+        projectScopeJob?.cancel()
+        _projects.value = _projects.value.copy(scope = null, scopeLoading = false)
     }
 
     init {
