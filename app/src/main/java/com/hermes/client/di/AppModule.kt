@@ -10,6 +10,7 @@ import com.hermes.client.data.network.HermesRestApi
 import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.ModelRepository
 import com.hermes.client.data.repository.ProfileRepository
+import com.hermes.client.data.repository.ProjectsRepository
 import com.hermes.client.data.repository.SessionRepository
 import com.hermes.client.data.repository.ToolsRepository
 import dagger.Module
@@ -109,6 +110,14 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideProjectsRepository(
+        client: HermesGatewayClient,
+        json: Json,
+    ): ProjectsRepository =
+        ProjectsRepository(client, json)
+
+    @Provides
+    @Singleton
     fun provideSessionRepository(rest: HermesRestApi): SessionRepository =
         SessionRepository(rest)
 
@@ -138,6 +147,13 @@ object AppModule {
         @ApplicationContext context: Context,
     ): com.hermes.client.data.repository.GroupExpansionStore =
         com.hermes.client.data.repository.GroupExpansionStore(context)
+
+    @Provides
+    @Singleton
+    fun provideViewModeStore(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.data.repository.ViewModeStore =
+        com.hermes.client.data.repository.ViewModeStore(context)
 
     @Provides
     @Singleton

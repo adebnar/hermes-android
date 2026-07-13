@@ -8,7 +8,10 @@ import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.GroupExpansionStore
 import com.hermes.client.data.repository.PinStore
 import com.hermes.client.data.repository.ProfileManager
+import com.hermes.client.data.repository.ProjectsRepository
 import com.hermes.client.data.repository.SessionRepository
+import com.hermes.client.data.repository.ViewModeStore
+import com.hermes.client.domain.Project
 import com.hermes.client.domain.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +31,15 @@ data class SessionsUiState(
     val unauthorized: Boolean = false,
 )
 
+/** Projects-mode state: [tree] is the overview; [scope] is the drilled-in hydrated project (null = overview). */
+data class ProjectsUiState(
+    val tree: List<Project> = emptyList(),
+    val loading: Boolean = false,
+    val error: String? = null,
+    val scope: Project? = null,
+    val scopeLoading: Boolean = false,
+)
+
 @HiltViewModel
 class SessionsViewModel @Inject constructor(
     private val sessions: SessionRepository,
@@ -35,6 +47,8 @@ class SessionsViewModel @Inject constructor(
     private val profileManager: ProfileManager,
     private val pinStore: PinStore,
     private val groupExpansion: GroupExpansionStore,
+    private val projects: ProjectsRepository,
+    private val viewModeStore: ViewModeStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SessionsUiState())
     val state: StateFlow<SessionsUiState> = _state.asStateFlow()
@@ -66,6 +80,58 @@ class SessionsViewModel @Inject constructor(
 
     /** Collapse or expand a group (profile or workspace) by its [GroupExpansionStore] key. */
     fun toggleGroup(groupKey: String) = viewModelScope.launch { groupExpansion.toggle(groupKey) }
+
+    /** Persisted view mode (Sessions flat list vs the gateway project tree). */
+    val viewMode: StateFlow<ViewMode> =
+        viewModeStore.mode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ViewMode.SESSIONS)
+
+    private val _projects = MutableStateFlow(ProjectsUiState())
+    val projectsState: StateFlow<ProjectsUiState> = _projects.asStateFlow()
+
+    /** Switch view mode; on the first entry into Projects (empty tree) fetch it. */
+    fun setViewMode(mode: ViewMode) {
+        viewModelScope.launch { viewModeStore.set(mode) }
+        if (mode == ViewMode.PROJECTS && _projects.value.tree.isEmpty() && !_projects.value.loading) {
+            loadProjectTree()
+        }
+    }
+
+    private var projectTreeJob: Job? = null
+    private var projectScopeJob: Job? = null
+
+    /** Fetch the project overview (also the retry entry point). Latest-wins like [refresh]. */
+    fun loadProjectTree() {
+        projectTreeJob?.cancel()
+        projectTreeJob = viewModelScope.launch {
+            _projects.value = _projects.value.copy(loading = true, error = null)
+            try {
+                val tree = projects.tree()
+                _projects.value = _projects.value.copy(loading = false, tree = tree.projects)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _projects.value = _projects.value.copy(loading = false, error = e.message ?: "Failed to load projects")
+            }
+        }
+    }
+
+    /** Drill into a project: hydrate its sessions. Falls back to the overview node on failure. */
+    fun enterProject(project: Project) {
+        projectScopeJob?.cancel()
+        projectScopeJob = viewModelScope.launch {
+            _projects.value = _projects.value.copy(scope = project, scopeLoading = true)
+            val hydrated = runCatching { projects.projectSessions(project.id) }
+                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+                .getOrNull() ?: project
+            _projects.value = _projects.value.copy(scope = hydrated, scopeLoading = false)
+        }
+    }
+
+    /** Return to the project overview. */
+    fun exitProject() {
+        projectScopeJob?.cancel()
+        _projects.value = _projects.value.copy(scope = null, scopeLoading = false)
+    }
 
     init {
         chat.connect()

@@ -20,6 +20,11 @@ data class Session(
     // Epoch millis of last activity (from the gateway's last_active seconds), for recency sorting
     // and the Mission Control feed. Null when the gateway omits it.
     val lastActive: Long? = null,
+    // Full working directory (not just the basename in [workspace]); null when the session has none.
+    val cwd: String? = null,
+    // Git context resolved server-side, present on project-tree session rows; null otherwise.
+    val gitBranch: String? = null,
+    val gitRepoRoot: String? = null,
 )
 
 data class ToolCall(
@@ -38,4 +43,40 @@ data class ChatMessage(
     val isStreaming: Boolean = false,
     val isError: Boolean = false,
     val interrupted: Boolean = false,
+)
+
+/** A server-authoritative project (explicit user project or an auto git-repo/discovered project). */
+data class Project(
+    val id: String,
+    val label: String,
+    val path: String?,
+    // Hex string like "#RRGGBB" for explicit projects; null for auto/discovered (render with accent).
+    val color: String?,
+    val isAuto: Boolean,
+    val sessionCount: Int,
+    val lastActive: Long?,
+    val repos: List<ProjectRepo>,
+    // Newest sessions for the overview card; empty after drill-in (lanes carry the full set then).
+    val previewSessions: List<Session>,
+)
+
+data class ProjectRepo(
+    val id: String,
+    val label: String,
+    val path: String?,
+    val sessionCount: Int,
+    val lanes: List<ProjectLane>,
+)
+
+data class ProjectLane(
+    val id: String,
+    val label: String,
+    val path: String?,
+    val isMain: Boolean,
+    val sessions: List<Session>,
+)
+
+data class ProjectTree(
+    val projects: List<Project>,
+    val activeId: String?,
 )
