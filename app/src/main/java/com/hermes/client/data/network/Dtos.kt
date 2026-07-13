@@ -24,6 +24,8 @@ import kotlinx.serialization.Serializable
     val archived: Boolean = false,
     val cwd: String? = null,
     val source: String? = null,
+    @SerialName("git_branch") val gitBranch: String? = null,
+    @SerialName("git_repo_root") val gitRepoRoot: String? = null,
 )
 @Serializable data class SessionListDto(val sessions: List<SessionDto> = emptyList())
 
@@ -187,4 +189,50 @@ data class ModelOptionDto(
     val enabled: Boolean = false,
     val available: Boolean = true,
     val tools: List<String> = emptyList(),
+)
+
+/**
+ * Gateway `projects.tree` result. Single-profile (the connected gateway's bound profile).
+ * `scoped_session_ids` is parsed but unused in v1 (Sessions mode shows the flat REST list
+ * independently). `icon` is an unknown key here and intentionally ignored (YAGNI).
+ */
+@Serializable data class ProjectTreeDto(
+    val projects: List<ProjectNodeDto> = emptyList(),
+    @SerialName("active_id") val activeId: String? = null,
+)
+
+@Serializable data class ProjectNodeDto(
+    val id: String,
+    val label: String = "",
+    val path: String? = null,
+    val color: String? = null,
+    val isAuto: Boolean = false,
+    val sessionCount: Int = 0,
+    val lastActive: Double? = null,
+    val repos: List<RepoDto> = emptyList(),
+    // On projects.tree these are up to preview_limit newest rows; on project_sessions it's empty.
+    val previewSessions: List<SessionDto> = emptyList(),
+)
+
+@Serializable data class RepoDto(
+    val id: String,
+    val label: String = "",
+    val path: String? = null,
+    val sessionCount: Int = 0,
+    // Gateway calls the branch lanes "groups".
+    val groups: List<LaneDto> = emptyList(),
+)
+
+@Serializable data class LaneDto(
+    val id: String,
+    val label: String = "",
+    val path: String? = null,
+    val isMain: Boolean = false,
+    // Lane sessions are empty on projects.tree (counts only) and hydrated on project_sessions.
+    val sessions: List<SessionDto> = emptyList(),
+)
+
+/** Gateway `projects.project_sessions` result — a single hydrated node (or null). */
+@Serializable data class ProjectSessionsResultDto(
+    val project: ProjectNodeDto? = null,
 )
