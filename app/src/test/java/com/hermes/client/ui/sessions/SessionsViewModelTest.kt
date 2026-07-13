@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -30,6 +31,8 @@ class SessionsViewModelTest {
     private val profileManager = mockk<ProfileManager>(relaxed = true)
     private val pinStore = mockk<PinStore>(relaxed = true)
     private val groupExpansion = mockk<com.hermes.client.data.repository.GroupExpansionStore>(relaxed = true)
+    private val projects = mockk<com.hermes.client.data.repository.ProjectsRepository>(relaxed = true)
+    private val viewModeStore = mockk<com.hermes.client.data.repository.ViewModeStore>(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
@@ -37,6 +40,7 @@ class SessionsViewModelTest {
         every { profileManager.active } returns MutableStateFlow<String?>("personal")
         every { pinStore.pinned } returns MutableStateFlow<Set<String>>(emptySet())
         every { groupExpansion.collapsed } returns MutableStateFlow<Set<String>>(emptySet())
+        every { viewModeStore.mode } returns MutableStateFlow(ViewMode.SESSIONS)
     }
 
     private fun session(id: String, title: String, profile: String = "personal") = Session(
@@ -44,7 +48,7 @@ class SessionsViewModelTest {
         messageCount = 1, profile = profile, workspace = "No workspace", source = "hermes-dispatch",
     )
 
-    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore, groupExpansion)
+    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore, groupExpansion, projects, viewModeStore)
 
     // Regression: a session created or updated while the user was in a chat must appear once
     // the list is re-fetched. The Sessions screen calls refresh() on ON_RESUME (the "sessions"
@@ -194,5 +198,60 @@ class SessionsViewModelTest {
         vm.toggleGroup("p:odos")
         advanceUntilIdle()
         io.mockk.coVerify { groupExpansion.toggle("p:odos") }
+    }
+
+    @Test fun setViewMode_persists_and_loads_tree_on_first_projects_entry() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        coEvery { projects.tree() } returns com.hermes.client.domain.ProjectTree(
+            projects = listOf(
+                com.hermes.client.domain.Project("p1", "Alpha", null, null, false, 2, null, emptyList(), emptyList()),
+            ),
+            activeId = "p1",
+        )
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.setViewMode(ViewMode.PROJECTS)
+        advanceUntilIdle()
+
+        io.mockk.coVerify { viewModeStore.set(ViewMode.PROJECTS) }
+        io.mockk.coVerify { projects.tree() }
+        assertEquals(listOf("p1"), vm.projectsState.value.tree.map { it.id })
+    }
+
+    @Test fun loadProjectTree_sets_error_on_failure() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        coEvery { projects.tree() } throws RuntimeException("rpc down")
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.loadProjectTree()
+        advanceUntilIdle()
+
+        assertFalse(vm.projectsState.value.loading)
+        assertTrue(vm.projectsState.value.error != null)
+    }
+
+    @Test fun enterProject_hydrates_scope_then_exit_clears_it() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val overview = com.hermes.client.domain.Project("p1", "Alpha", null, null, false, 2, null, emptyList(), emptyList())
+        val hydrated = overview.copy(
+            repos = listOf(
+                com.hermes.client.domain.ProjectRepo("r", "alpha", null, 1, listOf(
+                    com.hermes.client.domain.ProjectLane("main", "main", null, true, listOf(session("s1", "Hi"))),
+                )),
+            ),
+        )
+        coEvery { projects.projectSessions("p1") } returns hydrated
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.enterProject(overview)
+        advanceUntilIdle()
+        assertEquals("p1", vm.projectsState.value.scope?.id)
+        assertEquals("s1", vm.projectsState.value.scope?.repos?.single()?.lanes?.single()?.sessions?.single()?.id)
+
+        vm.exitProject()
+        assertNull(vm.projectsState.value.scope)
     }
 }
