@@ -55,4 +55,14 @@ class SessionGroupingTest {
         assertFalse("a sibling workspace stays expanded", docs.collapsed)
         assertEquals(listOf("c"), docs.sessions.map { it.id })
     }
+
+    private fun s(id: String, lastActive: Long?) = com.hermes.client.domain.Session(
+        id = id, title = id, model = null, provider = null, messageCount = 1,
+        profile = "personal", lastActive = lastActive,
+    )
+
+    @org.junit.Test fun sessionsByRecency_orders_newest_first_nulls_last() {
+        val out = sessionsByRecency(listOf(s("a", 100), s("b", null), s("c", 300))).map { it.id }
+        org.junit.Assert.assertEquals(listOf("c", "a", "b"), out)
+    }
 }

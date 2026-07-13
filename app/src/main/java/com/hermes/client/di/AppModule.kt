@@ -150,6 +150,13 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideViewModeStore(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.data.repository.ViewModeStore =
+        com.hermes.client.data.repository.ViewModeStore(context)
+
+    @Provides
+    @Singleton
     fun provideProfileAccentStore(
         @ApplicationContext context: Context,
     ): com.hermes.client.data.repository.ProfileAccentStore =
