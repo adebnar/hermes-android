@@ -8,13 +8,30 @@ import com.hermes.client.domain.Session
 import com.hermes.client.domain.toDomain
 
 /**
- * Mirror the desktop session list: show interactive, used sessions only. Cron-created sessions
- * live in the Cron view, and empty (0-message) sessions are scratch — both are hidden from the
- * session list so the mobile counts match the desktop dashboard.
+ * Mirror the desktop sidebar session list: show interactive, used sessions only. Sessions whose
+ * source is in [SessionRepository.EXCLUDED_SOURCES] — cron (shown in the Cron view), the internal
+ * subagent/tool sources, and every messaging platform (telegram/slack/email/… live in their own
+ * surfaces) — plus empty (0-message) scratch sessions are hidden, matching the desktop's
+ * SIDEBAR_EXCLUDED_SOURCES so the two lists agree. A null/unknown source is kept.
  */
-private fun Session.isInteractive(): Boolean = source != "cron" && messageCount > 0
+private fun Session.isInteractive(): Boolean =
+    messageCount > 0 && (source == null || source !in SessionRepository.EXCLUDED_SOURCES)
 
 class SessionRepository(private val rest: HermesRestApi) {
+    companion object {
+        /**
+         * Sources hidden from the sessions list, matching the desktop's SIDEBAR_EXCLUDED_SOURCES:
+         * cron + subagent + tool + every messaging platform. Local sources (cli/tui/desktop/…) and
+         * the app's own `hermes-dispatch` sessions are NOT excluded — they show in the list.
+         */
+        val EXCLUDED_SOURCES: Set<String> = setOf(
+            "cron", "subagent", "tool",
+            "telegram", "discord", "slack", "mattermost", "matrix", "signal", "whatsapp",
+            "bluebubbles", "homeassistant", "email", "sms", "webhook", "api_server",
+            "weixin", "wecom", "qqbot", "yuanbao", "dingtalk", "feishu",
+        )
+    }
+
     suspend fun list(profile: String? = null): List<Session> =
         rest.sessions(limit = 50, offset = 0, profile = profile).map { it.toDomain() }
 

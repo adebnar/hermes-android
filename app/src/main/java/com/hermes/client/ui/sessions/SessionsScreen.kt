@@ -118,8 +118,10 @@ fun SessionsScreen(
                         )
                     }
                 } else {
+                    // Projects come from the gateway's own profile (projects.tree takes no profile
+                    // param), NOT the selected tenant — so don't label them with the active profile.
                     Text(
-                        "Projects · ${activeProfile ?: "default"}",
+                        "Projects on this gateway · not filtered by profile",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
