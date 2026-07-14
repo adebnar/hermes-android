@@ -39,13 +39,23 @@ fun ProjectOverview(projects: List<Project>, onOpenProject: (Project) -> Unit) {
     }
 }
 
+/** Distinct profiles (tenants) a project's chats belong to — projects span profiles in this view. */
+private fun Project.tenantProfiles(): List<String> =
+    repos.asSequence()
+        .flatMap { it.lanes.asSequence() }
+        .flatMap { it.sessions.asSequence() }
+        .mapNotNull { it.profile?.takeIf { p -> p.isNotBlank() } }
+        .distinct()
+        .toList()
+
 @Composable
 fun ProjectCard(project: Project, onClick: () -> Unit) {
     ListItem(
         headlineContent = { Text(project.label) },
         supportingContent = {
-            val repos = if (project.isAuto) "auto" else "${project.repos.size} repo${if (project.repos.size == 1) "" else "s"}"
-            Text("${project.sessionCount} session${if (project.sessionCount == 1) "" else "s"} · $repos")
+            val tenants = project.tenantProfiles()
+            val tenantText = if (tenants.isEmpty()) "" else " · ${tenants.joinToString(", ")}"
+            Text("${project.sessionCount} session${if (project.sessionCount == 1) "" else "s"}$tenantText")
         },
         leadingContent = {
             Icon(Icons.Rounded.Folder, contentDescription = null, tint = projectTint(project.color), modifier = Modifier.size(24.dp))
@@ -87,7 +97,10 @@ fun ProjectScopeView(project: Project, onBack: () -> Unit, onOpenSession: (Sessi
             items(lane.sessions, key = { "sess-${it.id}" }) { s ->
                 ListItem(
                     headlineContent = { Text(s.title) },
-                    supportingContent = { Text(s.model ?: "") },
+                    // Badge the tenant since a project can span profiles.
+                    supportingContent = {
+                        Text(listOfNotNull(s.profile?.takeIf { it.isNotBlank() }, s.model).joinToString(" · "))
+                    },
                     modifier = Modifier.clickable { onOpenSession(s) },
                 )
             }

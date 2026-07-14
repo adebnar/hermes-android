@@ -31,7 +31,6 @@ class SessionsViewModelTest {
     private val profileManager = mockk<ProfileManager>(relaxed = true)
     private val pinStore = mockk<PinStore>(relaxed = true)
     private val groupExpansion = mockk<com.hermes.client.data.repository.GroupExpansionStore>(relaxed = true)
-    private val projects = mockk<com.hermes.client.data.repository.ProjectsRepository>(relaxed = true)
     private val viewModeStore = mockk<com.hermes.client.data.repository.ViewModeStore>(relaxed = true)
     // Controllable so tests can flip the persisted view mode (drives the VM's launch/toggle load).
     private val modeFlow = MutableStateFlow(ViewMode.SESSIONS)
@@ -50,7 +49,12 @@ class SessionsViewModelTest {
         messageCount = 1, profile = profile, workspace = "No workspace", source = "hermes-dispatch",
     )
 
-    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore, groupExpansion, projects, viewModeStore)
+    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore, groupExpansion, viewModeStore)
+
+    private fun repoSession(id: String, repo: String?, profile: String = "personal") = Session(
+        id = id, title = id, model = null, provider = null, messageCount = 1,
+        profile = profile, source = "tui", gitRepoRoot = repo,
+    )
 
     // Regression: a session created or updated while the user was in a chat must appear once
     // the list is re-fetched. The Sessions screen calls refresh() on ON_RESUME (the "sessions"
@@ -213,46 +217,40 @@ class SessionsViewModelTest {
         io.mockk.coVerify { viewModeStore.set(ViewMode.PROJECTS) }
     }
 
-    @Test fun tree_loads_when_view_mode_becomes_projects() = runTest {
-        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
-        coEvery { projects.tree() } returns com.hermes.client.domain.ProjectTree(
-            projects = listOf(
-                com.hermes.client.domain.Project("p1", "Alpha", null, null, false, 2, null, emptyList(), emptyList()),
-            ),
-            activeId = "p1",
+    @Test fun projects_derive_from_cross_profile_sessions_when_view_mode_becomes_projects() = runTest {
+        // Two profiles, two repos → two projects derived client-side (no gateway call).
+        coEvery { sessionRepo.listAllProfiles() } returns listOf(
+            repoSession("a", "/u/andrew/personal/travel-business", profile = "personal"),
+            repoSession("b", "/u/andrew/work/clients/dito/Southington", profile = "dito"),
         )
         val vm = buildVm()
         advanceUntilIdle()
 
-        // The persisted mode flips to Projects (what ViewModeStore emits after set()).
-        modeFlow.value = ViewMode.PROJECTS
+        modeFlow.value = ViewMode.PROJECTS // persisted mode flips to Projects
         advanceUntilIdle()
 
-        io.mockk.coVerify { projects.tree() }
-        assertEquals(listOf("p1"), vm.projectsState.value.tree.map { it.id })
+        assertEquals(
+            setOf("/u/andrew/personal/travel-business", "/u/andrew/work/clients/dito/Southington"),
+            vm.projectsState.value.tree.map { it.id }.toSet(),
+        )
     }
 
-    // Regression: a cold launch restored into Projects mode must fetch the tree, not show a
+    // Regression: a cold launch restored into Projects mode must build the tree, not show a
     // spurious "No projects". Previously only a toggle tap loaded it.
-    @Test fun tree_loads_on_cold_launch_when_persisted_mode_is_projects() = runTest {
-        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
-        coEvery { projects.tree() } returns com.hermes.client.domain.ProjectTree(
-            projects = listOf(
-                com.hermes.client.domain.Project("p9", "Beta", null, null, true, 1, null, emptyList(), emptyList()),
-            ),
-            activeId = null,
+    @Test fun projects_build_on_cold_launch_when_persisted_mode_is_projects() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns listOf(
+            repoSession("x", "/u/andrew/personal/inbound", profile = "personal"),
         )
         modeFlow.value = ViewMode.PROJECTS // persisted as Projects before the VM is even built
         val vm = buildVm()
         advanceUntilIdle()
 
-        io.mockk.coVerify { projects.tree() }
-        assertEquals(listOf("p9"), vm.projectsState.value.tree.map { it.id })
+        assertEquals(listOf("/u/andrew/personal/inbound"), vm.projectsState.value.tree.map { it.id })
     }
 
     @Test fun loadProjectTree_sets_error_on_failure() = runTest {
-        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
-        coEvery { projects.tree() } throws RuntimeException("rpc down")
+        // First call (Sessions init refresh) succeeds; the Projects build then fails.
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList() andThenThrows RuntimeException("net down")
         val vm = buildVm()
         advanceUntilIdle()
 
@@ -263,23 +261,24 @@ class SessionsViewModelTest {
         assertTrue(vm.projectsState.value.error != null)
     }
 
-    @Test fun enterProject_hydrates_scope_then_exit_clears_it() = runTest {
+    @Test fun enterProject_sets_scope_then_exit_clears_it() = runTest {
         coEvery { sessionRepo.listAllProfiles() } returns emptyList()
-        val overview = com.hermes.client.domain.Project("p1", "Alpha", null, null, false, 2, null, emptyList(), emptyList())
-        val hydrated = overview.copy(
+        // A derived project already carries its sessions — enterProject just scopes to it (no fetch).
+        val project = com.hermes.client.domain.Project(
+            "/u/andrew/p", "p", "/u/andrew/p", null, true, 1, null,
             repos = listOf(
-                com.hermes.client.domain.ProjectRepo("r", "alpha", null, 1, listOf(
-                    com.hermes.client.domain.ProjectLane("main", "main", null, true, listOf(session("s1", "Hi"))),
+                com.hermes.client.domain.ProjectRepo("/u/andrew/p", "p", "/u/andrew/p", 1, listOf(
+                    com.hermes.client.domain.ProjectLane("all", "", null, true, listOf(session("s1", "Hi"))),
                 )),
             ),
+            previewSessions = emptyList(),
         )
-        coEvery { projects.projectSessions("p1") } returns hydrated
         val vm = buildVm()
         advanceUntilIdle()
 
-        vm.enterProject(overview)
+        vm.enterProject(project)
         advanceUntilIdle()
-        assertEquals("p1", vm.projectsState.value.scope?.id)
+        assertEquals("/u/andrew/p", vm.projectsState.value.scope?.id)
         assertEquals("s1", vm.projectsState.value.scope?.repos?.single()?.lanes?.single()?.sessions?.single()?.id)
 
         vm.exitProject()
@@ -291,29 +290,4 @@ class SessionsViewModelTest {
     // after enter would let the delayed fetch complete and set scope back to the hydrated
     // project (looking like the user can't leave the detail view). This test verifies the race
     // is fixed: exitProject cancels the pending fetch, scope stays null.
-    @Test fun exitProject_cancels_in_flight_enterProject_so_stale_result_does_not_resurrect_scope() = runTest {
-        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
-        val overview = com.hermes.client.domain.Project("p1", "Alpha", null, null, false, 2, null, emptyList(), emptyList())
-        val hydrated = overview.copy(
-            repos = listOf(
-                com.hermes.client.domain.ProjectRepo("r", "alpha", null, 1, listOf(
-                    com.hermes.client.domain.ProjectLane("main", "main", null, true, listOf(session("s1", "Hi"))),
-                )),
-            ),
-        )
-        // Mock projectSessions with a delay so it's still in flight when exitProject runs
-        coEvery { projects.projectSessions("p1") } coAnswers {
-            kotlinx.coroutines.delay(1000)
-            hydrated
-        }
-        val vm = buildVm()
-        advanceUntilIdle()
-
-        vm.enterProject(overview)
-        vm.exitProject()
-        advanceUntilIdle()
-
-        assertNull(vm.projectsState.value.scope)
-        assertFalse(vm.projectsState.value.scopeLoading)
-    }
 }
