@@ -33,6 +33,8 @@ class SessionsViewModelTest {
     private val groupExpansion = mockk<com.hermes.client.data.repository.GroupExpansionStore>(relaxed = true)
     private val projects = mockk<com.hermes.client.data.repository.ProjectsRepository>(relaxed = true)
     private val viewModeStore = mockk<com.hermes.client.data.repository.ViewModeStore>(relaxed = true)
+    // Controllable so tests can flip the persisted view mode (drives the VM's launch/toggle load).
+    private val modeFlow = MutableStateFlow(ViewMode.SESSIONS)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
@@ -40,7 +42,7 @@ class SessionsViewModelTest {
         every { profileManager.active } returns MutableStateFlow<String?>("personal")
         every { pinStore.pinned } returns MutableStateFlow<Set<String>>(emptySet())
         every { groupExpansion.collapsed } returns MutableStateFlow<Set<String>>(emptySet())
-        every { viewModeStore.mode } returns MutableStateFlow(ViewMode.SESSIONS)
+        every { viewModeStore.mode } returns modeFlow
     }
 
     private fun session(id: String, title: String, profile: String = "personal") = Session(
@@ -200,7 +202,18 @@ class SessionsViewModelTest {
         io.mockk.coVerify { groupExpansion.toggle("p:odos") }
     }
 
-    @Test fun setViewMode_persists_and_loads_tree_on_first_projects_entry() = runTest {
+    @Test fun setViewMode_persists_the_mode() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.setViewMode(ViewMode.PROJECTS)
+        advanceUntilIdle()
+
+        io.mockk.coVerify { viewModeStore.set(ViewMode.PROJECTS) }
+    }
+
+    @Test fun tree_loads_when_view_mode_becomes_projects() = runTest {
         coEvery { sessionRepo.listAllProfiles() } returns emptyList()
         coEvery { projects.tree() } returns com.hermes.client.domain.ProjectTree(
             projects = listOf(
@@ -211,12 +224,30 @@ class SessionsViewModelTest {
         val vm = buildVm()
         advanceUntilIdle()
 
-        vm.setViewMode(ViewMode.PROJECTS)
+        // The persisted mode flips to Projects (what ViewModeStore emits after set()).
+        modeFlow.value = ViewMode.PROJECTS
         advanceUntilIdle()
 
-        io.mockk.coVerify { viewModeStore.set(ViewMode.PROJECTS) }
         io.mockk.coVerify { projects.tree() }
         assertEquals(listOf("p1"), vm.projectsState.value.tree.map { it.id })
+    }
+
+    // Regression: a cold launch restored into Projects mode must fetch the tree, not show a
+    // spurious "No projects". Previously only a toggle tap loaded it.
+    @Test fun tree_loads_on_cold_launch_when_persisted_mode_is_projects() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        coEvery { projects.tree() } returns com.hermes.client.domain.ProjectTree(
+            projects = listOf(
+                com.hermes.client.domain.Project("p9", "Beta", null, null, true, 1, null, emptyList(), emptyList()),
+            ),
+            activeId = null,
+        )
+        modeFlow.value = ViewMode.PROJECTS // persisted as Projects before the VM is even built
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        io.mockk.coVerify { projects.tree() }
+        assertEquals(listOf("p9"), vm.projectsState.value.tree.map { it.id })
     }
 
     @Test fun loadProjectTree_sets_error_on_failure() = runTest {

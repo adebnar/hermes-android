@@ -88,12 +88,9 @@ class SessionsViewModel @Inject constructor(
     private val _projects = MutableStateFlow(ProjectsUiState())
     val projectsState: StateFlow<ProjectsUiState> = _projects.asStateFlow()
 
-    /** Switch view mode; on the first entry into Projects (empty tree) fetch it. */
+    /** Persist the chosen view mode; the [viewMode] observer in init fetches the tree when needed. */
     fun setViewMode(mode: ViewMode) {
         viewModelScope.launch { viewModeStore.set(mode) }
-        if (mode == ViewMode.PROJECTS && _projects.value.tree.isEmpty() && !_projects.value.loading) {
-            loadProjectTree()
-        }
     }
 
     private var projectTreeJob: Job? = null
@@ -144,6 +141,17 @@ class SessionsViewModel @Inject constructor(
         // This VM stays in the back stack while a chat is open, so it catches the event live.
         viewModelScope.launch {
             chat.events.collect { if (it.type == "session.title") refresh() }
+        }
+        // Fetch the project tree whenever Projects becomes the active view without a loaded tree.
+        // Covers both the toggle tap AND a cold launch restored into Projects mode (persisted) —
+        // the launch case previously never called loadProjectTree, so Projects showed a spurious
+        // "No projects" until the user toggled.
+        viewModelScope.launch {
+            viewModeStore.mode.collect { mode ->
+                if (mode == ViewMode.PROJECTS && _projects.value.tree.isEmpty() && !_projects.value.loading) {
+                    loadProjectTree()
+                }
+            }
         }
     }
 
