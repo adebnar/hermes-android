@@ -68,4 +68,4 @@ private fun buildProject(id: String, label: String, rows: List<Session>): Projec
 }
 
 private fun basename(path: String): String =
-    path.trimEnd('/').substringAfterLast('/').ifBlank { path }
+    path.trimEnd('/', '\\').substringAfterLast('/').substringAfterLast('\\').ifBlank { path }
