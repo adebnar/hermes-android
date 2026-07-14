@@ -8,7 +8,6 @@ import com.hermes.client.data.repository.ChatRepository
 import com.hermes.client.data.repository.GroupExpansionStore
 import com.hermes.client.data.repository.PinStore
 import com.hermes.client.data.repository.ProfileManager
-import com.hermes.client.data.repository.ProjectsRepository
 import com.hermes.client.data.repository.SessionRepository
 import com.hermes.client.data.repository.ViewModeStore
 import com.hermes.client.domain.Project
@@ -37,7 +36,6 @@ data class ProjectsUiState(
     val loading: Boolean = false,
     val error: String? = null,
     val scope: Project? = null,
-    val scopeLoading: Boolean = false,
 )
 
 @HiltViewModel
@@ -47,7 +45,6 @@ class SessionsViewModel @Inject constructor(
     private val profileManager: ProfileManager,
     private val pinStore: PinStore,
     private val groupExpansion: GroupExpansionStore,
-    private val projects: ProjectsRepository,
     private val viewModeStore: ViewModeStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SessionsUiState())
@@ -94,16 +91,19 @@ class SessionsViewModel @Inject constructor(
     }
 
     private var projectTreeJob: Job? = null
-    private var projectScopeJob: Job? = null
 
-    /** Fetch the project overview (also the retry entry point). Latest-wins like [refresh]. */
+    /** Build the project overview (also the retry entry point). Latest-wins like [refresh]. */
     fun loadProjectTree() {
         projectTreeJob?.cancel()
         projectTreeJob = viewModelScope.launch {
             _projects.value = _projects.value.copy(loading = true, error = null)
             try {
-                val tree = projects.tree()
-                _projects.value = _projects.value.copy(loading = false, tree = tree.projects)
+                // Stopgap: derive Projects from the cross-profile session list (all profiles),
+                // because the gateway's projects.tree is pinned to the launch profile and can't
+                // serve a selected tenant's projects. Re-wire to a per-profile gateway RPC (see
+                // ProjectsRepository) once the gateway accepts a `profile` param.
+                val derived = deriveProjectsFromSessions(sessions.listAllProfiles())
+                _projects.value = _projects.value.copy(loading = false, tree = derived)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -112,22 +112,14 @@ class SessionsViewModel @Inject constructor(
         }
     }
 
-    /** Drill into a project: hydrate its sessions. Falls back to the overview node on failure. */
+    /** Drill into a project. Derived projects already carry all their sessions — no fetch needed. */
     fun enterProject(project: Project) {
-        projectScopeJob?.cancel()
-        projectScopeJob = viewModelScope.launch {
-            _projects.value = _projects.value.copy(scope = project, scopeLoading = true)
-            val hydrated = runCatching { projects.projectSessions(project.id) }
-                .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
-                .getOrNull() ?: project
-            _projects.value = _projects.value.copy(scope = hydrated, scopeLoading = false)
-        }
+        _projects.value = _projects.value.copy(scope = project)
     }
 
     /** Return to the project overview. */
     fun exitProject() {
-        projectScopeJob?.cancel()
-        _projects.value = _projects.value.copy(scope = null, scopeLoading = false)
+        _projects.value = _projects.value.copy(scope = null)
     }
 
     init {

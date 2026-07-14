@@ -118,10 +118,11 @@ fun SessionsScreen(
                         )
                     }
                 } else {
-                    // Projects come from the gateway's own profile (projects.tree takes no profile
-                    // param), NOT the selected tenant — so don't label them with the active profile.
+                    // Projects are derived from chats across ALL profiles (stopgap until the gateway
+                    // supports per-profile projects.tree), so they span tenants — each row is badged
+                    // with its profile. The per-profile switcher doesn't apply here.
                     Text(
-                        "Projects on this gateway · not filtered by profile",
+                        "Projects · all profiles",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -165,18 +166,18 @@ fun SessionsScreen(
                                 message = projectsState.error!!,
                                 onRetry = { vm.loadProjectTree() },
                             )
-                        projectsState.scope != null && projectsState.scopeLoading ->
-                            com.hermes.client.ui.components.LoadingState()
                         projectsState.scope != null ->
                             ProjectScopeView(
                                 project = projectsState.scope!!,
                                 onBack = { vm.exitProject() },
-                                onOpenSession = { s -> onOpen(s.id) },
+                                // Projects span profiles, so switch to the session's own profile
+                                // (awaited) before opening, or the chat resumes against the wrong DB.
+                                onOpenSession = { s -> scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
                             )
                         projectsState.tree.isEmpty() ->
                             com.hermes.client.ui.components.EmptyState(
                                 title = "No projects",
-                                subtitle = "Projects are created on the desktop app.",
+                                subtitle = "Chats run in a project folder show up here.",
                                 actionLabel = "Reload",
                                 onAction = { vm.loadProjectTree() },
                             )
