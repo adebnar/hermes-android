@@ -19,10 +19,10 @@ class ChatReducerTest {
 
     @Test fun start_delta_complete_builds_one_assistant_message() {
         var s = ChatUiState.empty()
-        s = reduce(s, ev("message.start") { put("message_id", "a1") })
-        s = reduce(s, ev("message.delta") { put("text","Hel") })
-        s = reduce(s, ev("message.delta") { put("text","lo") })
-        s = reduce(s, ev("message.complete") { put("text","Hello") })
+        s = s.reduce(ev("message.start") { put("message_id", "a1") })
+        s = s.reduce(ev("message.delta") { put("text","Hel") })
+        s = s.reduce(ev("message.delta") { put("text","lo") })
+        s = s.reduce(ev("message.complete") { put("text","Hello") })
         assertEquals(1, s.messages.size)
         assertEquals(Role.ASSISTANT, s.messages[0].role)
         assertEquals("Hello", s.messages[0].text)
@@ -32,9 +32,9 @@ class ChatReducerTest {
 
     @Test fun tool_events_attach_to_current_turn() {
         var s = ChatUiState.empty()
-        s = reduce(s, ev("message.start") { put("message_id", "a1") })
-        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("name","search") })
-        s = reduce(s, ev("tool.complete") { put("tool_id", "t1"); put("result", "found") })
+        s = s.reduce(ev("message.start") { put("message_id", "a1") })
+        s = s.reduce(ev("tool.start") { put("tool_id", "t1"); put("name","search") })
+        s = s.reduce(ev("tool.complete") { put("tool_id", "t1"); put("result", "found") })
         val tools = s.messages.last().tools
         assertEquals(1, tools.size)
         assertEquals("search", tools[0].name)
@@ -49,11 +49,11 @@ class ChatReducerTest {
     @Test fun reused_message_id_across_turns_yields_unique_ids() {
         var s = ChatUiState.empty()
         s = s.withUserMessage("hi")
-        s = reduce(s, ev("message.start") { put("message_id", "gemma") })
-        s = reduce(s, ev("message.complete") { put("text", "hello") })
+        s = s.reduce(ev("message.start") { put("message_id", "gemma") })
+        s = s.reduce(ev("message.complete") { put("text", "hello") })
         s = s.withUserMessage("again")
-        s = reduce(s, ev("message.start") { put("message_id", "gemma") })
-        s = reduce(s, ev("message.complete") { put("text", "hi again") })
+        s = s.reduce(ev("message.start") { put("message_id", "gemma") })
+        s = s.reduce(ev("message.complete") { put("text", "hi again") })
 
         val ids = s.messages.map { it.id }
         assertEquals("every message must have a unique list key", ids.size, ids.toSet().size)
@@ -67,9 +67,9 @@ class ChatReducerTest {
     // structured result should survive as text on the tool card.
     @Test fun tool_complete_with_object_result_does_not_crash() {
         var s = ChatUiState.empty()
-        s = reduce(s, ev("message.start") { put("message_id", "gemma") })
-        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("name", "gmail.search") })
-        s = reduce(s, ev("tool.complete") {
+        s = s.reduce(ev("message.start") { put("message_id", "gemma") })
+        s = s.reduce(ev("tool.start") { put("tool_id", "t1"); put("name", "gmail.search") })
+        s = s.reduce(ev("tool.complete") {
             put("tool_id", "t1")
             putJsonObject("result") { put("unread", 3); put("subject", "Citizenship update") }
         })
@@ -80,9 +80,9 @@ class ChatReducerTest {
 
     @Test fun tool_complete_with_array_result_does_not_crash() {
         var s = ChatUiState.empty()
-        s = reduce(s, ev("message.start") { put("message_id", "gemma") })
-        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("name", "gmail.list") })
-        s = reduce(s, ev("tool.complete") {
+        s = s.reduce(ev("message.start") { put("message_id", "gemma") })
+        s = s.reduce(ev("tool.start") { put("tool_id", "t1"); put("name", "gmail.list") })
+        s = s.reduce(ev("tool.complete") {
             put("tool_id", "t1")
             putJsonArray("result") { add("a@x.com"); add("b@y.com") }
         })
@@ -92,33 +92,33 @@ class ChatReducerTest {
     // The same non-primitive hazard applies to message text fields, not just tool results.
     @Test fun message_complete_with_object_text_does_not_crash() {
         var s = ChatUiState.empty()
-        s = reduce(s, ev("message.start") { put("message_id", "gemma") })
-        s = reduce(s, ev("message.complete") { putJsonObject("text") { put("v", "hi") } })
+        s = s.reduce(ev("message.start") { put("message_id", "gemma") })
+        s = s.reduce(ev("message.complete") { putJsonObject("text") { put("v", "hi") } })
         assertFalse(s.isGenerating)
     }
 
     @Test fun approval_request_sets_pending() {
         var s = ChatUiState.empty()
-        s = reduce(s, ev("approval.request") { put("prompt", "Run rm -rf?") })
-        assertEquals("Run rm -rf?", s.pendingApproval?.prompt)
+        s = s.reduce(ev("approval.request") { put("command", "rm -rf?") })
+        assertEquals("rm -rf?", s.pendingApproval?.command)
     }
 
     @Test fun thinking_delta_accumulates() {
         var s = ChatUiState.empty()
-        s = reduce(s, ev("message.start") { put("message_id", "a1") })
-        s = reduce(s, ev("reasoning.delta") { put("text","hmm ") })
-        s = reduce(s, ev("reasoning.delta") { put("text","ok") })
+        s = s.reduce(ev("message.start") { put("message_id", "a1") })
+        s = s.reduce(ev("reasoning.delta") { put("text","hmm ") })
+        s = s.reduce(ev("reasoning.delta") { put("text","ok") })
         assertEquals("hmm ok", s.messages.last().thinking)
     }
 
     // T8b: tool.complete arriving AFTER message.complete must still update the tool card.
     @Test fun late_tool_complete_after_message_complete_is_not_dropped() {
         var s = ChatUiState.empty()
-        s = reduce(s, ev("message.start") { put("message_id", "a1") })
-        s = reduce(s, ev("tool.start") { put("tool_id", "t1"); put("name","search") })
-        s = reduce(s, ev("message.complete") { put("text","done") })
+        s = s.reduce(ev("message.start") { put("message_id", "a1") })
+        s = s.reduce(ev("tool.start") { put("tool_id", "t1"); put("name","search") })
+        s = s.reduce(ev("message.complete") { put("text","done") })
         // At this point the assistant message is no longer streaming.
-        s = reduce(s, ev("tool.complete") { put("tool_id", "t1"); put("result", "done") })
+        s = s.reduce(ev("tool.complete") { put("tool_id", "t1"); put("result", "done") })
         val tools = s.messages.last().tools
         assertEquals(1, tools.size)
         assertEquals(ToolStatus.DONE, tools[0].status)
@@ -128,8 +128,8 @@ class ChatReducerTest {
     // I3: markInterrupted closes the streaming message and clears isGenerating.
     @Test fun markInterrupted_with_streaming_message() {
         var s = ChatUiState.empty()
-        s = reduce(s, ev("message.start") { put("message_id", "a1") })
-        s = reduce(s, ev("message.delta") { put("text","partial") })
+        s = s.reduce(ev("message.start") { put("message_id", "a1") })
+        s = s.reduce(ev("message.delta") { put("text","partial") })
         assertTrue(s.isGenerating)
         assertTrue(s.messages.last().isStreaming)
 

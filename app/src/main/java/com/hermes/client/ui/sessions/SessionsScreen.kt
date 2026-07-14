@@ -20,9 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Archive
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -37,6 +35,9 @@ import androidx.compose.material3.MaterialTheme
 import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -52,7 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermes.client.domain.Session
 import kotlinx.coroutines.launch
@@ -70,9 +71,10 @@ fun SessionsScreen(
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
     val profiles by vm.profiles.collectAsStateWithLifecycle()
     val pinnedTokens by vm.pinnedTokens.collectAsStateWithLifecycle()
-    val collapsedGroups by vm.collapsedGroups.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val messageResults by vm.messageResults.collectAsStateWithLifecycle()
+    val viewMode by vm.viewMode.collectAsStateWithLifecycle()
+    val projectsState by vm.projectsState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     // I1: route to Setup when a 401 is received
@@ -104,12 +106,42 @@ fun SessionsScreen(
                 )
                 // Same tenant switcher as Agent Activity: a chip row, active one selected. Tapping
                 // switches the active profile and the list re-fetches.
-                if (profiles.size > 1) {
-                    com.hermes.client.ui.components.ProfileSwitcher(
-                        names = profiles.map { it.name },
-                        active = activeProfile,
-                        onSelect = vm::switchProfile,
+                // Sessions mode spans all profiles (REST); Projects mode is single-profile (the
+                // gateway's bound profile — projects.tree takes no profile param), so the switcher
+                // would be misleading there. Show a caption instead.
+                if (viewMode == ViewMode.SESSIONS) {
+                    if (profiles.size > 1) {
+                        com.hermes.client.ui.components.ProfileSwitcher(
+                            names = profiles.map { it.name },
+                            active = activeProfile,
+                            onSelect = vm::switchProfile,
+                        )
+                    }
+                } else {
+                    // Projects are derived from chats across ALL profiles (stopgap until the gateway
+                    // supports per-profile projects.tree), so they span tenants — each row is badged
+                    // with its profile. The per-profile switcher doesn't apply here.
+                    Text(
+                        "Projects · all profiles",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                     )
+                }
+                val accent = LocalProfileAccent.current
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                    val tabs = listOf(ViewMode.SESSIONS to "Sessions", ViewMode.PROJECTS to "Projects")
+                    tabs.forEachIndexed { i, (mode, label) ->
+                        SegmentedButton(
+                            selected = viewMode == mode,
+                            onClick = { vm.setViewMode(mode) },
+                            shape = SegmentedButtonDefaults.itemShape(i, tabs.size),
+                            colors = SegmentedButtonDefaults.colors(
+                                activeContainerColor = accent.accent,
+                                activeContentColor = accent.onAccent,
+                            ),
+                        ) { Text(label) }
+                    }
                 }
             }
         },
@@ -124,205 +156,137 @@ fun SessionsScreen(
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            // Search: typing filters the loaded list by title/workspace instantly; the keyboard
-            // Search action runs a full message-content search via the gateway.
-            OutlinedTextField(
-                value = query,
-                onValueChange = vm::onQueryChange,
-                placeholder = { Text("Search sessions…") },
-                singleLine = true,
-                trailingIcon = {
-                    if (query.isNotBlank()) {
-                        IconButton(onClick = { vm.onQueryChange("") }) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Clear search")
-                        }
+            if (viewMode == ViewMode.PROJECTS) {
+                Box(Modifier.fillMaxSize()) {
+                    when {
+                        projectsState.loading && projectsState.tree.isEmpty() ->
+                            com.hermes.client.ui.components.LoadingState()
+                        projectsState.error != null ->
+                            com.hermes.client.ui.components.ErrorState(
+                                message = projectsState.error!!,
+                                onRetry = { vm.loadProjectTree() },
+                            )
+                        projectsState.scope != null ->
+                            ProjectScopeView(
+                                project = projectsState.scope!!,
+                                onBack = { vm.exitProject() },
+                                // Projects span profiles, so switch to the session's own profile
+                                // (awaited) before opening, or the chat resumes against the wrong DB.
+                                onOpenSession = { s -> scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
+                            )
+                        projectsState.tree.isEmpty() ->
+                            com.hermes.client.ui.components.EmptyState(
+                                title = "No projects",
+                                subtitle = "Chats run in a project folder show up here.",
+                                actionLabel = "Reload",
+                                onAction = { vm.loadProjectTree() },
+                            )
+                        else -> ProjectOverview(projectsState.tree, onOpenProject = { vm.enterProject(it) })
                     }
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { vm.searchMessages() }),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-            Box(Modifier.fillMaxSize()) {
-            when {
-                state.loading -> com.hermes.client.ui.components.LoadingState()
-                state.error != null -> com.hermes.client.ui.components.ErrorState(
-                    message = state.error!!,
-                    onRetry = { vm.refresh() },
+                }
+            } else {
+                // ── Sessions mode (flat recency) ─────────────────────────────────────────────
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = vm::onQueryChange,
+                    placeholder = { Text("Search sessions…") },
+                    singleLine = true,
+                    trailingIcon = {
+                        if (query.isNotBlank()) {
+                            IconButton(onClick = { vm.onQueryChange("") }) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                            }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { vm.searchMessages() }),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                 )
-                state.sessions.isEmpty() && query.isBlank() && messageResults.isEmpty() ->
-                    com.hermes.client.ui.components.EmptyState(
-                        title = "No sessions yet",
-                        subtitle = "Start a conversation with the New button.",
-                        actionLabel = "New session",
-                        onAction = { scope.launch { vm.createSession()?.let { onOpen(it) } } },
-                    )
-                else -> {
-                    val q = query.trim()
-                    // Instant client-side title/workspace filter over the loaded sessions.
-                    val matches = if (q.isEmpty()) state.sessions
-                    else state.sessions.filter {
-                        it.title.contains(q, ignoreCase = true) ||
-                            it.workspace.contains(q, ignoreCase = true)
-                    }
-                    // Pins are keyed by each session's OWN profile (the list spans all profiles),
-                    // so a pin made in another tenant still shows here.
-                    val isPinned = { s: Session ->
-                        com.hermes.client.data.repository.PinStore.token(s.profile, s.id) in pinnedTokens
-                    }
-                    val pinned = matches.filter(isPinned)
-                    // Two-tier tree: Profile → Workspace → rows, with collapsed groups already
-                    // pruned. The active profile sorts first.
-                    val tree = groupSessions(
-                        matches.filterNot(isPinned),
-                        collapsedGroups,
-                        activeProfile,
-                    )
+                Box(Modifier.fillMaxSize()) {
+                    when {
+                        state.loading -> com.hermes.client.ui.components.LoadingState()
+                        state.error != null -> com.hermes.client.ui.components.ErrorState(
+                            message = state.error!!,
+                            onRetry = { vm.refresh() },
+                        )
+                        state.sessions.isEmpty() && query.isBlank() && messageResults.isEmpty() ->
+                            com.hermes.client.ui.components.EmptyState(
+                                title = "No sessions yet",
+                                subtitle = "Start a conversation with the New button.",
+                                actionLabel = "New session",
+                                onAction = { scope.launch { vm.createSession()?.let { onOpen(it) } } },
+                            )
+                        else -> {
+                            val q = query.trim()
+                            val matches = if (q.isEmpty()) state.sessions
+                            else state.sessions.filter {
+                                it.title.contains(q, ignoreCase = true) ||
+                                    it.workspace.contains(q, ignoreCase = true)
+                            }
+                            val isPinned = { s: Session ->
+                                com.hermes.client.data.repository.PinStore.token(s.profile, s.id) in pinnedTokens
+                            }
+                            val pinned = matches.filter(isPinned)
+                            val recent = sessionsByRecency(matches.filterNot(isPinned))
 
-                    LazyColumn {
-                        // Gateway message-content search results (populated on the Search action).
-                        if (messageResults.isNotEmpty()) {
-                            item(key = "h-msg") { SectionHeader("Message matches", messageResults.size) }
-                            // No custom key: results are transient and snippets can collide
-                            // (duplicate/empty), which would crash the list. Index keys are safe.
-                            items(messageResults) { r ->
-                                ListItem(
-                                    headlineContent = {
-                                        Text(r.snippet?.take(140)?.replace("\n", " ") ?: r.sessionId)
-                                    },
-                                    supportingContent = { Text(r.model ?: r.role ?: "") },
-                                    modifier = Modifier.clickable { onOpen(r.sessionId) },
-                                )
-                                HorizontalDivider()
-                            }
-                        }
-                        // Hint when nothing matches by title — message search is one tap away.
-                        if (q.isNotEmpty() && matches.isEmpty() && messageResults.isEmpty()) {
-                            item(key = "no-title-match") {
-                                Text(
-                                    "No titles match \"$q\". Press search on the keyboard to search message text.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(16.dp),
-                                )
-                            }
-                        }
-                        if (pinned.isNotEmpty()) {
-                            // "Device only" makes clear pins live on this phone and don't sync to
-                            // the desktop app (the gateway has no pin concept).
-                            item(key = "h-pinned") { SectionHeader("Pinned", pinned.size, note = "Device only") }
-                            items(pinned, key = { "p-${it.id}" }) { s ->
-                                SessionRow(
-                                    session = s,
-                                    isPinned = true,
-                                    showProfile = true,
-                                    // Switch to the session's profile (awaited) before navigating,
-                                    // so the chat resumes against the right per-profile DB.
-                                    onOpen = { scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
-                                    onTogglePin = { vm.togglePin(s) },
-                                    onRename = { vm.rename(s, it) },
-                                    onArchive = { vm.archive(s) },
-                                    onDelete = { vm.delete(s) },
-                                    modifier = Modifier.animateItem(),
-                                )
-                            }
-                        }
-                        tree.forEach { pg ->
-                            item(key = "ph-${pg.profile}") {
-                                CollapsibleHeader(
-                                    label = pg.profile,
-                                    count = pg.count,
-                                    collapsed = pg.collapsed,
-                                    indent = false,
-                                    onToggle = {
-                                        vm.toggleGroup(
-                                            com.hermes.client.data.repository.GroupExpansionStore
-                                                .profileKey(pg.profile),
+                            LazyColumn {
+                                if (messageResults.isNotEmpty()) {
+                                    item(key = "h-msg") { SectionHeader("Message matches", messageResults.size) }
+                                    items(messageResults) { r ->
+                                        ListItem(
+                                            headlineContent = {
+                                                Text(r.snippet?.take(140)?.replace("\n", " ") ?: r.sessionId)
+                                            },
+                                            supportingContent = { Text(r.model ?: r.role ?: "") },
+                                            modifier = Modifier.clickable { onOpen(r.sessionId) },
                                         )
-                                    },
-                                )
-                            }
-                            pg.workspaces.forEach { wg ->
-                                item(key = "wh-${pg.profile}-${wg.workspace}") {
-                                    CollapsibleHeader(
-                                        label = wg.workspace,
-                                        count = wg.count,
-                                        collapsed = wg.collapsed,
-                                        indent = true,
-                                        onToggle = {
-                                            vm.toggleGroup(
-                                                com.hermes.client.data.repository.GroupExpansionStore
-                                                    .workspaceKey(pg.profile, wg.workspace),
-                                            )
-                                        },
-                                    )
+                                        HorizontalDivider()
+                                    }
                                 }
-                                items(wg.sessions, key = { it.id }) { s ->
-                                    SessionRow(
-                                        session = s,
-                                        isPinned = false,
-                                        showProfile = false,
-                                        onOpen = { scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
-                                        onTogglePin = { vm.togglePin(s) },
-                                        onRename = { vm.rename(s, it) },
-                                        onArchive = { vm.archive(s) },
-                                        onDelete = { vm.delete(s) },
-                                        modifier = Modifier.animateItem(),
-                                    )
+                                if (q.isNotEmpty() && matches.isEmpty() && messageResults.isEmpty()) {
+                                    item(key = "no-title-match") {
+                                        Text(
+                                            "No titles match \"$q\". Press search on the keyboard to search message text.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(16.dp),
+                                        )
+                                    }
+                                }
+                                if (pinned.isNotEmpty()) {
+                                    item(key = "h-pinned") { SectionHeader("Pinned", pinned.size, note = "Device only") }
+                                    items(pinned, key = { "p-${it.id}" }) { s ->
+                                        SessionRow(
+                                            session = s, isPinned = true, showProfile = true,
+                                            onOpen = { scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
+                                            onTogglePin = { vm.togglePin(s) },
+                                            onRename = { vm.rename(s, it) },
+                                            onArchive = { vm.archive(s) },
+                                            onDelete = { vm.delete(s) },
+                                            modifier = Modifier.animateItem(),
+                                        )
+                                    }
+                                }
+                                if (recent.isNotEmpty()) {
+                                    item(key = "h-recent") { SectionHeader("Recent", recent.size) }
+                                    items(recent, key = { it.id }) { s ->
+                                        SessionRow(
+                                            session = s, isPinned = false, showProfile = true,
+                                            onOpen = { scope.launch { vm.prepareOpen(s); onOpen(s.id) } },
+                                            onTogglePin = { vm.togglePin(s) },
+                                            onRename = { vm.rename(s, it) },
+                                            onArchive = { vm.archive(s) },
+                                            onDelete = { vm.delete(s) },
+                                            modifier = Modifier.animateItem(),
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-            }
         }
-    }
-}
-
-/**
- * A tap-to-collapse group header (profile = top tier, workspace = indented sub-tier). A leading
- * chevron shows the state; the whole row toggles. Profile labels read in caps; workspace labels
- * are indented and lighter so the two tiers are visually distinct.
- */
-@Composable
-private fun CollapsibleHeader(
-    label: String,
-    count: Int,
-    collapsed: Boolean,
-    indent: Boolean,
-    onToggle: () -> Unit,
-) {
-    androidx.compose.foundation.layout.Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(
-                start = if (indent) 28.dp else 16.dp,
-                end = 16.dp,
-                top = if (indent) 6.dp else 16.dp,
-                bottom = 4.dp,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            if (collapsed) Icons.Rounded.ChevronRight else Icons.Rounded.ExpandMore,
-            contentDescription = if (collapsed) "Expand" else "Collapse",
-            tint = if (indent) MaterialTheme.colorScheme.onSurfaceVariant
-            else LocalProfileAccent.current.accent,
-            modifier = Modifier.padding(end = 8.dp).size(18.dp),
-        )
-        Text(
-            if (indent) label else label.uppercase(),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (indent) MaterialTheme.colorScheme.onSurfaceVariant
-            else LocalProfileAccent.current.accent,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            count.toString(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

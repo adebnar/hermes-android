@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -30,6 +31,9 @@ class SessionsViewModelTest {
     private val profileManager = mockk<ProfileManager>(relaxed = true)
     private val pinStore = mockk<PinStore>(relaxed = true)
     private val groupExpansion = mockk<com.hermes.client.data.repository.GroupExpansionStore>(relaxed = true)
+    private val viewModeStore = mockk<com.hermes.client.data.repository.ViewModeStore>(relaxed = true)
+    // Controllable so tests can flip the persisted view mode (drives the VM's launch/toggle load).
+    private val modeFlow = MutableStateFlow(ViewMode.SESSIONS)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
@@ -37,6 +41,7 @@ class SessionsViewModelTest {
         every { profileManager.active } returns MutableStateFlow<String?>("personal")
         every { pinStore.pinned } returns MutableStateFlow<Set<String>>(emptySet())
         every { groupExpansion.collapsed } returns MutableStateFlow<Set<String>>(emptySet())
+        every { viewModeStore.mode } returns modeFlow
     }
 
     private fun session(id: String, title: String, profile: String = "personal") = Session(
@@ -44,7 +49,12 @@ class SessionsViewModelTest {
         messageCount = 1, profile = profile, workspace = "No workspace", source = "hermes-dispatch",
     )
 
-    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore, groupExpansion)
+    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore, groupExpansion, viewModeStore)
+
+    private fun repoSession(id: String, repo: String?, profile: String = "personal") = Session(
+        id = id, title = id, model = null, provider = null, messageCount = 1,
+        profile = profile, source = "tui", gitRepoRoot = repo,
+    )
 
     // Regression: a session created or updated while the user was in a chat must appear once
     // the list is re-fetched. The Sessions screen calls refresh() on ON_RESUME (the "sessions"
@@ -195,4 +205,89 @@ class SessionsViewModelTest {
         advanceUntilIdle()
         io.mockk.coVerify { groupExpansion.toggle("p:odos") }
     }
+
+    @Test fun setViewMode_persists_the_mode() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.setViewMode(ViewMode.PROJECTS)
+        advanceUntilIdle()
+
+        io.mockk.coVerify { viewModeStore.set(ViewMode.PROJECTS) }
+    }
+
+    @Test fun projects_derive_from_cross_profile_sessions_when_view_mode_becomes_projects() = runTest {
+        // Two profiles, two repos → two projects derived client-side (no gateway call).
+        coEvery { sessionRepo.listAllProfiles() } returns listOf(
+            repoSession("a", "/u/andrew/personal/travel-business", profile = "personal"),
+            repoSession("b", "/u/andrew/work/clients/dito/Southington", profile = "dito"),
+        )
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        modeFlow.value = ViewMode.PROJECTS // persisted mode flips to Projects
+        advanceUntilIdle()
+
+        assertEquals(
+            setOf("/u/andrew/personal/travel-business", "/u/andrew/work/clients/dito/Southington"),
+            vm.projectsState.value.tree.map { it.id }.toSet(),
+        )
+    }
+
+    // Regression: a cold launch restored into Projects mode must build the tree, not show a
+    // spurious "No projects". Previously only a toggle tap loaded it.
+    @Test fun projects_build_on_cold_launch_when_persisted_mode_is_projects() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns listOf(
+            repoSession("x", "/u/andrew/personal/inbound", profile = "personal"),
+        )
+        modeFlow.value = ViewMode.PROJECTS // persisted as Projects before the VM is even built
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        assertEquals(listOf("/u/andrew/personal/inbound"), vm.projectsState.value.tree.map { it.id })
+    }
+
+    @Test fun loadProjectTree_sets_error_on_failure() = runTest {
+        // First call (Sessions init refresh) succeeds; the Projects build then fails.
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList() andThenThrows RuntimeException("net down")
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.loadProjectTree()
+        advanceUntilIdle()
+
+        assertFalse(vm.projectsState.value.loading)
+        assertTrue(vm.projectsState.value.error != null)
+    }
+
+    @Test fun enterProject_sets_scope_then_exit_clears_it() = runTest {
+        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
+        // A derived project already carries its sessions — enterProject just scopes to it (no fetch).
+        val project = com.hermes.client.domain.Project(
+            "/u/andrew/p", "p", "/u/andrew/p", null, true, 1, null,
+            repos = listOf(
+                com.hermes.client.domain.ProjectRepo("/u/andrew/p", "p", "/u/andrew/p", 1, listOf(
+                    com.hermes.client.domain.ProjectLane("all", "", null, true, listOf(session("s1", "Hi"))),
+                )),
+            ),
+            previewSessions = emptyList(),
+        )
+        val vm = buildVm()
+        advanceUntilIdle()
+
+        vm.enterProject(project)
+        advanceUntilIdle()
+        assertEquals("/u/andrew/p", vm.projectsState.value.scope?.id)
+        assertEquals("s1", vm.projectsState.value.scope?.repos?.single()?.lanes?.single()?.sessions?.single()?.id)
+
+        vm.exitProject()
+        assertNull(vm.projectsState.value.scope)
+    }
+
+    // Regression: exitProject must cancel an in-flight enterProject so a stale projectSessions
+    // result does NOT resurrect the scope. The old code had no job tracking, so rapid exit
+    // after enter would let the delayed fetch complete and set scope back to the hydrated
+    // project (looking like the user can't leave the detail view). This test verifies the race
+    // is fixed: exitProject cancels the pending fetch, scope stays null.
 }

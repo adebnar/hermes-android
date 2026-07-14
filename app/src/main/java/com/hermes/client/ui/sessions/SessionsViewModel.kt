@@ -9,6 +9,8 @@ import com.hermes.client.data.repository.GroupExpansionStore
 import com.hermes.client.data.repository.PinStore
 import com.hermes.client.data.repository.ProfileManager
 import com.hermes.client.data.repository.SessionRepository
+import com.hermes.client.data.repository.ViewModeStore
+import com.hermes.client.domain.Project
 import com.hermes.client.domain.Session
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +30,14 @@ data class SessionsUiState(
     val unauthorized: Boolean = false,
 )
 
+/** Projects-mode state: [tree] is the overview; [scope] is the drilled-in hydrated project (null = overview). */
+data class ProjectsUiState(
+    val tree: List<Project> = emptyList(),
+    val loading: Boolean = false,
+    val error: String? = null,
+    val scope: Project? = null,
+)
+
 @HiltViewModel
 class SessionsViewModel @Inject constructor(
     private val sessions: SessionRepository,
@@ -35,6 +45,7 @@ class SessionsViewModel @Inject constructor(
     private val profileManager: ProfileManager,
     private val pinStore: PinStore,
     private val groupExpansion: GroupExpansionStore,
+    private val viewModeStore: ViewModeStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SessionsUiState())
     val state: StateFlow<SessionsUiState> = _state.asStateFlow()
@@ -67,6 +78,50 @@ class SessionsViewModel @Inject constructor(
     /** Collapse or expand a group (profile or workspace) by its [GroupExpansionStore] key. */
     fun toggleGroup(groupKey: String) = viewModelScope.launch { groupExpansion.toggle(groupKey) }
 
+    /** Persisted view mode (Sessions flat list vs the gateway project tree). */
+    val viewMode: StateFlow<ViewMode> =
+        viewModeStore.mode.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ViewMode.SESSIONS)
+
+    private val _projects = MutableStateFlow(ProjectsUiState())
+    val projectsState: StateFlow<ProjectsUiState> = _projects.asStateFlow()
+
+    /** Persist the chosen view mode; the [viewMode] observer in init fetches the tree when needed. */
+    fun setViewMode(mode: ViewMode) {
+        viewModelScope.launch { viewModeStore.set(mode) }
+    }
+
+    private var projectTreeJob: Job? = null
+
+    /** Build the project overview (also the retry entry point). Latest-wins like [refresh]. */
+    fun loadProjectTree() {
+        projectTreeJob?.cancel()
+        projectTreeJob = viewModelScope.launch {
+            _projects.value = _projects.value.copy(loading = true, error = null)
+            try {
+                // Stopgap: derive Projects from the cross-profile session list (all profiles),
+                // because the gateway's projects.tree is pinned to the launch profile and can't
+                // serve a selected tenant's projects. Re-wire to a per-profile gateway RPC (see
+                // ProjectsRepository) once the gateway accepts a `profile` param.
+                val derived = deriveProjectsFromSessions(sessions.listAllProfiles())
+                _projects.value = _projects.value.copy(loading = false, tree = derived)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _projects.value = _projects.value.copy(loading = false, error = e.message ?: "Failed to load projects")
+            }
+        }
+    }
+
+    /** Drill into a project. Derived projects already carry all their sessions — no fetch needed. */
+    fun enterProject(project: Project) {
+        _projects.value = _projects.value.copy(scope = project)
+    }
+
+    /** Return to the project overview. */
+    fun exitProject() {
+        _projects.value = _projects.value.copy(scope = null)
+    }
+
     init {
         chat.connect()
         viewModelScope.launch { profileManager.refresh() }
@@ -78,6 +133,17 @@ class SessionsViewModel @Inject constructor(
         // This VM stays in the back stack while a chat is open, so it catches the event live.
         viewModelScope.launch {
             chat.events.collect { if (it.type == "session.title") refresh() }
+        }
+        // Fetch the project tree whenever Projects becomes the active view without a loaded tree.
+        // Covers both the toggle tap AND a cold launch restored into Projects mode (persisted) —
+        // the launch case previously never called loadProjectTree, so Projects showed a spurious
+        // "No projects" until the user toggled.
+        viewModelScope.launch {
+            viewModeStore.mode.collect { mode ->
+                if (mode == ViewMode.PROJECTS && _projects.value.tree.isEmpty() && !_projects.value.loading) {
+                    loadProjectTree()
+                }
+            }
         }
     }
 

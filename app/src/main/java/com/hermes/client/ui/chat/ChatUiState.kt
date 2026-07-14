@@ -1,13 +1,20 @@
 package com.hermes.client.ui.chat
 
 import com.hermes.client.data.network.ServerEvent
+import com.hermes.client.data.network.bool
 import com.hermes.client.data.network.str
+import com.hermes.client.data.network.strList
 import com.hermes.client.domain.ChatMessage
 import com.hermes.client.domain.Role
 import com.hermes.client.domain.ToolCall
 import com.hermes.client.domain.ToolStatus
 
-data class ApprovalRequest(val prompt: String)
+data class ApprovalRequest(
+    val command: String,
+    val description: String,
+    val patternKeys: List<String>,
+    val allowPermanent: Boolean,
+)
 data class ClarifyRequest(val question: String, val options: List<String>)
 
 data class ChatUiState(
@@ -28,7 +35,8 @@ fun ChatUiState.withUserMessage(text: String): ChatUiState =
 
 
 /** Pure reducer: folds one server event into the chat state. */
-fun reduce(state: ChatUiState, event: ServerEvent): ChatUiState {
+fun ChatUiState.reduce(event: ServerEvent): ChatUiState {
+    val state = this
     // Targets the last STREAMING assistant message.
     fun mutateLastAssistant(block: (ChatMessage) -> ChatMessage): ChatUiState {
         val idx = state.messages.indexOfLast { it.role == Role.ASSISTANT && it.isStreaming }
@@ -83,7 +91,15 @@ fun reduce(state: ChatUiState, event: ServerEvent): ChatUiState {
                 if (it.id == tid) it.copy(status = ToolStatus.DONE, output = event.str("result") ?: "") else it
             })
         }
-        "approval.request" -> state.copy(pendingApproval = ApprovalRequest(event.str("prompt") ?: ""))
+        "approval.request" -> state.copy(
+            pendingApproval = ApprovalRequest(
+                command = event.str("command") ?: "",
+                description = event.str("description") ?: "",
+                patternKeys = event.strList("pattern_keys")
+                    .ifEmpty { event.str("pattern_key")?.let { listOf(it) } ?: emptyList() },
+                allowPermanent = event.bool("allow_permanent") ?: false,
+            ),
+        )
         "clarify.request" -> state.copy(
             pendingClarify = ClarifyRequest(event.str("question") ?: "", emptyList()),
         )
