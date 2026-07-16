@@ -30,7 +30,6 @@ class SessionsViewModelTest {
     private val chatRepo = mockk<ChatRepository>(relaxed = true)
     private val profileManager = mockk<ProfileManager>(relaxed = true)
     private val pinStore = mockk<PinStore>(relaxed = true)
-    private val groupExpansion = mockk<com.hermes.client.data.repository.GroupExpansionStore>(relaxed = true)
     private val viewModeStore = mockk<com.hermes.client.data.repository.ViewModeStore>(relaxed = true)
     // Controllable so tests can flip the persisted view mode (drives the VM's launch/toggle load).
     private val modeFlow = MutableStateFlow(ViewMode.SESSIONS)
@@ -40,7 +39,6 @@ class SessionsViewModelTest {
         every { chatRepo.events } returns kotlinx.coroutines.flow.MutableSharedFlow()
         every { profileManager.active } returns MutableStateFlow<String?>("personal")
         every { pinStore.pinned } returns MutableStateFlow<Set<String>>(emptySet())
-        every { groupExpansion.collapsed } returns MutableStateFlow<Set<String>>(emptySet())
         every { viewModeStore.mode } returns modeFlow
     }
 
@@ -49,7 +47,7 @@ class SessionsViewModelTest {
         messageCount = 1, profile = profile, workspace = "No workspace", source = "hermes-dispatch",
     )
 
-    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore, groupExpansion, viewModeStore)
+    private fun buildVm() = SessionsViewModel(sessionRepo, chatRepo, profileManager, pinStore, viewModeStore)
 
     private fun repoSession(id: String, repo: String?, profile: String = "personal") = Session(
         id = id, title = id, model = null, provider = null, messageCount = 1,
@@ -193,17 +191,6 @@ class SessionsViewModelTest {
         vm.prepareOpen(session("s1", "mine", profile = "personal"))
         advanceUntilIdle()
         io.mockk.coVerify(exactly = 0) { profileManager.switchTo(any()) }
-    }
-
-    // T2: toggling a group delegates to the persisted store (collapse state survives navigation).
-    @Test fun toggleGroup_persists_via_store() = runTest {
-        coEvery { sessionRepo.listAllProfiles() } returns emptyList()
-        val vm = buildVm()
-        advanceUntilIdle()
-
-        vm.toggleGroup("p:odos")
-        advanceUntilIdle()
-        io.mockk.coVerify { groupExpansion.toggle("p:odos") }
     }
 
     @Test fun setViewMode_persists_the_mode() = runTest {
