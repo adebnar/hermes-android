@@ -143,13 +143,6 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideGroupExpansionStore(
-        @ApplicationContext context: Context,
-    ): com.hermes.client.data.repository.GroupExpansionStore =
-        com.hermes.client.data.repository.GroupExpansionStore(context)
-
-    @Provides
-    @Singleton
     fun provideViewModeStore(
         @ApplicationContext context: Context,
     ): com.hermes.client.data.repository.ViewModeStore =

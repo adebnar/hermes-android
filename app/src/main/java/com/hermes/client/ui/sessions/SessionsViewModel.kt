@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.hermes.client.data.network.HermesApiException
 import com.hermes.client.data.network.SearchResultDto
 import com.hermes.client.data.repository.ChatRepository
-import com.hermes.client.data.repository.GroupExpansionStore
 import com.hermes.client.data.repository.PinStore
 import com.hermes.client.data.repository.ProfileManager
 import com.hermes.client.data.repository.SessionRepository
@@ -44,7 +43,6 @@ class SessionsViewModel @Inject constructor(
     private val chat: ChatRepository,
     private val profileManager: ProfileManager,
     private val pinStore: PinStore,
-    private val groupExpansion: GroupExpansionStore,
     private val viewModeStore: ViewModeStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SessionsUiState())
@@ -70,13 +68,6 @@ class SessionsViewModel @Inject constructor(
     /** True if [session] is pinned, keyed by the session's own profile. */
     fun isPinned(session: Session, tokens: Set<String> = pinnedTokens.value): Boolean =
         PinStore.token(session.profile, session.id) in tokens
-
-    /** Keys of currently-collapsed Profile/Workspace groups (device-local; default expanded). */
-    val collapsedGroups: StateFlow<Set<String>> =
-        groupExpansion.collapsed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
-
-    /** Collapse or expand a group (profile or workspace) by its [GroupExpansionStore] key. */
-    fun toggleGroup(groupKey: String) = viewModelScope.launch { groupExpansion.toggle(groupKey) }
 
     /** Persisted view mode (Sessions flat list vs the gateway project tree). */
     val viewMode: StateFlow<ViewMode> =
