@@ -64,6 +64,19 @@ class GatewayHealthMonitorTest {
         io.mockk.coVerify(exactly = 1) { api.gatewayStatus() }
     }
 
+    @Test fun genuine_cancellation_propagates_and_does_not_mark_unreachable() = runTest {
+        coEvery { api.gatewayStatus() } throws kotlinx.coroutines.CancellationException("cancelled")
+        val m = GatewayHealthMonitor(api, FakeConnectivity(true), MutableStateFlow(ConnectionState.Connected), backgroundScope)
+        var threw = false
+        try {
+            m.probe()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            threw = true
+        }
+        assertTrue(threw)
+        assertTrue(m.health.value is GatewayHealth.Unknown) // never set to a down state
+    }
+
     @Test fun recovery_from_unreachable_to_healthy() = runTest {
         (coEvery { api.gatewayStatus() } throws RuntimeException("down")).andThenThrows(RuntimeException("down")).andThen(ok())
         val m = GatewayHealthMonitor(api, FakeConnectivity(true), MutableStateFlow(ConnectionState.Connected), backgroundScope)

@@ -3,8 +3,10 @@ package com.hermes.client.data.network
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,8 +87,12 @@ class GatewayHealthMonitor(
         } catch (e: HermesApiException) {
             // 401 is a definitive answer (reachable but unauthorized) — do not retry.
             if (e.code == 401) GatewayHealth.GatewayUnreachable("unauthorized") else null
+        } catch (e: TimeoutCancellationException) {
+            null // probe timed out — retryable
+        } catch (e: CancellationException) {
+            throw e // genuine cancellation (e.g. stopForeground) — never swallow
         } catch (e: Exception) {
-            null // timeout / IO — retryable
+            null // IO / other — retryable
         }
     }
 
