@@ -33,6 +33,7 @@ class ChatViewModel @Inject constructor(
     private val profileManager: ProfileManager,
     private val favoritesStore: com.hermes.client.data.repository.ModelFavoritesStore,
     private val pendingShareStore: com.hermes.client.share.PendingShareStore,
+    private val tts: com.hermes.client.data.tts.TextToSpeechController,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChatUiState.empty())
@@ -65,6 +66,15 @@ class ChatViewModel @Inject constructor(
 
     val favorites: kotlinx.coroutines.flow.StateFlow<Set<String>> =
         favoritesStore.favorites.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** True while a response is being read aloud. */
+    val speaking: kotlinx.coroutines.flow.StateFlow<Boolean> = tts.speaking
+
+    /** Read [text] aloud (markdown stripped for cleaner speech). */
+    fun readAloud(text: String) = tts.speak(speechText(text))
+
+    /** Stop any current read-aloud. */
+    fun stopReading() = tts.stop()
 
     data class ModelSheetUi(
         val query: String = "",

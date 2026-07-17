@@ -212,4 +212,11 @@ object AppModule {
     @Singleton
     fun provideEnvRepository(rest: HermesRestApi): com.hermes.client.data.repository.EnvRepository =
         com.hermes.client.data.repository.EnvRepository(rest)
+
+    @Provides
+    @Singleton
+    fun provideTextToSpeechController(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.data.tts.TextToSpeechController =
+        com.hermes.client.data.tts.AndroidTtsManager(context)
 }
