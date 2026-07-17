@@ -255,6 +255,7 @@ private fun AssistantTurn(
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
+    val speakable = remember(msg.text) { speechText(msg.text).isNotBlank() }
     val accent = LocalProfileAccent.current.accent
     val hlShape = RoundedCornerShape(12.dp)
     Box {
@@ -308,7 +309,7 @@ private fun AssistantTurn(
                     onClick = { onRegenerate(); menuOpen = false },
                 )
             }
-            if (msg.text.isNotBlank() && !msg.isError) {
+            if (speakable && !msg.isError) {
                 DropdownMenuItem(
                     text = { Text(if (isSpeaking) "Stop" else "Read aloud") },
                     onClick = {
