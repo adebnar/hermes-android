@@ -35,6 +35,7 @@ class ChatViewModel @Inject constructor(
     private val pendingShareStore: com.hermes.client.share.PendingShareStore,
     private val tts: com.hermes.client.data.tts.TextToSpeechController,
     private val promptStore: com.hermes.client.data.repository.PromptStore,
+    private val configRepo: com.hermes.client.data.repository.ConfigRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChatUiState.empty())
@@ -338,5 +339,33 @@ class ChatViewModel @Inject constructor(
 
     fun selectProfile(name: String) {
         viewModelScope.launch { runCatching { profileRepo.setActive(name) } }
+    }
+
+    data class PersonaUi(
+        val personas: List<Persona> = emptyList(),
+        val active: String? = null,
+        val loading: Boolean = false,
+        val error: String? = null,
+    )
+    private val _personaUi = MutableStateFlow(PersonaUi())
+    val personaUi: StateFlow<PersonaUi> = _personaUi.asStateFlow()
+
+    /** Fetch the profile's configured personalities (called when the persona sheet opens). */
+    fun loadPersonas() {
+        _personaUi.value = _personaUi.value.copy(loading = true, error = null)
+        viewModelScope.launch {
+            runCatching { configRepo.get(profileManager.active.value) }
+                .onSuccess { cfg -> _personaUi.value = PersonaUi(parsePersonas(cfg), activePersonaOf(cfg)) }
+                .onFailure { _personaUi.value = _personaUi.value.copy(loading = false, error = "Couldn't load personas") }
+        }
+    }
+
+    /** Apply a persona to this session (null / "none" clears it). */
+    fun setPersona(name: String?) {
+        val wire = name?.takeIf { it.isNotBlank() && !it.equals("none", true) } ?: "none"
+        viewModelScope.launch {
+            runCatching { chat.slashExec(sessionId, "/personality $wire") }
+                .onSuccess { _personaUi.value = _personaUi.value.copy(active = if (wire == "none") null else wire) }
+        }
     }
 }
