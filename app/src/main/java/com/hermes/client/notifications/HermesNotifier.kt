@@ -95,7 +95,9 @@ class HermesNotifier(private val context: Context) {
         // The intent is explicit (our own receiver), so it can't be redirected — mutability is safe.
         return PendingIntent.getBroadcast(
             context,
-            (a.action + a.sessionId).hashCode(),
+            // Distinct namespace from actionIntent()'s button request code so a reply (MUTABLE) and a
+            // button (IMMUTABLE) can never share PendingIntent identity (would crash on Android 12+).
+            ("reply:" + a.action + a.sessionId).hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
