@@ -10,6 +10,19 @@
 
 ---
 
+## Correction (post-implementation review)
+
+The final review found the original mechanism below was **wrong**: a `clarify.request` is a *blocking* agent park on the gateway that is answered only by **`clarify.respond` with the event's `request_id`**. `prompt.submit` (originally specified) hits the gateway's busy handler while the turn is `running` — it **abandons the parked question and posts a disconnected new turn**. The review also found the *existing* in-app clarify path (`ChatRepository.respondClarify`) already omits `request_id` and fails with gateway error 4009 — a pre-existing bug.
+
+**Corrected mechanism (client-only; the `clarify.request` event carries `request_id`, added by the gateway's `_block`):** thread `request_id` end-to-end so the inline reply answers via `clarify.respond`, which also repairs the in-app bug:
+- `ClarifyRequest` gains `requestId`; the `clarify.request` reducer captures `event.str("request_id")`.
+- `ChatRepository.respondClarify(sessionId, requestId, answer)` sends `request_id`; `ChatViewModel.clarify` passes `pendingClarify.requestId`.
+- `NotifAction` gains `requestId`; the mapper's clarify action carries it; `HermesNotifier` puts it as a `request_id` intent extra; `NotificationActionReceiver` reads it and calls `chat.respondClarify(sid, requestId, text)` (not `submit`).
+
+The **Approve-for-session** half of this spec is unaffected and correct. Where the sections below say `prompt.submit`/`chat.submit` for the reply, read `clarify.respond`/`respondClarify(sid, requestId, text)`.
+
+---
+
 ## Scope (locked)
 
 - **Reply** action on `clarify.request` ("Needs your input") notifications — today they carry no actions, only tap-to-open. Android `RemoteInput` → headless `prompt.submit`.
