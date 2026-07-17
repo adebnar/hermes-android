@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.RemoteInput
 import com.hermes.client.MainActivity
 import com.hermes.client.R
 
@@ -49,7 +50,16 @@ class HermesNotifier(private val context: Context) {
             .setGroup(spec.groupKey)
             .setContentIntent(openIntent(spec.route, spec.id))
         spec.actions.forEach { a ->
-            b.addAction(0, a.label, actionIntent(a, spec.id))
+            if (a.reply) {
+                val remoteInput = RemoteInput.Builder(Notif.KEY_REPLY_TEXT).setLabel("Reply…").build()
+                val action = NotificationCompat.Action.Builder(0, a.label, replyIntent(a, spec.id))
+                    .addRemoteInput(remoteInput)
+                    .setAllowGeneratedReplies(false)
+                    .build()
+                b.addAction(action)
+            } else {
+                b.addAction(0, a.label, actionIntent(a, spec.id))
+            }
         }
         if (mgr.areNotificationsEnabled()) {
             mgr.notify(spec.id, b.build())
@@ -73,6 +83,25 @@ class HermesNotifier(private val context: Context) {
             putExtra("notif_id", notifId)
         }
         return PendingIntent.getBroadcast(context, (a.action + a.sessionId).hashCode(), intent, pendingFlags())
+    }
+
+    private fun replyIntent(a: NotifAction, notifId: Int): PendingIntent {
+        val intent = Intent(context, NotificationActionReceiver::class.java).apply {
+            action = a.action
+            putExtra("session_id", a.sessionId)
+            putExtra("notif_id", notifId)
+            putExtra("request_id", a.requestId.orEmpty())
+        }
+        // Direct-reply requires FLAG_MUTABLE so the system can attach the RemoteInput results.
+        // The intent is explicit (our own receiver), so it can't be redirected — mutability is safe.
+        return PendingIntent.getBroadcast(
+            context,
+            // Distinct namespace from actionIntent()'s button request code so a reply (MUTABLE) and a
+            // button (IMMUTABLE) can never share PendingIntent identity (would crash on Android 12+).
+            ("reply:" + a.action + a.sessionId).hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+        )
     }
 
     private fun pendingFlags() = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

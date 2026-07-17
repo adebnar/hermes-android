@@ -15,7 +15,7 @@ data class ApprovalRequest(
     val patternKeys: List<String>,
     val allowPermanent: Boolean,
 )
-data class ClarifyRequest(val question: String, val options: List<String>)
+data class ClarifyRequest(val question: String, val options: List<String>, val requestId: String = "")
 
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -101,7 +101,9 @@ fun ChatUiState.reduce(event: ServerEvent): ChatUiState {
             ),
         )
         "clarify.request" -> state.copy(
-            pendingClarify = ClarifyRequest(event.str("question") ?: "", emptyList()),
+            pendingClarify = ClarifyRequest(
+                event.str("question") ?: "", emptyList(), event.str("request_id") ?: "",
+            ),
         )
         "error" -> state.copy(
             messages = state.messages + ChatMessage(

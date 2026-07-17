@@ -103,6 +103,13 @@ class ChatReducerTest {
         assertEquals("rm -rf?", s.pendingApproval?.command)
     }
 
+    @Test fun clarify_request_captures_request_id() {
+        var s = ChatUiState.empty()
+        s = s.reduce(ev("clarify.request") { put("question", "Which repo?"); put("request_id", "req-9") })
+        assertEquals("Which repo?", s.pendingClarify?.question)
+        assertEquals("req-9", s.pendingClarify?.requestId)
+    }
+
     @Test fun thinking_delta_accumulates() {
         var s = ChatUiState.empty()
         s = s.reduce(ev("message.start") { put("message_id", "a1") })
