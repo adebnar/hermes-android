@@ -40,6 +40,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
@@ -56,7 +57,9 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.AnnotatedString
 import kotlinx.coroutines.launch
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -159,6 +162,8 @@ fun ChatScreen(
 
     // Image attach: read picked/captured bytes and stage them onto the session.
     val context = androidx.compose.ui.platform.LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    var transcriptMenu by remember { mutableStateOf(false) }
     val attachScope = androidx.compose.runtime.rememberCoroutineScope()
 
     fun readBytes(uri: Uri): ByteArray? =
@@ -266,6 +271,55 @@ fun ChatScreen(
                         ),
                     )
                     StatusDot(connState)
+                    Box {
+                        IconButton(onClick = { transcriptMenu = true }) {
+                            Icon(
+                                Icons.Rounded.MoreVert,
+                                contentDescription = "More",
+                                tint = com.hermes.client.ui.components.AccentChrome.onBar,
+                            )
+                        }
+                        DropdownMenu(expanded = transcriptMenu, onDismissRequest = { transcriptMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Copy transcript") },
+                                onClick = {
+                                    val t = transcriptText(state.messages)
+                                    if (t.isBlank()) {
+                                        android.widget.Toast.makeText(context, "Nothing to export yet", android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        runCatching {
+                                            clipboard.setText(AnnotatedString(t))
+                                            android.widget.Toast.makeText(context, "Transcript copied", android.widget.Toast.LENGTH_SHORT).show()
+                                        }.onFailure {
+                                            android.widget.Toast.makeText(context, "Couldn't copy transcript", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    transcriptMenu = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Share transcript") },
+                                onClick = {
+                                    val t = transcriptText(state.messages)
+                                    if (t.isBlank()) {
+                                        android.widget.Toast.makeText(context, "Nothing to export yet", android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(android.content.Intent.EXTRA_SUBJECT, "Hermes chat transcript")
+                                            putExtra(android.content.Intent.EXTRA_TEXT, t)
+                                        }
+                                        runCatching {
+                                            context.startActivity(android.content.Intent.createChooser(send, "Share transcript"))
+                                        }.onFailure {
+                                            android.widget.Toast.makeText(context, "Couldn't share transcript", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    transcriptMenu = false
+                                },
+                            )
+                        }
+                    }
                 },
             )
         },
