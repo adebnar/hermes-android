@@ -22,4 +22,4 @@ private val pairingJson = Json { ignoreUnknownKeys = true }
 fun parsePairingPayload(raw: String): PairingPayload? =
     runCatching { pairingJson.decodeFromString<PairingPayload>(raw) }
         .getOrNull()
-        ?.takeIf { it.v == 1 && it.url.isNotBlank() }
+        ?.takeIf { it.v == 1 && (it.url.startsWith("http://") || it.url.startsWith("https://")) }

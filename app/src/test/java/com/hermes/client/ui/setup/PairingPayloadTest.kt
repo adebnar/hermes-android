@@ -39,4 +39,9 @@ class PairingPayloadTest {
         assertNull(parsePairingPayload("""{"v":1,"url":""}"""))
         assertNull(parsePairingPayload("""{"v":1}"""))
     }
+
+    @Test fun rejects_non_url() {
+        assertNull(parsePairingPayload("""{"v":1,"url":"hello"}"""))
+        assertNull(parsePairingPayload("""{"v":1,"url":"ftp://h"}"""))
+    }
 }
