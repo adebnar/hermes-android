@@ -105,6 +105,23 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideConnectivityChecker(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.data.network.ConnectivityChecker =
+        com.hermes.client.data.network.AndroidConnectivityChecker(context)
+
+    @Provides
+    @Singleton
+    fun provideGatewayHealthMonitor(
+        api: HermesRestApi,
+        connectivity: com.hermes.client.data.network.ConnectivityChecker,
+        client: HermesGatewayClient,
+        scope: CoroutineScope,
+    ): com.hermes.client.data.network.GatewayHealthMonitor =
+        com.hermes.client.data.network.GatewayHealthMonitor(api, connectivity, client.connectionState, scope)
+
+    @Provides
+    @Singleton
     fun provideChatRepository(client: HermesGatewayClient): ChatRepository =
         ChatRepository(client)
 

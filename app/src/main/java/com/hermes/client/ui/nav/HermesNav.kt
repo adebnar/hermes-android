@@ -1,28 +1,47 @@
 package com.hermes.client.ui.nav
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.hermes.client.data.network.isUnhealthy
 import com.hermes.client.ui.admin.SessionAdminScreen
 import com.hermes.client.ui.chat.ChatScreen
+import com.hermes.client.ui.components.HealthSheet
+import com.hermes.client.ui.components.HealthStrip
 import com.hermes.client.ui.cron.CronDetailScreen
 import com.hermes.client.ui.cron.CronEditScreen
 import com.hermes.client.ui.cron.CronScreen
@@ -75,6 +94,24 @@ fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsu
     val backStackEntry by nav.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
 
+    val shellVm: ShellViewModel = hiltViewModel()
+    val health by shellVm.health.collectAsStateWithLifecycle()
+    var showHealthSheet by rememberSaveable { mutableStateOf(false) }
+
+    // Probe only while the app is foregrounded (in-app-only v1). ProcessLifecycleOwner replays its
+    // current state on addObserver, so ON_START fires immediately if already foregrounded.
+    DisposableEffect(Unit) {
+        val obs = LifecycleEventObserver { _, e ->
+            when (e) {
+                Lifecycle.Event.ON_START -> shellVm.onAppForeground()
+                Lifecycle.Event.ON_STOP -> shellVm.onAppBackground()
+                else -> {}
+            }
+        }
+        ProcessLifecycleOwner.get().lifecycle.addObserver(obs)
+        onDispose { ProcessLifecycleOwner.get().lifecycle.removeObserver(obs) }
+    }
+
     val onUnauthorized: () -> Unit = {
         nav.navigate("setup") { popUpTo(0) { inclusive = true } }
     }
@@ -106,7 +143,15 @@ fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsu
                         NavigationBarItem(
                             selected = route == tab.route,
                             onClick = { switchTab(tab.route) },
-                            icon = { Icon(tab.icon, contentDescription = tab.label) },
+                            icon = {
+                                if (tab.route == "you" && hasConfig && health.isUnhealthy()) {
+                                    BadgedBox(badge = { Badge() }) {
+                                        Icon(tab.icon, contentDescription = tab.label)
+                                    }
+                                } else {
+                                    Icon(tab.icon, contentDescription = tab.label)
+                                }
+                            },
                             label = { Text(tab.label) },
                         )
                     }
@@ -114,12 +159,20 @@ fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsu
             }
         },
     ) { padding ->
-        NavHost(
-            navController = nav,
-            startDestination = start,
-            // Only reserve space for the bottom bar; top/side insets are each screen's own job.
-            modifier = Modifier.padding(bottom = padding.calculateBottomPadding()),
-        ) {
+        Column(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
+            // Renders nothing when healthy. When shown it owns the status-bar inset, so the content
+            // below consumes that inset to avoid a second top gap under the strip.
+            if (hasConfig && health.isUnhealthy()) {
+                HealthStrip(health = health, onClick = { showHealthSheet = true })
+            }
+            val contentModifier =
+                if (hasConfig && health.isUnhealthy()) Modifier.weight(1f).consumeWindowInsets(WindowInsets.statusBars)
+                else Modifier.weight(1f)
+            NavHost(
+                navController = nav,
+                startDestination = start,
+                modifier = contentModifier,
+            ) {
             composable("setup") {
                 SetupScreen(
                     onSaved = {
@@ -222,6 +275,15 @@ fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsu
                 )
             }
             composable("agents_tools") { AgentsToolsScreen(onMenu = back) }
+            }
         }
+    }
+
+    if (showHealthSheet) {
+        HealthSheet(
+            health = health,
+            onRecheck = { shellVm.recheckHealth() },
+            onDismiss = { showHealthSheet = false },
+        )
     }
 }
