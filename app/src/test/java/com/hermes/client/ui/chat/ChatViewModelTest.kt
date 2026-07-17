@@ -40,6 +40,7 @@ class ChatViewModelTest {
     private val profileManager = mockk<com.hermes.client.data.repository.ProfileManager>(relaxed = true)
     private val favoritesStore = mockk<ModelFavoritesStore>(relaxed = true)
     private val pendingShareStore = com.hermes.client.share.PendingShareStore()
+    private val tts = mockk<com.hermes.client.data.tts.TextToSpeechController>(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
@@ -54,9 +55,10 @@ class ChatViewModelTest {
         coEvery { modelRepo.providers() } returns emptyList()
         coEvery { profileRepo.list() } returns emptyList()
         every { favoritesStore.favorites } returns MutableStateFlow(emptySet())
+        every { tts.speaking } returns MutableStateFlow(false)
     }
 
-    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager, favoritesStore, pendingShareStore)
+    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager, favoritesStore, pendingShareStore, tts)
 
     @Test fun streamed_delta_appears_in_state() = runTest {
         val vm = buildVm()
@@ -252,5 +254,17 @@ class ChatViewModelTest {
         advanceUntilIdle()
 
         coVerify { profileRepo.setActive("personal") }
+    }
+
+    @Test fun readAloud_speaks_markdown_stripped_text() {
+        val vm = buildVm()
+        vm.readAloud("**hi** `there`")
+        io.mockk.verify { tts.speak("hi there") }
+    }
+
+    @Test fun stopReading_stops_tts() {
+        val vm = buildVm()
+        vm.stopReading()
+        io.mockk.verify { tts.stop() }
     }
 }
