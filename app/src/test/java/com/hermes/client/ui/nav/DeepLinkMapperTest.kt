@@ -1,7 +1,9 @@
 package com.hermes.client.ui.nav
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DeepLinkMapperTest {
@@ -27,5 +29,18 @@ class DeepLinkMapperTest {
         assertNull(deepLinkRouteFor("http://tab/sessions")) // wrong scheme
         assertNull(deepLinkRouteFor(""))
         assertNull(deepLinkRouteFor("not a uri at all ::: %%%"))
+    }
+
+    @Test fun new_chat_link_recognised() {
+        assertTrue(isNewChatLink("hermes://new"))
+        assertTrue(isNewChatLink("HERMES://new"))
+    }
+
+    @Test fun non_new_links_are_false() {
+        assertFalse(isNewChatLink("hermes://new/x"))
+        assertFalse(isNewChatLink("hermes://tab/sessions"))
+        assertFalse(isNewChatLink("http://new"))
+        assertFalse(isNewChatLink(""))
+        assertFalse(isNewChatLink("garbage ::: %%"))
     }
 }

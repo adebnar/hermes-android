@@ -19,3 +19,11 @@ fun deepLinkRouteFor(raw: String): String? {
         else -> null
     }
 }
+
+/** True for a `hermes://new` link (widget "New chat"). Not a nav route — the caller runs createSession. */
+fun isNewChatLink(raw: String): Boolean {
+    val uri = runCatching { java.net.URI(raw) }.getOrNull() ?: return false
+    if (!"hermes".equals(uri.scheme, ignoreCase = true) || uri.host != "new") return false
+    val segs = uri.path.orEmpty().split('/').filter { it.isNotBlank() }
+    return segs.isEmpty()
+}
