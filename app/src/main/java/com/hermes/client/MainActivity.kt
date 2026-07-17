@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
      * already running still navigates; consumed by `HermesNav`'s `deepLinkRoute` param.
      */
     private var pendingRoute = mutableStateOf<String?>(null)
+    private val newChatInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -156,18 +157,23 @@ class MainActivity : ComponentActivity() {
     /** Create a fresh chat and navigate to it (widget "New chat" / hermes://new). No-op if unconfigured. */
     private fun openNewChat() {
         if (credentialStore.load() == null) return
+        if (!newChatInFlight.compareAndSet(false, true)) return // a create is already running — ignore repeat taps
         lifecycleScope.launch {
-            chat.connect() // idempotent; a cold start has no socket yet
-            runCatching {
-                profileManager.refresh() // load active profile so the session isn't orphaned to default
-                chat.createSession(profileManager.active.value)
-            }.onSuccess { id -> pendingRoute.value = "chat/$id" }
-                .onFailure { e ->
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-                    android.widget.Toast.makeText(
-                        this@MainActivity, "Couldn't start a chat", android.widget.Toast.LENGTH_SHORT,
-                    ).show()
-                }
+            try {
+                chat.connect() // idempotent; a cold start has no socket yet
+                runCatching {
+                    profileManager.refresh() // load active profile so the session isn't orphaned to default
+                    chat.createSession(profileManager.active.value)
+                }.onSuccess { id -> pendingRoute.value = "chat/$id" }
+                    .onFailure { e ->
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        android.widget.Toast.makeText(
+                            this@MainActivity, "Couldn't start a chat", android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+            } finally {
+                newChatInFlight.set(false)
+            }
         }
     }
 
