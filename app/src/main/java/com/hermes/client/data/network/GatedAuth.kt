@@ -69,12 +69,13 @@ class GatedAuth(
             put("username", cfg.username)
             put("password", cfg.password)
         }
-        val req = Request.Builder()
-            .url("${cfg.baseUrl.trimEnd('/')}/auth/password-login")
-            .post(json.encodeToString(JsonObject.serializer(), payload).toRequestBody(JSON_MEDIA))
-            .build()
-        val ok = runCatching { loginClient.newCall(req).execute().use { it.isSuccessful } }
-            .getOrDefault(false)
+        val ok = runCatching {
+            val req = Request.Builder()
+                .url("${cfg.baseUrl.trimEnd('/')}/auth/password-login")
+                .post(json.encodeToString(JsonObject.serializer(), payload).toRequestBody(JSON_MEDIA))
+                .build()
+            loginClient.newCall(req).execute().use { it.isSuccessful }
+        }.getOrDefault(false)
         DebugLog.log("ws", "gated login -> $ok")
         return ok
     }
@@ -108,11 +109,11 @@ class GatedAuth(
             put("username", username)
             put("password", password)
         }
-        val req = Request.Builder()
-            .url("${baseUrl.trimEnd('/')}/auth/password-login")
-            .post(json.encodeToString(JsonObject.serializer(), payload).toRequestBody(JSON_MEDIA))
-            .build()
         return runCatching {
+            val req = Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/auth/password-login")
+                .post(json.encodeToString(JsonObject.serializer(), payload).toRequestBody(JSON_MEDIA))
+                .build()
             OkHttpClient().newCall(req).execute().use { it.isSuccessful }
         }.getOrDefault(false)
     }

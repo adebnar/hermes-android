@@ -22,6 +22,7 @@ data class SetupUiState(
     val password: String = "",
     val testResult: String? = null,
     val saved: Boolean = false,
+    val scanError: String? = null,
 )
 
 @HiltViewModel
@@ -58,5 +59,23 @@ class SetupViewModel @Inject constructor(
         store.save(GatewayConfig(s.url, s.token, s.username.trim(), s.password))
         gatedAuth.cookieJar.clear()
         _state.value = _state.value.copy(saved = true)
+    }
+
+    /** Apply a scanned pairing QR: prefill the fields and auto-run the existing probe. */
+    fun applyPairing(raw: String) {
+        val p = parsePairingPayload(raw)
+        if (p == null) {
+            _state.value = _state.value.copy(scanError = "Not a Hermes pairing code")
+            return
+        }
+        _state.value = _state.value.copy(
+            url = p.url, token = p.token, username = p.username, password = p.password,
+            scanError = null, testResult = null,
+        )
+        test()
+    }
+
+    fun clearScanError() {
+        if (_state.value.scanError != null) _state.value = _state.value.copy(scanError = null)
     }
 }
