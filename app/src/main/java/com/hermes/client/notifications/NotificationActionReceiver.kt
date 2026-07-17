@@ -31,8 +31,9 @@ fun receiverActionFor(action: String?): ReceiverAction = when (action) {
 
 /**
  * Handles a notification action headlessly: Allow-once/Session/Deny → `approval.respond`; an inline
- * Reply → `prompt.submit`. Runs a single RPC on a background scope; only clears the notification
- * once the RPC succeeds, so a failed action isn't silently lost.
+ * Reply → `clarify.respond` (answers the pending clarify request, doesn't start a new turn). Runs a
+ * single RPC on a background scope; only clears the notification once the RPC succeeds, so a failed
+ * action isn't silently lost.
  */
 @AndroidEntryPoint
 class NotificationActionReceiver : BroadcastReceiver() {
@@ -57,7 +58,10 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     withTimeout(8_000) {
                         when (ra) {
                             is ReceiverAction.Approval -> chat.respondApproval(sid, ra.choice)
-                            ReceiverAction.Reply -> chat.submit(sid, replyText!!)
+                            ReceiverAction.Reply -> {
+                                val requestId = intent.getStringExtra("request_id").orEmpty()
+                                chat.respondClarify(sid, requestId, replyText!!)
+                            }
                             ReceiverAction.Unknown -> Unit // unreachable (returned above)
                         }
                     }

@@ -16,6 +16,7 @@ data class NotifAction(
     val action: String,
     val sessionId: String,
     val reply: Boolean = false,
+    val requestId: String? = null,
 )
 
 /** A platform-independent description of a notification, so mapping stays unit-testable. */

@@ -46,7 +46,7 @@ fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs, appInForegr
             id = id, channelId = Notif.CHANNEL_APPROVALS, title = "Needs your input",
             body = event.str("question") ?: "The agent has a question.",
             route = "chat/$sid",
-            actions = listOf(NotifAction("Reply", Notif.ACTION_REPLY, sid, reply = true)),
+            actions = listOf(NotifAction("Reply", Notif.ACTION_REPLY, sid, reply = true, requestId = event.str("request_id"))),
             groupKey = "approval",
         )
         // Run finished: `message.complete` is the end-of-turn event on /api/ws (the app also uses it

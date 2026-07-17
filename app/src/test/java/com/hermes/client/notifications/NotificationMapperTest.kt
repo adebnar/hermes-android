@@ -75,7 +75,7 @@ class NotificationMapperTest {
     }
 
     @Test fun clarify_notifies_with_question_regardless_of_foreground() {
-        val e = event(Notif.EVENT_CLARIFY, "c1", "question" to "Which repo?")
+        val e = event(Notif.EVENT_CLARIFY, "c1", "question" to "Which repo?", "request_id" to "req-9")
         val spec = toNotificationSpec(e, on, appInForeground = true)!!
         assertEquals("Needs your input", spec.title)
         assertEquals("Which repo?", spec.body)
@@ -86,6 +86,7 @@ class NotificationMapperTest {
         assertEquals("Reply", reply.label)
         assertTrue(reply.reply)
         assertEquals("c1", reply.sessionId)
+        assertEquals("req-9", reply.requestId)
     }
 
     @Test fun clarify_off_when_approvals_off() {

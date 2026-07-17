@@ -90,6 +90,7 @@ class HermesNotifier(private val context: Context) {
             action = a.action
             putExtra("session_id", a.sessionId)
             putExtra("notif_id", notifId)
+            putExtra("request_id", a.requestId.orEmpty())
         }
         // Direct-reply requires FLAG_MUTABLE so the system can attach the RemoteInput results.
         // The intent is explicit (our own receiver), so it can't be redirected — mutability is safe.

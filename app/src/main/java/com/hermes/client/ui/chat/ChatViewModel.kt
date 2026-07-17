@@ -254,8 +254,9 @@ class ChatViewModel @Inject constructor(
     }
 
     fun clarify(answer: String) {
+        val requestId = _state.value.pendingClarify?.requestId ?: ""
         _state.value = _state.value.copy(pendingClarify = null)
-        viewModelScope.launch { runCatching { chat.respondClarify(sessionId, answer) } }
+        viewModelScope.launch { runCatching { chat.respondClarify(sessionId, requestId, answer) } }
     }
 
     /** Appends a non-fatal error as a system message and stops the generating spinner. */
