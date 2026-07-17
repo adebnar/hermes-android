@@ -34,6 +34,7 @@ class ChatViewModel @Inject constructor(
     private val favoritesStore: com.hermes.client.data.repository.ModelFavoritesStore,
     private val pendingShareStore: com.hermes.client.share.PendingShareStore,
     private val tts: com.hermes.client.data.tts.TextToSpeechController,
+    private val promptStore: com.hermes.client.data.repository.PromptStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChatUiState.empty())
@@ -75,6 +76,10 @@ class ChatViewModel @Inject constructor(
 
     /** Stop any current read-aloud. */
     fun stopReading() = tts.stop()
+
+    /** Device-local saved prompts, for the composer's prompt picker. */
+    val savedPrompts: kotlinx.coroutines.flow.StateFlow<List<com.hermes.client.data.repository.SavedPrompt>> =
+        promptStore.prompts.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), emptyList())
 
     data class ModelSheetUi(
         val query: String = "",
