@@ -64,6 +64,14 @@ class GatewayHealthMonitorTest {
         io.mockk.coVerify(exactly = 1) { api.gatewayStatus() }
     }
 
+    @Test fun no_gateway_configured_maps_to_unknown_not_unreachable() = runTest {
+        coEvery { api.gatewayStatus() } throws HermesApiException(0, "no gateway configured")
+        val m = GatewayHealthMonitor(api, FakeConnectivity(true), MutableStateFlow(ConnectionState.Connected), backgroundScope)
+        m.probe()
+        assertEquals(GatewayHealth.Unknown, m.health.value)
+        io.mockk.coVerify(exactly = 1) { api.gatewayStatus() }
+    }
+
     @Test fun genuine_cancellation_propagates_and_does_not_mark_unreachable() = runTest {
         coEvery { api.gatewayStatus() } throws kotlinx.coroutines.CancellationException("cancelled")
         val m = GatewayHealthMonitor(api, FakeConnectivity(true), MutableStateFlow(ConnectionState.Connected), backgroundScope)

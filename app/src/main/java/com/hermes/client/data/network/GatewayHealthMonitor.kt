@@ -85,8 +85,11 @@ class GatewayHealthMonitor(
             val latencyMs = (System.nanoTime() - start) / 1_000_000
             GatewayHealth.Healthy(version = dto.version, running = dto.gatewayRunning, latencyMs = latencyMs)
         } catch (e: HermesApiException) {
-            // 401 is a definitive answer (reachable but unauthorized) — do not retry.
-            if (e.code == 401) GatewayHealth.GatewayUnreachable("unauthorized") else null
+            when (e.code) {
+                401 -> GatewayHealth.GatewayUnreachable("unauthorized") // definitive
+                0 -> GatewayHealth.Unknown // no gateway configured yet — not a down state
+                else -> null // retryable
+            }
         } catch (e: TimeoutCancellationException) {
             null // probe timed out — retryable
         } catch (e: CancellationException) {

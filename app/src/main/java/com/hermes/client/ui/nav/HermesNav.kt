@@ -144,7 +144,7 @@ fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsu
                             selected = route == tab.route,
                             onClick = { switchTab(tab.route) },
                             icon = {
-                                if (tab.route == "you" && health.isUnhealthy()) {
+                                if (tab.route == "you" && hasConfig && health.isUnhealthy()) {
                                     BadgedBox(badge = { Badge() }) {
                                         Icon(tab.icon, contentDescription = tab.label)
                                     }
@@ -162,11 +162,11 @@ fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsu
         Column(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
             // Renders nothing when healthy. When shown it owns the status-bar inset, so the content
             // below consumes that inset to avoid a second top gap under the strip.
-            if (health.isUnhealthy()) {
+            if (hasConfig && health.isUnhealthy()) {
                 HealthStrip(health = health, onClick = { showHealthSheet = true })
             }
             val contentModifier =
-                if (health.isUnhealthy()) Modifier.weight(1f).consumeWindowInsets(WindowInsets.statusBars)
+                if (hasConfig && health.isUnhealthy()) Modifier.weight(1f).consumeWindowInsets(WindowInsets.statusBars)
                 else Modifier.weight(1f)
             NavHost(
                 navController = nav,
