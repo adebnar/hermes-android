@@ -260,6 +260,9 @@ fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsu
                 com.hermes.client.ui.settings.NotificationsScreen(onBack = { nav.popBackStack() })
             }
             composable("settings_memory") { MemorySettingsScreen(onBack = { nav.popBackStack() }) }
+            composable("settings_prompts") {
+                com.hermes.client.ui.settings.PromptLibraryScreen(onBack = { nav.popBackStack() })
+            }
             composable("settings_mcp") { McpSettingsScreen(onBack = { nav.popBackStack() }) }
             composable("settings_env") { EnvScreen(onBack = { nav.popBackStack() }) }
             composable("settings_connection") {

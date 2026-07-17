@@ -41,6 +41,7 @@ class ChatViewModelTest {
     private val favoritesStore = mockk<ModelFavoritesStore>(relaxed = true)
     private val pendingShareStore = com.hermes.client.share.PendingShareStore()
     private val tts = mockk<com.hermes.client.data.tts.TextToSpeechController>(relaxed = true)
+    private val promptStore = mockk<com.hermes.client.data.repository.PromptStore>(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
@@ -56,9 +57,10 @@ class ChatViewModelTest {
         coEvery { profileRepo.list() } returns emptyList()
         every { favoritesStore.favorites } returns MutableStateFlow(emptySet())
         every { tts.speaking } returns MutableStateFlow(false)
+        every { promptStore.prompts } returns MutableStateFlow(emptyList())
     }
 
-    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager, favoritesStore, pendingShareStore, tts)
+    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager, favoritesStore, pendingShareStore, tts, promptStore)
 
     @Test fun streamed_delta_appears_in_state() = runTest {
         val vm = buildVm()

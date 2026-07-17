@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.NoteAdd
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.AttachFile
@@ -48,8 +49,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.rememberModalBottomSheetState
 import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -103,6 +107,8 @@ fun ChatScreen(
     val commands by vm.commands.collectAsStateWithLifecycle()
     val pathItems by vm.pathItems.collectAsStateWithLifecycle()
     val speaking by vm.speaking.collectAsStateWithLifecycle()
+    val savedPrompts by vm.savedPrompts.collectAsStateWithLifecycle()
+    var showPromptSheet by remember { mutableStateOf(false) }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { vm.stopReading() } }
     var draft by remember { mutableStateOf("") }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
@@ -351,6 +357,9 @@ fun ChatScreen(
                             )
                         }
                     }
+                    IconButton(onClick = { showPromptSheet = true }) {
+                        Icon(Icons.AutoMirrored.Rounded.NoteAdd, contentDescription = "Saved prompts")
+                    }
                     if (speechAvailable) {
                         IconButton(onClick = { startDictation() }) {
                             Icon(
@@ -531,6 +540,32 @@ fun ChatScreen(
             pending = modelSheet.pending, error = modelSheet.error,
             onDismiss = { modelSheetOpen = false },
         )
+    }
+
+    if (showPromptSheet) {
+        val promptSheetState = rememberModalBottomSheetState()
+        ModalBottomSheet(onDismissRequest = { showPromptSheet = false }, sheetState = promptSheetState) {
+            if (savedPrompts.isEmpty()) {
+                Text(
+                    "No saved prompts yet — add them in Settings › Saved prompts.",
+                    modifier = Modifier.padding(24.dp),
+                )
+            } else {
+                LazyColumn(Modifier.fillMaxWidth()) {
+                    items(savedPrompts, key = { it.id }) { p ->
+                        ListItem(
+                            headlineContent = { Text(p.title) },
+                            supportingContent = { Text(p.body.lineSequence().firstOrNull().orEmpty()) },
+                            modifier = Modifier.clickable {
+                                draft = if (draft.isBlank()) p.body else draft.trimEnd() + "\n" + p.body
+                                showPromptSheet = false
+                                focusRequester.requestFocus()
+                            },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

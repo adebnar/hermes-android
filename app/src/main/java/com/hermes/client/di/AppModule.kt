@@ -219,4 +219,9 @@ object AppModule {
         @ApplicationContext context: Context,
     ): com.hermes.client.data.tts.TextToSpeechController =
         com.hermes.client.data.tts.AndroidTtsManager(context)
+
+    @Provides
+    @Singleton
+    fun providePromptStore(@ApplicationContext context: Context): com.hermes.client.data.repository.PromptStore =
+        com.hermes.client.data.repository.PromptStore(context)
 }
