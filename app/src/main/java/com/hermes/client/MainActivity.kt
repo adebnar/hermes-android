@@ -22,6 +22,7 @@ import com.hermes.client.data.repository.SettingsStore
 import com.hermes.client.data.repository.ThemeMode
 import com.hermes.client.ui.diagnostics.CrashReportScreen
 import com.hermes.client.ui.nav.HermesNav
+import com.hermes.client.ui.nav.deepLinkRouteFor
 import com.hermes.client.ui.theme.HermesTheme
 import com.hermes.client.ui.theme.LocalToolCallTechnical
 import dagger.hilt.android.AndroidEntryPoint
@@ -52,7 +53,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingRoute.value = intent?.getStringExtra("extra_route")
+            ?: intent?.data?.let { deepLinkRouteFor(it.toString()) }
         intent?.removeExtra("extra_route")
+        intent?.data = null
         handleShare(intent)
         val hasConfig = credentialStore.load() != null
         val crashReport = CrashReporter.read(this)
@@ -121,7 +124,9 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingRoute.value = intent.getStringExtra("extra_route")
+            ?: intent.data?.let { deepLinkRouteFor(it.toString()) }
         intent.removeExtra("extra_route")
+        intent.data = null
         handleShare(intent)
     }
 

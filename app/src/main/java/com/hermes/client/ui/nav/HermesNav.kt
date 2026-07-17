@@ -89,7 +89,14 @@ fun HermesNav(hasConfig: Boolean, deepLinkRoute: String? = null, onDeepLinkConsu
     val nav = rememberNavController()
     val start = if (hasConfig) "activity" else "setup"
 
-    LaunchedEffect(deepLinkRoute) { deepLinkRoute?.let { nav.navigate(it); onDeepLinkConsumed() } }
+    // Guard the navigate: a hermes:// deep link is untrusted, and even the notification path could
+    // carry a stale/unknown route — an unresolved route must be ignored, never crash.
+    LaunchedEffect(deepLinkRoute) {
+        deepLinkRoute?.let {
+            runCatching { nav.navigate(it) }
+            onDeepLinkConsumed()
+        }
+    }
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
