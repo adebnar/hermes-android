@@ -21,7 +21,7 @@ fun parsePersonas(config: JsonObject): List<Persona> {
     }.sortedBy { it.name.lowercase() }
 }
 
-/** The active personality (`display.personality`); blank/"none" → null. */
+/** The active personality (`display.personality`); blank/"none"/"default" → null. */
 fun activePersonaOf(config: JsonObject): String? =
     config.objOrNull("display")?.strOrNull("personality")
-        ?.takeIf { it.isNotBlank() && !it.equals("none", ignoreCase = true) }
+        ?.takeIf { it.isNotBlank() && !it.equals("none", ignoreCase = true) && !it.equals("default", ignoreCase = true) }

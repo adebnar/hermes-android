@@ -635,7 +635,7 @@ fun ChatScreen(
     if (showPersonaSheet) {
         PersonaSheet(
             ui = personaUi,
-            onPick = { vm.setPersona(it); showPersonaSheet = false },
+            onPick = { vm.setPersona(it) },
             onRetry = { vm.loadPersonas() },
             onDismiss = { showPersonaSheet = false },
         )

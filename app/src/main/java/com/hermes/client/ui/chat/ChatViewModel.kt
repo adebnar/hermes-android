@@ -360,12 +360,20 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /** Apply a persona to this session (null / "none" clears it). */
+    /** Apply a persona to this session (null / "none" / "default" clears it). */
     fun setPersona(name: String?) {
-        val wire = name?.takeIf { it.isNotBlank() && !it.equals("none", true) } ?: "none"
+        val wire = name?.takeIf { it.isNotBlank() && !it.equals("none", true) && !it.equals("default", true) } ?: "none"
+        _personaUi.value = _personaUi.value.copy(loading = true, error = null)
         viewModelScope.launch {
             runCatching { chat.slashExec(sessionId, "/personality $wire") }
-                .onSuccess { _personaUi.value = _personaUi.value.copy(active = if (wire == "none") null else wire) }
+                .onSuccess { out ->
+                    if (out != null && out.contains("unknown", ignoreCase = true)) {
+                        _personaUi.value = _personaUi.value.copy(loading = false, error = "Couldn't apply that persona")
+                    } else {
+                        _personaUi.value = _personaUi.value.copy(loading = false, active = if (wire == "none") null else wire)
+                    }
+                }
+                .onFailure { _personaUi.value = _personaUi.value.copy(loading = false, error = "Couldn't apply persona") }
         }
     }
 }

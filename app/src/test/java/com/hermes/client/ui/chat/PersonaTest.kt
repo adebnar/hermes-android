@@ -28,4 +28,8 @@ class PersonaTest {
         assertNull(activePersonaOf(obj("""{"display":{"personality":""}}""")))
         assertNull(activePersonaOf(obj("""{}""")))
     }
+
+    @Test fun active_persona_maps_default_to_null() {
+        assertNull(activePersonaOf(obj("""{"display":{"personality":"default"}}""")))
+    }
 }
