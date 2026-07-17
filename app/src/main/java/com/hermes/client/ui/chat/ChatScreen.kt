@@ -102,6 +102,8 @@ fun ChatScreen(
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
     val commands by vm.commands.collectAsStateWithLifecycle()
     val pathItems by vm.pathItems.collectAsStateWithLifecycle()
+    val speaking by vm.speaking.collectAsStateWithLifecycle()
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { vm.stopReading() } }
     var draft by remember { mutableStateOf("") }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -480,6 +482,9 @@ fun ChatScreen(
                         isGenerating = state.isGenerating,
                         onEditResend = { text -> draft = text; focusRequester.requestFocus() },
                         onRegenerate = { vm.regenerate() },
+                        isSpeaking = speaking,
+                        onReadAloud = { vm.readAloud(it) },
+                        onStopReading = { vm.stopReading() },
                         modifier = Modifier.weight(1f),
                     )
                 }

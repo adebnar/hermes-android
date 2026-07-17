@@ -81,6 +81,9 @@ fun ChatMessageList(
     isGenerating: Boolean = false,
     onEditResend: (String) -> Unit = {},
     onRegenerate: () -> Unit = {},
+    isSpeaking: Boolean = false,
+    onReadAloud: (String) -> Unit = {},
+    onStopReading: () -> Unit = {},
     highlightIndex: Int? = null,
 ) {
     val lastIndex = state.messages.lastIndex
@@ -165,7 +168,16 @@ fun ChatMessageList(
             key = { index, msg -> "$index:${msg.id}" },
         ) { index, msg ->
             val canRegenerate = msg.id == lastAssistantId && !isGenerating
-            MessageBubble(msg, canRegenerate, onEditResend, onRegenerate, highlighted = index == highlightIndex)
+            MessageBubble(
+                msg,
+                canRegenerate,
+                onEditResend,
+                onRegenerate,
+                isSpeaking,
+                onReadAloud,
+                onStopReading,
+                highlighted = index == highlightIndex,
+            )
         }
     }
 }
@@ -180,11 +192,14 @@ private fun MessageBubble(
     canRegenerate: Boolean,
     onEditResend: (String) -> Unit,
     onRegenerate: () -> Unit,
+    isSpeaking: Boolean,
+    onReadAloud: (String) -> Unit,
+    onStopReading: () -> Unit,
     highlighted: Boolean = false,
 ) {
     when (msg.role) {
         Role.USER -> UserBubble(msg, onEditResend, highlighted = highlighted)
-        else -> AssistantTurn(msg, canRegenerate, onRegenerate, highlighted = highlighted)
+        else -> AssistantTurn(msg, canRegenerate, onRegenerate, isSpeaking, onReadAloud, onStopReading, highlighted = highlighted)
     }
 }
 
@@ -228,7 +243,15 @@ private fun UserBubble(msg: ChatMessage, onEditResend: (String) -> Unit, highlig
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AssistantTurn(msg: ChatMessage, canRegenerate: Boolean, onRegenerate: () -> Unit, highlighted: Boolean = false) {
+private fun AssistantTurn(
+    msg: ChatMessage,
+    canRegenerate: Boolean,
+    onRegenerate: () -> Unit,
+    isSpeaking: Boolean,
+    onReadAloud: (String) -> Unit,
+    onStopReading: () -> Unit,
+    highlighted: Boolean = false,
+) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
@@ -283,6 +306,15 @@ private fun AssistantTurn(msg: ChatMessage, canRegenerate: Boolean, onRegenerate
                 DropdownMenuItem(
                     text = { Text("Regenerate") },
                     onClick = { onRegenerate(); menuOpen = false },
+                )
+            }
+            if (msg.text.isNotBlank() && !msg.isError) {
+                DropdownMenuItem(
+                    text = { Text(if (isSpeaking) "Stop" else "Read aloud") },
+                    onClick = {
+                        if (isSpeaking) onStopReading() else onReadAloud(msg.text)
+                        menuOpen = false
+                    },
                 )
             }
         }
