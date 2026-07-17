@@ -23,19 +23,34 @@ class NotificationMapperTest {
         assertEquals(Notif.CHANNEL_APPROVALS, spec.channelId)
         assertEquals("chat/s1", spec.route)
         assertTrue(spec.body.contains("Delete file?"))
-        assertEquals(listOf(Notif.ACTION_ALLOW_ONCE, Notif.ACTION_DENY), spec.actions.map { it.action })
+        assertEquals(
+            listOf(Notif.ACTION_ALLOW_ONCE, Notif.ACTION_ALLOW_SESSION, Notif.ACTION_DENY),
+            spec.actions.map { it.action },
+        )
+        assertTrue(spec.actions.none { it.reply })
         assertTrue(spec.actions.all { it.sessionId == "s1" })
     }
 
-    @Test fun standard_approval_offers_allow_once_and_deny() {
+    @Test fun standard_approval_offers_allow_once_session_and_deny() {
         val e = ServerEvent("approval.request", "s1", buildJsonObject {
             put("session_id", "s1"); put("command", "git push -f"); put("allow_permanent", true)
         })
         val spec = toNotificationSpec(e, on, appInForeground = false)!!
-        assertEquals(listOf(Notif.ACTION_ALLOW_ONCE, Notif.ACTION_DENY), spec.actions.map { it.action })
+        assertEquals(
+            listOf(Notif.ACTION_ALLOW_ONCE, Notif.ACTION_ALLOW_SESSION, Notif.ACTION_DENY),
+            spec.actions.map { it.action },
+        )
     }
 
     @Test fun elevated_approval_offers_deny_only() {
+        val e = ServerEvent("approval.request", "s1", buildJsonObject {
+            put("session_id", "s1"); put("command", "rm -rf /"); put("allow_permanent", false)
+        })
+        val spec = toNotificationSpec(e, on, appInForeground = false)!!
+        assertEquals(listOf(Notif.ACTION_DENY), spec.actions.map { it.action })
+    }
+
+    @Test fun elevated_approval_has_no_session_action() {
         val e = ServerEvent("approval.request", "s1", buildJsonObject {
             put("session_id", "s1"); put("command", "rm -rf /"); put("allow_permanent", false)
         })
@@ -65,7 +80,12 @@ class NotificationMapperTest {
         assertEquals("Needs your input", spec.title)
         assertEquals("Which repo?", spec.body)
         assertEquals("chat/c1", spec.route)
-        assertTrue(spec.actions.isEmpty())
+        assertEquals(1, spec.actions.size)
+        val reply = spec.actions.single()
+        assertEquals(Notif.ACTION_REPLY, reply.action)
+        assertEquals("Reply", reply.label)
+        assertTrue(reply.reply)
+        assertEquals("c1", reply.sessionId)
     }
 
     @Test fun clarify_off_when_approvals_off() {
