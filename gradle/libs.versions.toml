@@ -30,6 +30,7 @@ androidxTestCore = "1.7.0"
 androidxTestJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
 zxingEmbedded = "4.3.0"
+glance = "1.1.1"
 
 [libraries]
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -68,6 +69,7 @@ androidx-test-core = { module = "androidx.test:core-ktx", version.ref = "android
 androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestJunit" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 zxing-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxingEmbedded" }
+glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

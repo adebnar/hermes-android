@@ -23,6 +23,7 @@ import com.hermes.client.data.repository.ThemeMode
 import com.hermes.client.ui.diagnostics.CrashReportScreen
 import com.hermes.client.ui.nav.HermesNav
 import com.hermes.client.ui.nav.deepLinkRouteFor
+import com.hermes.client.ui.nav.isNewChatLink
 import com.hermes.client.ui.theme.HermesTheme
 import com.hermes.client.ui.theme.LocalToolCallTechnical
 import dagger.hilt.android.AndroidEntryPoint
@@ -49,13 +50,20 @@ class MainActivity : ComponentActivity() {
      * already running still navigates; consumed by `HermesNav`'s `deepLinkRoute` param.
      */
     private var pendingRoute = mutableStateOf<String?>(null)
+    private val newChatInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        pendingRoute.value = intent?.getStringExtra("extra_route")
-            ?: intent?.data?.let { deepLinkRouteFor(it.toString()) }
-        intent?.removeExtra("extra_route")
-        intent?.data = null
+        val dlData = intent?.data
+        if (dlData != null && isNewChatLink(dlData.toString())) {
+            openNewChat()
+            intent?.data = null
+        } else {
+            pendingRoute.value = intent?.getStringExtra("extra_route")
+                ?: dlData?.let { deepLinkRouteFor(it.toString()) }
+            intent?.removeExtra("extra_route")
+            intent?.data = null
+        }
         handleShare(intent)
         val hasConfig = credentialStore.load() != null
         val crashReport = CrashReporter.read(this)
@@ -123,10 +131,16 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        pendingRoute.value = intent.getStringExtra("extra_route")
-            ?: intent.data?.let { deepLinkRouteFor(it.toString()) }
-        intent.removeExtra("extra_route")
-        intent.data = null
+        val dlData = intent.data
+        if (dlData != null && isNewChatLink(dlData.toString())) {
+            openNewChat()
+            intent.data = null
+        } else {
+            pendingRoute.value = intent.getStringExtra("extra_route")
+                ?: dlData?.let { deepLinkRouteFor(it.toString()) }
+            intent.removeExtra("extra_route")
+            intent.data = null
+        }
         handleShare(intent)
     }
 
@@ -138,6 +152,29 @@ class MainActivity : ComponentActivity() {
             putExtra(Intent.EXTRA_TEXT, report)
         }
         startActivity(Intent.createChooser(intent, "Share crash report"))
+    }
+
+    /** Create a fresh chat and navigate to it (widget "New chat" / hermes://new). No-op if unconfigured. */
+    private fun openNewChat() {
+        if (credentialStore.load() == null) return
+        if (!newChatInFlight.compareAndSet(false, true)) return // a create is already running — ignore repeat taps
+        lifecycleScope.launch {
+            try {
+                chat.connect() // idempotent; a cold start has no socket yet
+                runCatching {
+                    profileManager.refresh() // load active profile so the session isn't orphaned to default
+                    chat.createSession(profileManager.active.value)
+                }.onSuccess { id -> pendingRoute.value = "chat/$id" }
+                    .onFailure { e ->
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        android.widget.Toast.makeText(
+                            this@MainActivity, "Couldn't start a chat", android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+            } finally {
+                newChatInFlight.set(false)
+            }
+        }
     }
 
     /**
