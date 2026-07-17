@@ -59,6 +59,23 @@ fun ApprovalSheet(req: ApprovalRequest, onRespond: (ApprovalChoice) -> Unit, onD
                 Text(req.description, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 16.dp))
             }
 
+            if (req.patternKeys.isNotEmpty()) {
+                Text(
+                    "Grants: ${req.patternKeys.joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+            if (req.smartDenied) {
+                Text(
+                    "Owner override — approve only this one operation.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+
             if (tier == ApprovalTier.STANDARD) {
                 Button(
                     onClick = { onRespond(ApprovalChoice.ONCE) },
