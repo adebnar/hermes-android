@@ -16,7 +16,8 @@ fun transcriptText(messages: List<ChatMessage>): String =
         .filter { it.text.isNotBlank() }
         .joinToString("\n\n") { m ->
             val label = when {
-                m.isError || m.role == Role.SYSTEM -> "Error"
+                m.isError -> "Error"
+                m.role == Role.SYSTEM -> "System"
                 m.role == Role.USER -> "You"
                 else -> "Assistant"
             }

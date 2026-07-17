@@ -24,9 +24,10 @@ class MessageActionsTranscriptTest {
         assertEquals("You:\nq\n\nAssistant:\na", t)
     }
 
-    @Test fun error_and_system_labelled_error() {
+    @Test fun error_labelled_error_and_system_labelled_system() {
         assertTrue(transcriptText(listOf(msg(Role.ASSISTANT, "boom", isError = true))).startsWith("Error:"))
-        assertTrue(transcriptText(listOf(msg(Role.SYSTEM, "sys"))).startsWith("Error:"))
+        assertTrue(transcriptText(listOf(msg(Role.SYSTEM, "note"))).startsWith("System:"))
+        assertTrue(transcriptText(listOf(msg(Role.USER, "boom", isError = true))).startsWith("Error:"))
     }
 
     @Test fun markdown_preserved_verbatim() {

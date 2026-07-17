@@ -287,8 +287,12 @@ fun ChatScreen(
                                     if (t.isBlank()) {
                                         android.widget.Toast.makeText(context, "Nothing to export yet", android.widget.Toast.LENGTH_SHORT).show()
                                     } else {
-                                        clipboard.setText(AnnotatedString(t))
-                                        android.widget.Toast.makeText(context, "Transcript copied", android.widget.Toast.LENGTH_SHORT).show()
+                                        runCatching {
+                                            clipboard.setText(AnnotatedString(t))
+                                            android.widget.Toast.makeText(context, "Transcript copied", android.widget.Toast.LENGTH_SHORT).show()
+                                        }.onFailure {
+                                            android.widget.Toast.makeText(context, "Couldn't copy transcript", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                     transcriptMenu = false
                                 },
@@ -305,7 +309,11 @@ fun ChatScreen(
                                             putExtra(android.content.Intent.EXTRA_SUBJECT, "Hermes chat transcript")
                                             putExtra(android.content.Intent.EXTRA_TEXT, t)
                                         }
-                                        context.startActivity(android.content.Intent.createChooser(send, "Share transcript"))
+                                        runCatching {
+                                            context.startActivity(android.content.Intent.createChooser(send, "Share transcript"))
+                                        }.onFailure {
+                                            android.widget.Toast.makeText(context, "Couldn't share transcript", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                     transcriptMenu = false
                                 },
