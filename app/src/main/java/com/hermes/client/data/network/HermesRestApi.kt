@@ -4,6 +4,7 @@ import com.hermes.client.data.auth.GatewayConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -289,6 +290,25 @@ class HermesRestApi(
             val body = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) throw HermesApiException(resp.code, "reveal env failed")
             json.decodeFromString<JsonObject>(body)["value"]?.jsonPrimitive?.content ?: ""
+        }
+    }
+
+    /**
+     * Transcribe a recorded voice note. [dataUrl] is a base64 data URL (data:<mime>;base64,<b64>)
+     * the gateway's POST /api/audio/transcribe accepts; returns the trimmed transcript ("" if the
+     * STT backend returned nothing). Throws HermesApiException on a non-2xx (e.g. no STT configured).
+     */
+    suspend fun transcribe(dataUrl: String, mimeType: String): String = withContext(Dispatchers.IO) {
+        val obj = buildJsonObject { put("data_url", dataUrl); put("mime_type", mimeType) }
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+            .toRequestBody("application/json".toMediaType())
+        okHttp.newCall(builder("/api/audio/transcribe").post(payload).build()).execute().use { resp ->
+            val body = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw HermesApiException(resp.code, "transcription failed")
+            // Treat an explicit JSON null (out-of-contract, but guards against a phantom "null"
+            // transcript) the same as a missing field → "".
+            val el = json.decodeFromString<JsonObject>(body)["transcript"]
+            if (el == null || el is JsonNull) "" else el.jsonPrimitive.content.trim()
         }
     }
 

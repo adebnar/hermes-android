@@ -40,6 +40,8 @@ fun SettingsScreen(
             HorizontalDivider()
             Entry("Memory & budgets", "Memory, user profile & default model") { onNavigate("settings_memory") }
             HorizontalDivider()
+            Entry("Saved prompts", "Reusable prompts for the composer") { onNavigate("settings_prompts") }
+            HorizontalDivider()
             Entry("MCP servers", "View and edit connected MCP servers") { onNavigate("settings_mcp") }
             HorizontalDivider()
             Entry("API keys & env", "Provider keys and tool env vars") { onNavigate("settings_env") }

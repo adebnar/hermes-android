@@ -1,5 +1,10 @@
 package com.hermes.client.ui.sessions
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -49,13 +55,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
+import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hermes.client.domain.Session
+import com.hermes.client.ui.record.RecordPhase
+import com.hermes.client.ui.record.RecordTaskSheet
+import com.hermes.client.ui.record.RecordTaskViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,10 +88,44 @@ fun SessionsScreen(
     val viewMode by vm.viewMode.collectAsStateWithLifecycle()
     val projectsState by vm.projectsState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     // I1: route to Setup when a 401 is received
     LaunchedEffect(state.unauthorized) {
         if (state.unauthorized) onUnauthorized()
+    }
+
+    // Record-a-task: mic entry point on the home session list. The sheet's own show/hide state
+    // lives here (not in the VM) so it survives recomposition without coupling the VM to
+    // navigation visibility; recordVm drives the actual record/transcribe pipeline.
+    val recordVm: RecordTaskViewModel = hiltViewModel()
+    var showRecord by rememberSaveable { mutableStateOf(false) }
+    val recordUi by recordVm.ui.collectAsStateWithLifecycle()
+    val micPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            showRecord = true
+            recordVm.startRecording()
+        } else {
+            Toast.makeText(context, "Microphone needed to record a task", Toast.LENGTH_SHORT).show()
+        }
+    }
+    fun onMicTap() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            showRecord = true
+            recordVm.startRecording()
+        } else {
+            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    LaunchedEffect(Unit) {
+        recordVm.navigateTo.collect { id ->
+            showRecord = false
+            onOpen(id)
+        }
     }
 
     // Re-fetch on every resume — notably when returning from a chat. The "sessions" nav entry
@@ -96,6 +142,9 @@ fun SessionsScreen(
                 com.hermes.client.ui.components.HermesTopBar(
                     title = "Chats",
                     actions = {
+                        IconButton(onClick = { onMicTap() }) {
+                            Icon(Icons.Rounded.Mic, contentDescription = "Record a task")
+                        }
                         TextButton(
                             onClick = onOpenArchived,
                             colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
@@ -287,6 +336,20 @@ fun SessionsScreen(
                 }
             }
         }
+    }
+
+    if (showRecord) {
+        RecordTaskSheet(
+            ui = recordUi,
+            onStop = { recordVm.stopAndTranscribe() },
+            onCancel = { recordVm.cancel(); showRecord = false },
+            onRetry = { recordVm.dismissError(); recordVm.startRecording() },
+            onDismiss = {
+                if (recordUi.phase == RecordPhase.RECORDING) recordVm.cancel()
+                recordVm.dismissError()
+                showRecord = false
+            },
+        )
     }
 }
 

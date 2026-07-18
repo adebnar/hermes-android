@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.NoteAdd
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.AttachFile
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.AlertDialog
@@ -48,11 +50,16 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.rememberModalBottomSheetState
 import com.hermes.client.ui.theme.LocalProfileAccent
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.AnnotatedString
 import kotlinx.coroutines.launch
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -102,6 +109,12 @@ fun ChatScreen(
     val activeProfile by vm.activeProfile.collectAsStateWithLifecycle()
     val commands by vm.commands.collectAsStateWithLifecycle()
     val pathItems by vm.pathItems.collectAsStateWithLifecycle()
+    val speaking by vm.speaking.collectAsStateWithLifecycle()
+    val savedPrompts by vm.savedPrompts.collectAsStateWithLifecycle()
+    var showPromptSheet by remember { mutableStateOf(false) }
+    val personaUi by vm.personaUi.collectAsStateWithLifecycle()
+    var showPersonaSheet by remember { mutableStateOf(false) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { vm.stopReading() } }
     var draft by remember { mutableStateOf("") }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -151,6 +164,8 @@ fun ChatScreen(
 
     // Image attach: read picked/captured bytes and stage them onto the session.
     val context = androidx.compose.ui.platform.LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    var transcriptMenu by remember { mutableStateOf(false) }
     val attachScope = androidx.compose.runtime.rememberCoroutineScope()
 
     fun readBytes(uri: Uri): ByteArray? =
@@ -258,6 +273,63 @@ fun ChatScreen(
                         ),
                     )
                     StatusDot(connState)
+                    Box {
+                        IconButton(onClick = { transcriptMenu = true }) {
+                            Icon(
+                                Icons.Rounded.MoreVert,
+                                contentDescription = "More",
+                                tint = com.hermes.client.ui.components.AccentChrome.onBar,
+                            )
+                        }
+                        DropdownMenu(expanded = transcriptMenu, onDismissRequest = { transcriptMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Copy transcript") },
+                                onClick = {
+                                    val t = transcriptText(state.messages)
+                                    if (t.isBlank()) {
+                                        android.widget.Toast.makeText(context, "Nothing to export yet", android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        runCatching {
+                                            clipboard.setText(AnnotatedString(t))
+                                            android.widget.Toast.makeText(context, "Transcript copied", android.widget.Toast.LENGTH_SHORT).show()
+                                        }.onFailure {
+                                            android.widget.Toast.makeText(context, "Couldn't copy transcript", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    transcriptMenu = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Share transcript") },
+                                onClick = {
+                                    val t = transcriptText(state.messages)
+                                    if (t.isBlank()) {
+                                        android.widget.Toast.makeText(context, "Nothing to export yet", android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(android.content.Intent.EXTRA_SUBJECT, "Hermes chat transcript")
+                                            putExtra(android.content.Intent.EXTRA_TEXT, t)
+                                        }
+                                        runCatching {
+                                            context.startActivity(android.content.Intent.createChooser(send, "Share transcript"))
+                                        }.onFailure {
+                                            android.widget.Toast.makeText(context, "Couldn't share transcript", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    transcriptMenu = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Persona") },
+                                onClick = {
+                                    transcriptMenu = false
+                                    vm.loadPersonas()
+                                    showPersonaSheet = true
+                                },
+                            )
+                        }
+                    }
                 },
             )
         },
@@ -348,6 +420,9 @@ fun ChatScreen(
                                 },
                             )
                         }
+                    }
+                    IconButton(onClick = { showPromptSheet = true }) {
+                        Icon(Icons.AutoMirrored.Rounded.NoteAdd, contentDescription = "Saved prompts")
                     }
                     if (speechAvailable) {
                         IconButton(onClick = { startDictation() }) {
@@ -480,6 +555,9 @@ fun ChatScreen(
                         isGenerating = state.isGenerating,
                         onEditResend = { text -> draft = text; focusRequester.requestFocus() },
                         onRegenerate = { vm.regenerate() },
+                        isSpeaking = speaking,
+                        onReadAloud = { vm.readAloud(it) },
+                        onStopReading = { vm.stopReading() },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -525,6 +603,41 @@ fun ChatScreen(
             onSelect = { p, m -> vm.onSelectFromSheet(p, m) { modelSheetOpen = false } },
             pending = modelSheet.pending, error = modelSheet.error,
             onDismiss = { modelSheetOpen = false },
+        )
+    }
+
+    if (showPromptSheet) {
+        val promptSheetState = rememberModalBottomSheetState()
+        ModalBottomSheet(onDismissRequest = { showPromptSheet = false }, sheetState = promptSheetState) {
+            if (savedPrompts.isEmpty()) {
+                Text(
+                    "No saved prompts yet — add them in Settings › Saved prompts.",
+                    modifier = Modifier.padding(24.dp),
+                )
+            } else {
+                LazyColumn(Modifier.fillMaxWidth()) {
+                    items(savedPrompts, key = { it.id }) { p ->
+                        ListItem(
+                            headlineContent = { Text(p.title) },
+                            supportingContent = { Text(p.body.lineSequence().firstOrNull().orEmpty()) },
+                            modifier = Modifier.clickable {
+                                draft = if (draft.isBlank()) p.body else draft.trimEnd() + "\n" + p.body
+                                showPromptSheet = false
+                                focusRequester.requestFocus()
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showPersonaSheet) {
+        PersonaSheet(
+            ui = personaUi,
+            onPick = { vm.setPersona(it) },
+            onRetry = { vm.loadPersonas() },
+            onDismiss = { showPersonaSheet = false },
         )
     }
 }

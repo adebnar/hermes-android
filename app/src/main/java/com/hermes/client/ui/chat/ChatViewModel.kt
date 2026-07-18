@@ -33,6 +33,9 @@ class ChatViewModel @Inject constructor(
     private val profileManager: ProfileManager,
     private val favoritesStore: com.hermes.client.data.repository.ModelFavoritesStore,
     private val pendingShareStore: com.hermes.client.share.PendingShareStore,
+    private val tts: com.hermes.client.data.tts.TextToSpeechController,
+    private val promptStore: com.hermes.client.data.repository.PromptStore,
+    private val configRepo: com.hermes.client.data.repository.ConfigRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ChatUiState.empty())
@@ -65,6 +68,19 @@ class ChatViewModel @Inject constructor(
 
     val favorites: kotlinx.coroutines.flow.StateFlow<Set<String>> =
         favoritesStore.favorites.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    /** True while a response is being read aloud. */
+    val speaking: kotlinx.coroutines.flow.StateFlow<Boolean> = tts.speaking
+
+    /** Read [text] aloud (markdown stripped for cleaner speech). */
+    fun readAloud(text: String) = tts.speak(speechText(text))
+
+    /** Stop any current read-aloud. */
+    fun stopReading() = tts.stop()
+
+    /** Device-local saved prompts, for the composer's prompt picker. */
+    val savedPrompts: kotlinx.coroutines.flow.StateFlow<List<com.hermes.client.data.repository.SavedPrompt>> =
+        promptStore.prompts.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), emptyList())
 
     data class ModelSheetUi(
         val query: String = "",
@@ -254,8 +270,9 @@ class ChatViewModel @Inject constructor(
     }
 
     fun clarify(answer: String) {
+        val requestId = _state.value.pendingClarify?.requestId ?: ""
         _state.value = _state.value.copy(pendingClarify = null)
-        viewModelScope.launch { runCatching { chat.respondClarify(sessionId, answer) } }
+        viewModelScope.launch { runCatching { chat.respondClarify(sessionId, requestId, answer) } }
     }
 
     /** Appends a non-fatal error as a system message and stops the generating spinner. */
@@ -322,5 +339,47 @@ class ChatViewModel @Inject constructor(
 
     fun selectProfile(name: String) {
         viewModelScope.launch { runCatching { profileRepo.setActive(name) } }
+    }
+
+    data class PersonaUi(
+        val personas: List<Persona> = emptyList(),
+        val active: String? = null,
+        val loading: Boolean = false,
+        val error: String? = null,
+    )
+    private val _personaUi = MutableStateFlow(PersonaUi())
+    val personaUi: StateFlow<PersonaUi> = _personaUi.asStateFlow()
+
+    /** Fetch the profile's configured personalities (called when the persona sheet opens). */
+    fun loadPersonas() {
+        _personaUi.value = _personaUi.value.copy(loading = true, error = null)
+        viewModelScope.launch {
+            runCatching { configRepo.get(profileManager.active.value) }
+                .onSuccess { cfg -> _personaUi.value = PersonaUi(parsePersonas(cfg), activePersonaOf(cfg)) }
+                .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    _personaUi.value = _personaUi.value.copy(loading = false, error = "Couldn't load personas")
+                }
+        }
+    }
+
+    /** Apply a persona to this session (null / "none" / "default" clears it). */
+    fun setPersona(name: String?) {
+        val wire = name?.takeIf { it.isNotBlank() && !it.equals("none", true) && !it.equals("default", true) } ?: "none"
+        _personaUi.value = _personaUi.value.copy(loading = true, error = null)
+        viewModelScope.launch {
+            runCatching { chat.slashExec(sessionId, "/personality $wire") }
+                .onSuccess { out ->
+                    if (out != null && out.contains("unknown", ignoreCase = true)) {
+                        _personaUi.value = _personaUi.value.copy(loading = false, error = "Couldn't apply that persona")
+                    } else {
+                        _personaUi.value = _personaUi.value.copy(loading = false, active = if (wire == "none") null else wire)
+                    }
+                }
+                .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    _personaUi.value = _personaUi.value.copy(loading = false, error = "Couldn't apply persona")
+                }
+        }
     }
 }

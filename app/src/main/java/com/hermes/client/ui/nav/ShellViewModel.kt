@@ -14,9 +14,13 @@ import javax.inject.Inject
 class ShellViewModel @Inject constructor(
     private val profileManager: ProfileManager,
     private val accentStore: ProfileAccentStore,
+    private val healthMonitor: com.hermes.client.data.network.GatewayHealthMonitor,
 ) : ViewModel() {
     val profiles: StateFlow<List<ProfileDto>> = profileManager.list
     val active: StateFlow<String?> = profileManager.active
+
+    /** Backend health for the shell's status strip + You-tab badge. */
+    val health: StateFlow<com.hermes.client.data.network.GatewayHealth> = healthMonitor.health
 
     init { viewModelScope.launch { profileManager.refresh() } }
 
@@ -27,4 +31,11 @@ class ShellViewModel @Inject constructor(
 
     /** Clear [profile]'s custom colour, reverting to the auto hue. */
     fun clearAccent(profile: String) = viewModelScope.launch { accentStore.clear(profile) }
+
+    /** Fire an immediate health probe (Re-check button). */
+    fun recheckHealth() = healthMonitor.recheck()
+
+    /** Foreground/background gating for periodic probing. */
+    fun onAppForeground() = healthMonitor.startForeground()
+    fun onAppBackground() = healthMonitor.stopForeground()
 }

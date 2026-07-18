@@ -35,6 +35,7 @@ fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs, appInForegr
                 actions = if (elevated) listOf(NotifAction("Deny", Notif.ACTION_DENY, sid))
                           else listOf(
                               NotifAction("Allow once", Notif.ACTION_ALLOW_ONCE, sid),
+                              NotifAction("Session", Notif.ACTION_ALLOW_SESSION, sid),
                               NotifAction("Deny", Notif.ACTION_DENY, sid),
                           ),
                 groupKey = "approval",
@@ -44,7 +45,9 @@ fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs, appInForegr
         Notif.EVENT_CLARIFY -> if (!prefs.approvals) null else NotificationSpec(
             id = id, channelId = Notif.CHANNEL_APPROVALS, title = "Needs your input",
             body = event.str("question") ?: "The agent has a question.",
-            route = "chat/$sid", actions = emptyList(), groupKey = "approval",
+            route = "chat/$sid",
+            actions = listOf(NotifAction("Reply", Notif.ACTION_REPLY, sid, reply = true, requestId = event.str("request_id"))),
+            groupKey = "approval",
         )
         // Run finished: `message.complete` is the end-of-turn event on /api/ws (the app also uses it
         // to stop the "generating" spinner). Only notify when backgrounded; the per-session id above

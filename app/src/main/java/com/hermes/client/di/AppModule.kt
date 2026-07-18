@@ -105,6 +105,23 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideConnectivityChecker(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.data.network.ConnectivityChecker =
+        com.hermes.client.data.network.AndroidConnectivityChecker(context)
+
+    @Provides
+    @Singleton
+    fun provideGatewayHealthMonitor(
+        api: HermesRestApi,
+        connectivity: com.hermes.client.data.network.ConnectivityChecker,
+        client: HermesGatewayClient,
+        scope: CoroutineScope,
+    ): com.hermes.client.data.network.GatewayHealthMonitor =
+        com.hermes.client.data.network.GatewayHealthMonitor(api, connectivity, client.connectionState, scope)
+
+    @Provides
+    @Singleton
     fun provideChatRepository(client: HermesGatewayClient): ChatRepository =
         ChatRepository(client)
 
@@ -140,13 +157,6 @@ object AppModule {
     @Singleton
     fun providePinStore(@ApplicationContext context: Context): com.hermes.client.data.repository.PinStore =
         com.hermes.client.data.repository.PinStore(context)
-
-    @Provides
-    @Singleton
-    fun provideGroupExpansionStore(
-        @ApplicationContext context: Context,
-    ): com.hermes.client.data.repository.GroupExpansionStore =
-        com.hermes.client.data.repository.GroupExpansionStore(context)
 
     @Provides
     @Singleton
@@ -202,4 +212,21 @@ object AppModule {
     @Singleton
     fun provideEnvRepository(rest: HermesRestApi): com.hermes.client.data.repository.EnvRepository =
         com.hermes.client.data.repository.EnvRepository(rest)
+
+    @Provides
+    @Singleton
+    fun provideTextToSpeechController(
+        @ApplicationContext context: Context,
+    ): com.hermes.client.data.tts.TextToSpeechController =
+        com.hermes.client.data.tts.AndroidTtsManager(context)
+
+    @Provides
+    @Singleton
+    fun providePromptStore(@ApplicationContext context: Context): com.hermes.client.data.repository.PromptStore =
+        com.hermes.client.data.repository.PromptStore(context)
+
+    @Provides
+    @Singleton
+    fun provideAudioRecorder(@ApplicationContext context: Context): com.hermes.client.data.audio.AudioRecorder =
+        com.hermes.client.data.audio.MediaAudioRecorder(context)
 }

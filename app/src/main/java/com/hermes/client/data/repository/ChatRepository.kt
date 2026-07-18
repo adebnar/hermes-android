@@ -132,9 +132,10 @@ class ChatRepository(private val client: HermesGatewayClient) {
         })
     }
 
-    suspend fun respondClarify(sessionId: String, answer: String) {
+    suspend fun respondClarify(sessionId: String, requestId: String, answer: String) {
         client.call("clarify.respond", buildJsonObject {
             put("session_id", sessionId)
+            put("request_id", requestId)
             put("answer", answer)
         })
     }

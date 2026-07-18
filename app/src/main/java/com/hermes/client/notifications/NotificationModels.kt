@@ -7,8 +7,17 @@ data class NotificationPrefs(
     val runFinished: Boolean = true,
 )
 
-/** An inline notification action (Allow once/Deny) carrying the target session. */
-data class NotifAction(val label: String, val action: String, val sessionId: String)
+/**
+ * An inline notification action carrying the target session. [reply] = true marks a direct-reply
+ * action (Android RemoteInput text field) rather than a plain button.
+ */
+data class NotifAction(
+    val label: String,
+    val action: String,
+    val sessionId: String,
+    val reply: Boolean = false,
+    val requestId: String? = null,
+)
 
 /** A platform-independent description of a notification, so mapping stays unit-testable. */
 data class NotificationSpec(
@@ -41,5 +50,10 @@ object Notif {
     const val EVENT_ERROR = "error"
 
     const val ACTION_ALLOW_ONCE = "allow_once"
+    const val ACTION_ALLOW_SESSION = "allow_session"
     const val ACTION_DENY = "deny"
+    const val ACTION_REPLY = "reply"
+
+    // RemoteInput result key for the inline reply on a clarify ("Needs your input") notification.
+    const val KEY_REPLY_TEXT = "reply_text"
 }
