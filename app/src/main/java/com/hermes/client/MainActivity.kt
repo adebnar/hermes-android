@@ -160,8 +160,8 @@ class MainActivity : ComponentActivity() {
         if (!newChatInFlight.compareAndSet(false, true)) return // a create is already running — ignore repeat taps
         lifecycleScope.launch {
             try {
-                chat.connect() // idempotent; a cold start has no socket yet
                 runCatching {
+                    chat.connect() // idempotent; a cold start has no socket yet
                     profileManager.refresh() // load active profile so the session isn't orphaned to default
                     chat.createSession(profileManager.active.value)
                 }.onSuccess { id -> pendingRoute.value = "chat/$id" }

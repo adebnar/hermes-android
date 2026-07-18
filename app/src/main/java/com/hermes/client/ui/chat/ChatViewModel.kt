@@ -356,7 +356,10 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { configRepo.get(profileManager.active.value) }
                 .onSuccess { cfg -> _personaUi.value = PersonaUi(parsePersonas(cfg), activePersonaOf(cfg)) }
-                .onFailure { _personaUi.value = _personaUi.value.copy(loading = false, error = "Couldn't load personas") }
+                .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    _personaUi.value = _personaUi.value.copy(loading = false, error = "Couldn't load personas")
+                }
         }
     }
 
@@ -373,7 +376,10 @@ class ChatViewModel @Inject constructor(
                         _personaUi.value = _personaUi.value.copy(loading = false, active = if (wire == "none") null else wire)
                     }
                 }
-                .onFailure { _personaUi.value = _personaUi.value.copy(loading = false, error = "Couldn't apply persona") }
+                .onFailure { e ->
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    _personaUi.value = _personaUi.value.copy(loading = false, error = "Couldn't apply persona")
+                }
         }
     }
 }
