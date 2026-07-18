@@ -35,8 +35,14 @@ class MediaAudioRecorder(private val context: Context) : AudioRecorder {
         rec.setAudioEncodingBitRate(96_000)
         rec.setAudioSamplingRate(44_100)
         rec.setOutputFile(file.absolutePath)
-        rec.prepare()
-        rec.start()
+        try {
+            rec.prepare()
+            rec.start()
+        } catch (e: Exception) {
+            runCatching { rec.release() }
+            file.delete()
+            throw e
+        }
         recorder = rec
         outputFile = file
     }
@@ -52,9 +58,9 @@ class MediaAudioRecorder(private val context: Context) : AudioRecorder {
             file?.delete()
             return null
         }
-        val bytes = file.readBytes()
+        val bytes = runCatching { file.readBytes() }.getOrNull()
         file.delete()
-        return Recording(bytes, "audio/mp4")
+        return bytes?.let { Recording(it, "audio/mp4") }
     }
 
     override fun cancel() {
