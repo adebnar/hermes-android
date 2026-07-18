@@ -4,6 +4,7 @@ import com.hermes.client.data.auth.GatewayConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -304,7 +305,10 @@ class HermesRestApi(
         okHttp.newCall(builder("/api/audio/transcribe").post(payload).build()).execute().use { resp ->
             val body = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) throw HermesApiException(resp.code, "transcription failed")
-            json.decodeFromString<JsonObject>(body)["transcript"]?.jsonPrimitive?.content?.trim() ?: ""
+            // Treat an explicit JSON null (out-of-contract, but guards against a phantom "null"
+            // transcript) the same as a missing field → "".
+            val el = json.decodeFromString<JsonObject>(body)["transcript"]
+            if (el == null || el is JsonNull) "" else el.jsonPrimitive.content.trim()
         }
     }
 

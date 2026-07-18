@@ -41,6 +41,13 @@ class HermesRestApiTranscribeTest {
         assertEquals("", api(serverRule.server).transcribe("data:audio/mp4;base64,AAA", "audio/mp4"))
     }
 
+    @Test fun transcribe_explicit_null_transcript_returns_empty() = runTest {
+        serverRule.server.enqueue(MockResponse.Builder().code(200).body(
+            """{"ok":true,"transcript":null}"""
+        ).build())
+        assertEquals("", api(serverRule.server).transcribe("data:audio/mp4;base64,AAA", "audio/mp4"))
+    }
+
     @Test fun transcribe_error_throws() = runTest {
         serverRule.server.enqueue(MockResponse.Builder().code(400).body("""{"detail":"no stt"}""").build())
         try {
