@@ -42,6 +42,7 @@ class ChatViewModelTest {
     private val pendingShareStore = com.hermes.client.share.PendingShareStore()
     private val tts = mockk<com.hermes.client.data.tts.TextToSpeechController>(relaxed = true)
     private val promptStore = mockk<com.hermes.client.data.repository.PromptStore>(relaxed = true)
+    private val configRepo = mockk<com.hermes.client.data.repository.ConfigRepository>(relaxed = true)
 
     @Before fun setUp() {
         Dispatchers.setMain(StandardTestDispatcher())
@@ -60,7 +61,7 @@ class ChatViewModelTest {
         every { promptStore.prompts } returns MutableStateFlow(emptyList())
     }
 
-    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager, favoritesStore, pendingShareStore, tts, promptStore)
+    private fun buildVm() = ChatViewModel(chatRepo, sessionRepo, modelRepo, profileRepo, profileManager, favoritesStore, pendingShareStore, tts, promptStore, configRepo)
 
     @Test fun streamed_delta_appears_in_state() = runTest {
         val vm = buildVm()
@@ -268,5 +269,29 @@ class ChatViewModelTest {
         val vm = buildVm()
         vm.stopReading()
         io.mockk.verify { tts.stop() }
+    }
+
+    @Test fun setPersona_sends_personality_slash() = runTest {
+        val vm = buildVm()
+        vm.setPersona("witty"); advanceUntilIdle()
+        io.mockk.coVerify { chatRepo.slashExec(any(), "/personality witty") }
+    }
+
+    @Test fun setPersona_null_clears_with_none() = runTest {
+        val vm = buildVm()
+        vm.setPersona(null); advanceUntilIdle()
+        io.mockk.coVerify { chatRepo.slashExec(any(), "/personality none") }
+    }
+
+    // chat.slashExec returns command-level errors in its output string (only transport failures
+    // throw), so a gateway rejection of an unknown persona must surface as an error, not silently
+    // set active — otherwise the UI would show a persona as applied when the gateway refused it.
+    @Test fun setPersona_rejection_surfaces_error_and_does_not_set_active() = runTest {
+        coEvery { chatRepo.slashExec(any(), any()) } returns "unknown personality: x"
+        val vm = buildVm()
+        vm.setPersona("bad"); advanceUntilIdle()
+
+        assertTrue("a gateway rejection must surface a persona error", vm.personaUi.value.error != null)
+        assertEquals(null, vm.personaUi.value.active)
     }
 }

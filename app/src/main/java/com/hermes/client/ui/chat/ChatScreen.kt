@@ -112,6 +112,8 @@ fun ChatScreen(
     val speaking by vm.speaking.collectAsStateWithLifecycle()
     val savedPrompts by vm.savedPrompts.collectAsStateWithLifecycle()
     var showPromptSheet by remember { mutableStateOf(false) }
+    val personaUi by vm.personaUi.collectAsStateWithLifecycle()
+    var showPersonaSheet by remember { mutableStateOf(false) }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { vm.stopReading() } }
     var draft by remember { mutableStateOf("") }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
@@ -316,6 +318,14 @@ fun ChatScreen(
                                         }
                                     }
                                     transcriptMenu = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Persona") },
+                                onClick = {
+                                    transcriptMenu = false
+                                    vm.loadPersonas()
+                                    showPersonaSheet = true
                                 },
                             )
                         }
@@ -620,6 +630,15 @@ fun ChatScreen(
                 }
             }
         }
+    }
+
+    if (showPersonaSheet) {
+        PersonaSheet(
+            ui = personaUi,
+            onPick = { vm.setPersona(it) },
+            onRetry = { vm.loadPersonas() },
+            onDismiss = { showPersonaSheet = false },
+        )
     }
 }
 
