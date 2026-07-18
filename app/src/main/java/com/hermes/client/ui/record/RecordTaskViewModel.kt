@@ -78,30 +78,49 @@ class RecordTaskViewModel(
     // (async, IO-dispatched) work has a chance to write a stale phase over IDLE.
     private var activeJob: Job? = null
 
+    // Tracks the in-flight recorder.start() coroutine so stopAndTranscribe() can wait for it to
+    // finish before calling recorder.stop() - otherwise a stop() that lands during the start
+    // window could run before start() ever executed, stranding the recorder state.
+    private var startJob: Job? = null
+
     fun startRecording() {
         if (_ui.value.phase != RecordPhase.IDLE) return
-        activeJob = viewModelScope.launch {
+        // Set RECORDING synchronously (not after the IO hop) so a stop tap that races the start
+        // call sees the correct phase immediately instead of IDLE.
+        _ui.value = RecordUi(RecordPhase.RECORDING)
+        startJob = viewModelScope.launch {
             try {
                 withContext(ioDispatcher) { recorder.start() }
-                _ui.value = RecordUi(RecordPhase.RECORDING)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _ui.value = RecordUi(RecordPhase.IDLE, error = "Couldn't start recording")
             }
         }
+        activeJob = startJob
     }
 
     fun stopAndTranscribe() {
+        // Guards both a double stop-tap (second call sees TRANSCRIBING/IDLE, not RECORDING) and
+        // a stop with nothing recording. TRANSCRIBING is set synchronously below so a
+        // back-to-back second call is rejected here even before the first call's coroutine runs.
+        if (_ui.value.phase != RecordPhase.RECORDING) return
+        _ui.value = RecordUi(RecordPhase.TRANSCRIBING)
         activeJob = viewModelScope.launch {
             try {
-                val clip = withContext(ioDispatcher) { recorder.stop() }
-                if (clip == null) {
+                // Never let stop() precede a still-running start() - wait for it first.
+                startJob?.join()
+                // Recorder stop + base64 encoding are both blocking/CPU work; keep them off Main.
+                val encoded = withContext(ioDispatcher) {
+                    val clip = recorder.stop()
+                    clip?.let { audioDataUrl(it.bytes, it.mime) to it.mime }
+                }
+                if (encoded == null) {
                     _ui.value = RecordUi(RecordPhase.IDLE, error = "Nothing recorded")
                     return@launch
                 }
-                _ui.value = RecordUi(RecordPhase.TRANSCRIBING)
-                val text = transcribe(audioDataUrl(clip.bytes, clip.mime), clip.mime).trim()
+                val (dataUrl, mime) = encoded
+                val text = transcribe(dataUrl, mime).trim()
                 if (text.isBlank()) {
                     _ui.value = RecordUi(RecordPhase.IDLE, error = "Couldn't transcribe that")
                     return@launch

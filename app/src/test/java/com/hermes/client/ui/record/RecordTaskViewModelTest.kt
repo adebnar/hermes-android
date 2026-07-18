@@ -101,4 +101,26 @@ class RecordTaskViewModelTest {
         assertEquals(true, rec.cancelled)
         assertEquals(RecordPhase.IDLE, model.ui.value.phase)
     }
+
+    @Test fun double_stop_does_not_clobber_transcribing() = runTest {
+        val nav = mutableListOf<String>()
+        var sessionCount = 0
+        val model = vm(
+            FakeRecorder(Recording(byteArrayOf(1, 2, 3), "audio/mp4")),
+            transcribe = { _, _ -> "book the flight" },
+            createSession = { sessionCount++; "sess-1" },
+        )
+        val job = CoroutineScope(dispatcher).launch { model.navigateTo.collect { nav.add(it) } }
+        model.startRecording()
+        // Two stop taps back-to-back, before the scheduler runs either coroutine body: the
+        // second call must be rejected by the synchronous TRANSCRIBING guard, not race the first.
+        model.stopAndTranscribe()
+        model.stopAndTranscribe()
+        advanceUntilIdle()
+        assertEquals(1, sessionCount)
+        assertEquals(listOf("sess-1"), nav)
+        assertEquals(RecordPhase.IDLE, model.ui.value.phase)
+        assertNull(model.ui.value.error)
+        job.cancel()
+    }
 }
