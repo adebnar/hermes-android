@@ -292,6 +292,22 @@ class HermesRestApi(
         }
     }
 
+    /**
+     * Transcribe a recorded voice note. [dataUrl] is a base64 data URL (data:<mime>;base64,<b64>)
+     * the gateway's POST /api/audio/transcribe accepts; returns the trimmed transcript ("" if the
+     * STT backend returned nothing). Throws HermesApiException on a non-2xx (e.g. no STT configured).
+     */
+    suspend fun transcribe(dataUrl: String, mimeType: String): String = withContext(Dispatchers.IO) {
+        val obj = buildJsonObject { put("data_url", dataUrl); put("mime_type", mimeType) }
+        val payload = json.encodeToString(JsonObject.serializer(), obj)
+            .toRequestBody("application/json".toMediaType())
+        okHttp.newCall(builder("/api/audio/transcribe").post(payload).build()).execute().use { resp ->
+            val body = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw HermesApiException(resp.code, "transcription failed")
+            json.decodeFromString<JsonObject>(body)["transcript"]?.jsonPrimitive?.content?.trim() ?: ""
+        }
+    }
+
     suspend fun skills(): List<SkillDto> = get("/api/skills")
 
     suspend fun toggleSkill(name: String, enabled: Boolean) = withContext(Dispatchers.IO) {
