@@ -70,6 +70,16 @@ class GatewayConnectionService : Service() {
         }
         lifecycleObserver = obs
         androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(obs)
+        // START_STICKY means Android can recreate this service headlessly (no UI ever launched),
+        // in which case ProfileManager._active is still the initial null — nothing but UI code
+        // ever calls refresh(). Seed it here so a bare-restart run's progress notification still
+        // gets the tenant name instead of falling back to a generic title. Non-blocking (launched,
+        // not awaited) and runCatching-wrapped: a gateway unreachable at boot must not crash the
+        // service. Skipped when a profile is already known so we don't redundantly refresh on
+        // every ordinary (UI-driven) start.
+        if (profiles.active.value == null) {
+            scope.launch { runCatching { profiles.refresh() } }
+        }
         // Track the latest prefs reactively so the event loop reads a cached value instead of
         // collecting DataStore per event. Started first so its replayed value is in place before
         // events arrive; also picks up mid-run toggles (e.g. approvals turned off).

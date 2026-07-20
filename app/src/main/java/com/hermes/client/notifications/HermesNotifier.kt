@@ -99,27 +99,13 @@ class HermesNotifier(private val context: Context) {
     }
 
     @androidx.annotation.RequiresApi(36)
-    private fun buildPromoted(spec: RunProgressSpec, accent: Int): Notification {
-        val style = Notification.ProgressStyle().setProgressIndeterminate(spec.indeterminate)
-        if (!spec.indeterminate) {
-            // ProgressStyle has no setProgressMax(): the bar's maximum is the SUM of its segment
-            // lengths, so one segment of `total` gives a bar of exactly that length.
-            style.addProgressSegment(Notification.ProgressStyle.Segment(spec.total).setColor(accent))
-            style.setProgress(spec.done)
-        }
-        val b = Notification.Builder(context, Notif.CHANNEL_RUN_PROGRESS)
-            .setSmallIcon(R.drawable.ic_stat_hermes)
-            .setContentTitle(spec.title)
-            .setContentText(spec.body)
-            .setStyle(style)
-            .setOngoing(true)
-            .setColor(accent)
-            .setContentIntent(openIntent(spec.route, RUN_PROGRESS_NOTIFICATION_ID))
-        // Status-bar chip text on a promoted notification. The system decides promotion itself
-        // (Notification.FLAG_PROMOTED_ONGOING); there is no request API to call.
-        spec.shortText?.let { b.setShortCriticalText(it) }
-        return b.build()
-    }
+    private fun buildPromoted(spec: RunProgressSpec, accent: Int): Notification =
+        Api36RunProgressBuilder.build(
+            context = context,
+            spec = spec,
+            accent = accent,
+            contentIntent = openIntent(spec.route, RUN_PROGRESS_NOTIFICATION_ID),
+        )
 
     private fun buildCompat(spec: RunProgressSpec, accent: Int): Notification =
         NotificationCompat.Builder(context, Notif.CHANNEL_RUN_PROGRESS)
@@ -177,5 +163,37 @@ class HermesNotifier(private val context: Context) {
         // Distinct from SERVICE_NOTIFICATION_ID (1001) and from toNotificationSpec's 1002
         // collision fallback, so the ongoing progress notification can never clobber either.
         const val RUN_PROGRESS_NOTIFICATION_ID = 1003
+    }
+}
+
+/**
+ * Isolates the API-36-only `Notification.ProgressStyle` construction in its own class so that
+ * [HermesNotifier]'s own method bodies never name an API-36 type. ART verifies dex classes
+ * lazily and per-class, so this is defensive hardening against class-verification issues rather
+ * than a behaviour change — [HermesNotifier.buildPromoted] only reaches this class from behind
+ * the existing `Build.VERSION.SDK_INT >= 36` guard.
+ */
+@androidx.annotation.RequiresApi(36)
+private object Api36RunProgressBuilder {
+    fun build(context: Context, spec: RunProgressSpec, accent: Int, contentIntent: PendingIntent): Notification {
+        val style = Notification.ProgressStyle().setProgressIndeterminate(spec.indeterminate)
+        if (!spec.indeterminate) {
+            // ProgressStyle has no setProgressMax(): the bar's maximum is the SUM of its segment
+            // lengths, so one segment of `total` gives a bar of exactly that length.
+            style.addProgressSegment(Notification.ProgressStyle.Segment(spec.total).setColor(accent))
+            style.setProgress(spec.done)
+        }
+        val b = Notification.Builder(context, Notif.CHANNEL_RUN_PROGRESS)
+            .setSmallIcon(R.drawable.ic_stat_hermes)
+            .setContentTitle(spec.title)
+            .setContentText(spec.body)
+            .setStyle(style)
+            .setOngoing(true)
+            .setColor(accent)
+            .setContentIntent(contentIntent)
+        // Status-bar chip text on a promoted notification. The system decides promotion itself
+        // (Notification.FLAG_PROMOTED_ONGOING); there is no request API to call.
+        spec.shortText?.let { b.setShortCriticalText(it) }
+        return b.build()
     }
 }

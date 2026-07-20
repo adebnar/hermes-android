@@ -56,7 +56,8 @@ internal fun ServerEvent.todoCounts(): Pair<Int, Int> {
     var done = 0
     var total = 0
     for (el in arr) {
-        val status = ((el as? JsonObject)?.get("status") as? JsonPrimitive)?.content?.lowercase()
+        val obj = el as? JsonObject ?: continue
+        val status = (obj["status"] as? JsonPrimitive)?.content?.lowercase()
         if (status == "cancelled") continue
         total++
         if (status == "completed") done++

@@ -128,6 +128,24 @@ class RunProgressTest {
         assertEquals(1, s.total)
     }
 
+    @Test fun junk_array_elements_are_excluded_from_both_counters() {
+        var s = RunProgress().reduce(ev("message.start"), "acme")
+        s = s.reduce(
+            ev("tool.complete") {
+                put("name", "todo")
+                putJsonArray("todos") {
+                    addJsonObject { put("id", "1"); put("content", "task 1"); put("status", "completed") }
+                    add(kotlinx.serialization.json.JsonPrimitive("not-an-object"))
+                    add(kotlinx.serialization.json.JsonNull)
+                    addJsonObject { put("id", "2"); put("content", "task 2"); put("status", "pending") }
+                }
+            },
+            "acme",
+        )
+        assertEquals(1, s.done)
+        assertEquals(2, s.total)
+    }
+
     @Test fun non_todo_tool_complete_clears_the_tool_without_touching_counts() {
         var s = RunProgress().reduce(ev("message.start"), "acme")
         s = s.reduce(todoEvent("completed", "pending"), "acme")
