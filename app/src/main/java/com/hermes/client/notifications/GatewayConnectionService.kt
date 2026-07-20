@@ -91,15 +91,17 @@ class GatewayConnectionService : Service() {
 
     /** Folds the event into run state and posts/cancels the progress notification on change. */
     private fun updateRunProgress(event: com.hermes.client.data.network.ServerEvent) {
-        runProgress = runProgress.reduce(event)
-        // Single read: profiles.active.value is used for both the spec derivation and the post
-        // call below, so a profile switch landing between two separate reads can't split a
-        // notification's title/route from its accent colour across two different tenants.
+        // Single read: profiles.active.value feeds the reducer, which latches it into the run
+        // itself (RunProgress.profile). The spec and the post call below both derive their tenant
+        // from that latched value rather than re-reading profiles.active.value, so a profile
+        // switch landing mid-run can never split a notification's title/route from its accent
+        // colour across two different tenants — see RunProgress.reduce's kdoc.
         val activeProfile = profiles.active.value
-        val spec = runProgress.toSpec(activeProfile, latestPrefs)
+        runProgress = runProgress.reduce(event, activeProfile)
+        val spec = runProgress.toSpec(latestPrefs)
         if (spec == lastRunSpec) return
         lastRunSpec = spec
-        if (spec != null) notifier.postRunProgress(spec, activeProfile)
+        if (spec != null) notifier.postRunProgress(spec, runProgress.profile)
         else notifier.cancelRunProgress()
     }
 
