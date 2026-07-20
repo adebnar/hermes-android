@@ -25,7 +25,10 @@ class GatewayConnectionService : Service() {
     @Inject lateinit var notifier: HermesNotifier
     @Inject lateinit var profiles: com.hermes.client.data.repository.ProfileManager
 
-    private val scope = CoroutineScope(SupervisorJob())
+    // Held separately (not just scope.coroutineContext[Job]) so onDestroy can register an
+    // invokeOnCompletion callback on it directly — see onDestroy for why.
+    private val job = SupervisorJob()
+    private val scope = CoroutineScope(job)
 
     // Latest notification prefs, kept current by a collector so the hot event loop never blocks on
     // DataStore. @Volatile for cross-thread visibility (scope has no single-thread dispatcher).
@@ -89,10 +92,14 @@ class GatewayConnectionService : Service() {
     /** Folds the event into run state and posts/cancels the progress notification on change. */
     private fun updateRunProgress(event: com.hermes.client.data.network.ServerEvent) {
         runProgress = runProgress.reduce(event)
-        val spec = runProgress.toSpec(profiles.active.value, latestPrefs)
+        // Single read: profiles.active.value is used for both the spec derivation and the post
+        // call below, so a profile switch landing between two separate reads can't split a
+        // notification's title/route from its accent colour across two different tenants.
+        val activeProfile = profiles.active.value
+        val spec = runProgress.toSpec(activeProfile, latestPrefs)
         if (spec == lastRunSpec) return
         lastRunSpec = spec
-        if (spec != null) notifier.postRunProgress(spec, profiles.active.value)
+        if (spec != null) notifier.postRunProgress(spec, activeProfile)
         else notifier.cancelRunProgress()
     }
 
@@ -109,9 +116,16 @@ class GatewayConnectionService : Service() {
     }
 
     override fun onDestroy() {
+        // A stopped service must never strand an ongoing "running" notification. scope.cancel()
+        // is cooperative: it does not preempt a collector iteration already executing
+        // synchronously, so if the collector is mid-lambda when we get here it can still call
+        // notifier.postRunProgress(...) after this function returns, with no ordering guarantee
+        // against a cancelRunProgress() called from here directly. Hanging the final cancel off
+        // the Job's actual completion — rather than off the cancel() call itself — guarantees it
+        // runs strictly after every child coroutine (including any such in-flight iteration) has
+        // finished, so no post can ever win the race.
+        job.invokeOnCompletion { notifier.cancelRunProgress() }
         scope.cancel()
-        // A stopped service must never strand an ongoing "running" notification.
-        notifier.cancelRunProgress()
         // onDestroy() runs on the main thread — remove the observer synchronously so this Service
         // instance isn't retained (and no event can hit a defunct instance in a deferred window).
         lifecycleObserver?.let { androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.removeObserver(it) }
