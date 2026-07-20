@@ -5,6 +5,7 @@ data class NotificationPrefs(
     val enabled: Boolean = false,
     val approvals: Boolean = true,
     val runFinished: Boolean = true,
+    val runProgress: Boolean = true,
 )
 
 /**
@@ -30,11 +31,30 @@ data class NotificationSpec(
     val groupKey: String,
 )
 
+/**
+ * A platform-independent description of the live run-progress notification, so mapping stays
+ * unit-testable. [indeterminate] means no todo counts are available yet; [shortText] is the
+ * status-bar chip text used on API 36+ promoted notifications (null when indeterminate).
+ */
+data class RunProgressSpec(
+    val title: String,
+    val body: String,
+    val done: Int,
+    val total: Int,
+    val indeterminate: Boolean,
+    val route: String?,
+    val shortText: String?,
+)
+
 /** Channel ids, gateway event-type strings, and action names in one place. */
 object Notif {
     const val CHANNEL_APPROVALS = "approvals"
     const val CHANNEL_SERVICE = "service"
     const val CHANNEL_ACTIVITY = "activity"
+    // Live in-flight run progress. IMPORTANCE_LOW (not MIN like CHANNEL_SERVICE) so the ongoing
+    // progress notification is actually glanceable in the shade and eligible for promotion to a
+    // status-bar Live Update on API 36+, while still making no sound.
+    const val CHANNEL_RUN_PROGRESS = "run_progress"
 
     // Notifiable events on the app's WebSocket (/api/ws), verified against the gateway source:
     //  - approval.request / clarify.request -> the agent needs the user (always notify)
@@ -48,6 +68,12 @@ object Notif {
     const val EVENT_CLARIFY = "clarify.request"
     const val EVENT_MESSAGE_COMPLETE = "message.complete"
     const val EVENT_ERROR = "error"
+    // Run-lifecycle events consumed by the run-progress reducer (not by toNotificationSpec).
+    // `session.info` carries "running": bool and is the authoritative busy/idle backstop.
+    const val EVENT_MESSAGE_START = "message.start"
+    const val EVENT_TOOL_START = "tool.start"
+    const val EVENT_TOOL_COMPLETE = "tool.complete"
+    const val EVENT_SESSION_INFO = "session.info"
 
     const val ACTION_ALLOW_ONCE = "allow_once"
     const val ACTION_ALLOW_SESSION = "allow_session"

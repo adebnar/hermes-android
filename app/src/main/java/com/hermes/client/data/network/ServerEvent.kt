@@ -43,3 +43,24 @@ internal fun ServerEvent.bool(key: String): Boolean? =
 
 internal fun ServerEvent.strList(key: String): List<String> =
     (payload[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: emptyList()
+
+/**
+ * Counts todo items from a `tool.complete` payload's `todos` array (gateway sends the full list
+ * as `{id, content, status}` objects). `done` counts `completed`; `total` counts every item that
+ * is NOT `cancelled` — a cancelled task never completes, so including it would stall the progress
+ * bar below 100% forever. Defensive like [str]: a malformed or absent payload yields 0 to 0
+ * rather than throwing, because a throw here would escape the event collector.
+ */
+internal fun ServerEvent.todoCounts(): Pair<Int, Int> {
+    val arr = payload["todos"] as? JsonArray ?: return 0 to 0
+    var done = 0
+    var total = 0
+    for (el in arr) {
+        val obj = el as? JsonObject ?: continue
+        val status = (obj["status"] as? JsonPrimitive)?.content?.lowercase()
+        if (status == "cancelled") continue
+        total++
+        if (status == "completed") done++
+    }
+    return done to total
+}

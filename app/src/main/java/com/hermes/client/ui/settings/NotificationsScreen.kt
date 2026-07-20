@@ -47,6 +47,7 @@ class NotificationsViewModel @Inject constructor(
     fun setEnabled(v: Boolean) = viewModelScope.launch { settings.setEnabled(v) }
     fun setApprovals(v: Boolean) = viewModelScope.launch { settings.setApprovals(v) }
     fun setRunFinished(v: Boolean) = viewModelScope.launch { settings.setRunFinished(v) }
+    fun setRunProgress(v: Boolean) = viewModelScope.launch { settings.setRunProgress(v) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,6 +101,13 @@ fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = hiltVie
                 prefs.runFinished,
                 enabled = prefs.enabled,
             ) { vm.setRunFinished(it) }
+            HorizontalDivider()
+            ToggleRow(
+                "Live run progress",
+                "Show an ongoing notification with live progress while an agent run is in flight",
+                prefs.runProgress,
+                enabled = prefs.enabled,
+            ) { vm.setRunProgress(it) }
         }
     }
 }
