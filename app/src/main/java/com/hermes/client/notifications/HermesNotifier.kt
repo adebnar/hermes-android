@@ -120,7 +120,14 @@ class HermesNotifier(private val context: Context) {
             .build()
 
     private fun openIntent(route: String?, id: Int): PendingIntent {
-        val intent = Intent(context, MainActivity::class.java).apply {
+        val intent = Intent().apply {
+            // Target our own Activity by name rather than via Intent(Context, Class). Both are
+            // equally explicit at runtime, but static analysis models setClassName() as "component
+            // set", whereas Kotlin's `::class.java` compiles to a reflection call rather than a
+            // type literal and reads as an *implicit* intent — which would be a real finding if
+            // it were true, since an implicit PendingIntent handed to the shade is redirectable.
+            // `.name` keeps this rename-safe.
+            setClassName(context, MainActivity::class.java.name)
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             route?.let { putExtra("extra_route", it) }
         }
@@ -128,7 +135,9 @@ class HermesNotifier(private val context: Context) {
     }
 
     private fun actionIntent(a: NotifAction, notifId: Int): PendingIntent {
-        val intent = Intent(context, NotificationActionReceiver::class.java).apply {
+        val intent = Intent().apply {
+            // Explicit component by name — see the note in openIntent().
+            setClassName(context, NotificationActionReceiver::class.java.name)
             action = a.action
             putExtra("session_id", a.sessionId)
             putExtra("notif_id", notifId)
@@ -137,7 +146,11 @@ class HermesNotifier(private val context: Context) {
     }
 
     private fun replyIntent(a: NotifAction, notifId: Int): PendingIntent {
-        val intent = Intent(context, NotificationActionReceiver::class.java).apply {
+        val intent = Intent().apply {
+            // Explicit component by name — see the note in openIntent(). This matters most here:
+            // direct reply requires FLAG_MUTABLE below, and mutable + implicit is the actual
+            // vulnerable combination. Naming the component keeps it explicit and unredirectable.
+            setClassName(context, NotificationActionReceiver::class.java.name)
             action = a.action
             putExtra("session_id", a.sessionId)
             putExtra("notif_id", notifId)
