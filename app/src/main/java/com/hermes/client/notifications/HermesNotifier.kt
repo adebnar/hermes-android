@@ -120,17 +120,15 @@ class HermesNotifier(private val context: Context) {
             .build()
 
     private fun openIntent(route: String?, id: Int): PendingIntent {
-        val intent = Intent().apply {
-            // Target our own Activity by name rather than via Intent(Context, Class). Both are
-            // equally explicit at runtime, but static analysis models setClassName() as "component
-            // set", whereas Kotlin's `::class.java` compiles to a reflection call rather than a
-            // type literal and reads as an *implicit* intent — which would be a real finding if
-            // it were true, since an implicit PendingIntent handed to the shade is redirectable.
-            // `.name` keeps this rename-safe.
-            setClassName(context, MainActivity::class.java.name)
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            route?.let { putExtra("extra_route", it) }
-        }
+        // Built with direct calls on the variable rather than inside an `apply { }` block, and
+        // targeted by class name rather than via Intent(Context, Class). All forms are equally
+        // explicit at runtime, but this is the one static analysis reliably attributes to the
+        // intent — an implicit PendingIntent handed to the notification shade IS redirectable,
+        // so it is worth making the component unmistakable. `.name` keeps it rename-safe.
+        val intent = Intent()
+        intent.setClassName(context, MainActivity::class.java.name)
+        intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        route?.let { intent.putExtra("extra_route", it) }
         // Flags spelled out at the creation site rather than via a helper: static analysis
         // constant-folds a literal here, but not a value returned from a function, and an
         // unprovable FLAG_IMMUTABLE reads as a mutable PendingIntent.
@@ -143,13 +141,12 @@ class HermesNotifier(private val context: Context) {
     }
 
     private fun actionIntent(a: NotifAction, notifId: Int): PendingIntent {
-        val intent = Intent().apply {
-            // Explicit component by name — see the note in openIntent().
-            setClassName(context, NotificationActionReceiver::class.java.name)
-            action = a.action
-            putExtra("session_id", a.sessionId)
-            putExtra("notif_id", notifId)
-        }
+        // Direct calls, explicit component — see the note in openIntent().
+        val intent = Intent()
+        intent.setClassName(context, NotificationActionReceiver::class.java.name)
+        intent.action = a.action
+        intent.putExtra("session_id", a.sessionId)
+        intent.putExtra("notif_id", notifId)
         // Flags inline — see the note in openIntent().
         return PendingIntent.getBroadcast(
             context,
@@ -160,16 +157,15 @@ class HermesNotifier(private val context: Context) {
     }
 
     private fun replyIntent(a: NotifAction, notifId: Int): PendingIntent {
-        val intent = Intent().apply {
-            // Explicit component by name — see the note in openIntent(). This matters most here:
-            // direct reply requires FLAG_MUTABLE below, and mutable + implicit is the actual
-            // vulnerable combination. Naming the component keeps it explicit and unredirectable.
-            setClassName(context, NotificationActionReceiver::class.java.name)
-            action = a.action
-            putExtra("session_id", a.sessionId)
-            putExtra("notif_id", notifId)
-            putExtra("request_id", a.requestId.orEmpty())
-        }
+        // Direct calls, explicit component — see the note in openIntent(). This matters most
+        // here: direct reply requires FLAG_MUTABLE below, and mutable + implicit is the actually
+        // vulnerable combination. Naming the component keeps it explicit and unredirectable.
+        val intent = Intent()
+        intent.setClassName(context, NotificationActionReceiver::class.java.name)
+        intent.action = a.action
+        intent.putExtra("session_id", a.sessionId)
+        intent.putExtra("notif_id", notifId)
+        intent.putExtra("request_id", a.requestId.orEmpty())
         // Direct-reply requires FLAG_MUTABLE so the system can attach the RemoteInput results.
         // The intent is explicit (our own receiver), so it can't be redirected — mutability is safe.
         return PendingIntent.getBroadcast(
