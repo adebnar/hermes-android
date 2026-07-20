@@ -131,7 +131,15 @@ class HermesNotifier(private val context: Context) {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             route?.let { putExtra("extra_route", it) }
         }
-        return PendingIntent.getActivity(context, id, intent, pendingFlags())
+        // Flags spelled out at the creation site rather than via a helper: static analysis
+        // constant-folds a literal here, but not a value returned from a function, and an
+        // unprovable FLAG_IMMUTABLE reads as a mutable PendingIntent.
+        return PendingIntent.getActivity(
+            context,
+            id,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun actionIntent(a: NotifAction, notifId: Int): PendingIntent {
@@ -142,7 +150,13 @@ class HermesNotifier(private val context: Context) {
             putExtra("session_id", a.sessionId)
             putExtra("notif_id", notifId)
         }
-        return PendingIntent.getBroadcast(context, (a.action + a.sessionId).hashCode(), intent, pendingFlags())
+        // Flags inline — see the note in openIntent().
+        return PendingIntent.getBroadcast(
+            context,
+            (a.action + a.sessionId).hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun replyIntent(a: NotifAction, notifId: Int): PendingIntent {
@@ -168,7 +182,6 @@ class HermesNotifier(private val context: Context) {
         )
     }
 
-    private fun pendingFlags() = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
     companion object {
         const val SERVICE_NOTIFICATION_ID = 1001
