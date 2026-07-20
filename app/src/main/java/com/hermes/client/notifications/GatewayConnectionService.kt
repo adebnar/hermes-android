@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import com.hermes.client.data.network.HermesGatewayClient
+import com.hermes.client.data.progress.reduce
 import com.hermes.client.data.repository.NotificationSettings
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -22,8 +23,12 @@ class GatewayConnectionService : Service() {
     @Inject lateinit var client: HermesGatewayClient
     @Inject lateinit var settings: NotificationSettings
     @Inject lateinit var notifier: HermesNotifier
+    @Inject lateinit var profiles: com.hermes.client.data.repository.ProfileManager
 
-    private val scope = CoroutineScope(SupervisorJob())
+    // Held separately (not just scope.coroutineContext[Job]) so onDestroy can register an
+    // invokeOnCompletion callback on it directly — see onDestroy for why.
+    private val job = SupervisorJob()
+    private val scope = CoroutineScope(job)
 
     // Latest notification prefs, kept current by a collector so the hot event loop never blocks on
     // DataStore. @Volatile for cross-thread visibility (scope has no single-thread dispatcher).
@@ -34,6 +39,15 @@ class GatewayConnectionService : Service() {
     // already looking at. @Volatile for cross-thread visibility (scope has no single-thread
     // dispatcher).
     @Volatile private var appInForeground = false
+
+    // Live run state, folded from the same event stream. @Volatile for the same reason as the
+    // fields above: the collector scope has no single-thread dispatcher.
+    @Volatile private var runProgress = com.hermes.client.data.progress.RunProgress()
+
+    // Last spec actually posted. message.delta fires many times per second and does not change
+    // the spec, so re-posting on every event would burn cycles and visibly flicker the
+    // notification. Only act when the derived spec actually changes.
+    @Volatile private var lastRunSpec: RunProgressSpec? = null
 
     // ProcessLifecycleOwner is a process-lifetime singleton; hold the observer so onDestroy can
     // remove it — otherwise each stop/start of this service (e.g. toggling notifications) would
@@ -66,6 +80,7 @@ class GatewayConnectionService : Service() {
                 // ChatViewModel's reduce() uses around event handling.
                 runCatching {
                     toNotificationSpec(event, latestPrefs, appInForeground)?.let { notifier.post(it) }
+                    updateRunProgress(event)
                 }
             }
         }
@@ -73,6 +88,22 @@ class GatewayConnectionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /** Folds the event into run state and posts/cancels the progress notification on change. */
+    private fun updateRunProgress(event: com.hermes.client.data.network.ServerEvent) {
+        // Single read: profiles.active.value feeds the reducer, which latches it into the run
+        // itself (RunProgress.profile). The spec and the post call below both derive their tenant
+        // from that latched value rather than re-reading profiles.active.value, so a profile
+        // switch landing mid-run can never split a notification's title/route from its accent
+        // colour across two different tenants — see RunProgress.reduce's kdoc.
+        val activeProfile = profiles.active.value
+        runProgress = runProgress.reduce(event, activeProfile)
+        val spec = runProgress.toSpec(latestPrefs)
+        if (spec == lastRunSpec) return
+        lastRunSpec = spec
+        if (spec != null) notifier.postRunProgress(spec, runProgress.profile)
+        else notifier.cancelRunProgress()
+    }
 
     // Android 15+ (API 35) caps a dataSync foreground service at ~6h and calls this instead of
     // just killing the process; Android 16 (API 36) added a fgsType-aware overload. Implement
@@ -87,6 +118,15 @@ class GatewayConnectionService : Service() {
     }
 
     override fun onDestroy() {
+        // A stopped service must never strand an ongoing "running" notification. scope.cancel()
+        // is cooperative: it does not preempt a collector iteration already executing
+        // synchronously, so if the collector is mid-lambda when we get here it can still call
+        // notifier.postRunProgress(...) after this function returns, with no ordering guarantee
+        // against a cancelRunProgress() called from here directly. Hanging the final cancel off
+        // the Job's actual completion — rather than off the cancel() call itself — guarantees it
+        // runs strictly after every child coroutine (including any such in-flight iteration) has
+        // finished, so no post can ever win the race.
+        job.invokeOnCompletion { notifier.cancelRunProgress() }
         scope.cancel()
         // onDestroy() runs on the main thread — remove the observer synchronously so this Service
         // instance isn't retained (and no event can hit a defunct instance in a deferred window).

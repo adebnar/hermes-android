@@ -18,9 +18,10 @@ fun toNotificationSpec(event: ServerEvent, prefs: NotificationPrefs, appInForegr
     if (!prefs.enabled) return null
     val sid = event.sessionId ?: return null
     var id = (event.type + sid).hashCode()
-    // Never collide with HermesNotifier.SERVICE_NOTIFICATION_ID (1001) — that id belongs to the
-    // ongoing foreground-service notification, and notify()-ing over it would clobber it.
-    if (id == 1001) id = 1002
+    // Never collide with HermesNotifier.SERVICE_NOTIFICATION_ID (1001) or the run-progress
+    // notification id (1003) — those ids belong to the ongoing foreground-service notification
+    // and the live run-progress notification, and notify()-ing over either would clobber it.
+    if (id == 1001 || id == 1003) id = 1002
     return when (event.type) {
         Notif.EVENT_APPROVAL -> if (!prefs.approvals) null else {
             val elevated = tierFor(event.bool("allow_permanent") ?: false) == ApprovalTier.ELEVATED
