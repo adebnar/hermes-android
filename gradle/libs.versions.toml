@@ -8,7 +8,7 @@
 #    Dagger 2.57+) kotlin-metadata-jvm on the Hilt processor classpath in app/build.gradle.kts.
 agp = "9.1.0"
 kotlin = "2.3.10"
-ksp = "2.3.10"
+ksp = "2.3.11"
 coreKtx = "1.16.0"
 lifecycle = "2.11.0"
 activityCompose = "1.13.0"
